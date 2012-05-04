@@ -1,0 +1,29 @@
+== Direct uploader architecture ==
+
+Several parallel processes:
+
+Process 1 (tree builder):
+  Walk through directory tree hashing files and directories.
+  Skip over files and directories thare are marked as already backed up.
+  Pass names and hashes of files and directories that may be new onto process 2
+  along with messages indicating to 'mark tree X as fully stored' (after
+  all blobs comprising the tree have been passed).
+  When an entire named tree (identified by a path given by the user, which there
+  might be several) has been identified, pass the identifier to process 4.
+  Send DONE marker to processes 2 and 4 and exit.
+
+Process 2 (uploaded checker):
+  For each hashed blob, ask the server if it has it already.
+  Pass the hashes that the server does not already have on to process 3,
+  along with 'mark tree X as fully stored' as completed messages.
+  When the DONE message is received, pass it on to process 3 and exit.
+
+Process 3 (uploader):
+  Upload blobs passed from process 2 and act on 'mark tree X as fully stored'
+  messages.  Exit when the DONE message is received, exit.
+
+Process 4 (root logger):
+  Write root paths + identifiers to log file.
+  Exit when DONE marker is received.
+
+Main program kicks off all processes and waits for them all to exit.
