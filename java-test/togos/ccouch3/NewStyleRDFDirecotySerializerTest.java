@@ -14,7 +14,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 {
 	NewStyleRDFDirectorySerializer serializer = new NewStyleRDFDirectorySerializer();
 	
-	protected void assertSerializesTo( String expected, Collection<FileInfo> entries ) {
+	protected void assertSerializesTo( String expected, Collection<DirectoryEntry> entries ) {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		try {
 			serializer.serialize( entries, baos );
@@ -26,7 +26,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 		}
 	}
 	
-	protected void assertSerializesTo( String expected, FileInfo[] entries ) {
+	protected void assertSerializesTo( String expected, DirectoryEntry[] entries ) {
 		assertSerializesTo( expected, Arrays.asList(entries) );
 	}
 	
@@ -43,8 +43,8 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 		"</Directory>";
 	
 	public void testBlobEntry() {
-		assertSerializesTo( blobEntryString, new FileInfo[] {
-			new FileInfo("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FileInfo.FILETYPE_BLOB, -1, -1)
+		assertSerializesTo( blobEntryString, new DirectoryEntry[] {
+			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FileInfo.FILETYPE_BLOB, -1, -1)
 		} );
 	}
 	
@@ -79,11 +79,11 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 			"</Directory>";
 		
 	public void testMultiBlobEntry() {
-		assertSerializesTo( multiBlobEntryString, new FileInfo[] {
-			new FileInfo("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZF", FileInfo.FILETYPE_BLOB, -1, -1),
-			new FileInfo("goo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZG", FileInfo.FILETYPE_BLOB, -1, -1),
-			new FileInfo("boo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZB", FileInfo.FILETYPE_BLOB, -1, -1),
-			new FileInfo("doo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZD", FileInfo.FILETYPE_BLOB, -1, -1),
+		assertSerializesTo( multiBlobEntryString, new DirectoryEntry[] {
+			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZF", FileInfo.FILETYPE_BLOB, -1, -1),
+			new DirectoryEntry("goo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZG", FileInfo.FILETYPE_BLOB, -1, -1),
+			new DirectoryEntry("boo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZB", FileInfo.FILETYPE_BLOB, -1, -1),
+			new DirectoryEntry("doo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZD", FileInfo.FILETYPE_BLOB, -1, -1),
 		} );
 	}
 		
@@ -102,8 +102,8 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 		"</Directory>";
 	
 	public void testBlobWithSizeEntry() {
-		assertSerializesTo( blobWithSizeEntryString, new FileInfo[] {
-			new FileInfo("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FileInfo.FILETYPE_BLOB, 1234, -1)
+		assertSerializesTo( blobWithSizeEntryString, new DirectoryEntry[] {
+			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FileInfo.FILETYPE_BLOB, 1234, -1)
 		});
 	}
 	
@@ -123,8 +123,8 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 		"</Directory>";
 	
 	public void testBlobWithSizeAndMtimeEntry() throws ParseException {
-		assertSerializesTo( blobWithSizeAndMtimeEntryString, new FileInfo[] {
-			new FileInfo("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FileInfo.FILETYPE_BLOB, 1234, DateUtil.parseDate("2010-01-01 06:00:32 GMT").getTime())
+		assertSerializesTo( blobWithSizeAndMtimeEntryString, new DirectoryEntry[] {
+			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FileInfo.FILETYPE_BLOB, 1234, DateUtil.parseDate("2010-01-01 06:00:32 GMT").getTime())
 		});
 	}
 	
@@ -141,8 +141,8 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 		"</Directory>";
 	
 	public void testDirectoryEntry() throws ParseException {
-		assertSerializesTo( directoryEntryString, new FileInfo[] {
-			new FileInfo("2010-01", "x-rdf-subject:urn:sha1:AO6BBOUDVIXOV6PEDR7GM536K3WLO6ES", FileInfo.FILETYPE_DIRECTORY, 1234, DateUtil.parseDate("2010-01-01 06:00:32 GMT").getTime())
+		assertSerializesTo( directoryEntryString, new DirectoryEntry[] {
+			new DirectoryEntry("2010-01", "x-rdf-subject:urn:sha1:AO6BBOUDVIXOV6PEDR7GM536K3WLO6ES", FileInfo.FILETYPE_DIRECTORY, 1234, DateUtil.parseDate("2010-01-01 06:00:32 GMT").getTime())
 		});
 	}
 }

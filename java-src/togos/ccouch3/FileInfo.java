@@ -1,6 +1,6 @@
 package togos.ccouch3;
 
-public class FileInfo implements Comparable<FileInfo>
+public class FileInfo
 {
 	static final int FILETYPE_BLOB = 1;
 	static final int FILETYPE_DIRECTORY = 2;
@@ -18,9 +18,8 @@ public class FileInfo implements Comparable<FileInfo>
 		this.size     = size;
 		this.mtime    = mtime;
 	}
-	
-	@Override
-	public int compareTo(FileInfo o) {
-		return path.compareTo(o.path);
+
+	public FileInfo( FileInfo fileInfo ) {
+		this( fileInfo.path, fileInfo.urn, fileInfo.fileType, fileInfo.size, fileInfo.mtime );
 	}
 }

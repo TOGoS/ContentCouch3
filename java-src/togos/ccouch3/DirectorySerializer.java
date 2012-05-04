@@ -6,5 +6,5 @@ import java.util.Collection;
 
 public interface DirectorySerializer
 {
-	public void serialize( Collection<FileInfo> entries, OutputStream os ) throws IOException;
+	public void serialize( Collection<DirectoryEntry> entries, OutputStream os ) throws IOException;
 }

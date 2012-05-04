@@ -17,8 +17,8 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 	}
 	
 	@Override
-	public void serialize(Collection<FileInfo> entries, OutputStream os) throws IOException {
-		ArrayList<FileInfo> sortedEntries = new ArrayList<FileInfo>( entries );
+	public void serialize(Collection<DirectoryEntry> entries, OutputStream os) throws IOException {
+		ArrayList<DirectoryEntry> sortedEntries = new ArrayList<DirectoryEntry>( entries );
 		Collections.sort( sortedEntries );
 
 		boolean needBzNamespace = false, needDcNamespace = false;
