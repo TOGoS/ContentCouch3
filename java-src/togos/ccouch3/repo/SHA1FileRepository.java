@@ -3,6 +3,7 @@ package togos.ccouch3.repo;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Random;
@@ -48,7 +49,7 @@ public class SHA1FileRepository implements Repository
 		p.mkdirs();
 	}
 	
-	public void put(String urn, java.io.InputStream is) throws StoreException {
+	public void put(String urn, InputStream is) throws StoreException {
 		try {
 			if( !contains(urn) ) {
 				Matcher m = SHA1EXTRACTOR.matcher(urn); 
