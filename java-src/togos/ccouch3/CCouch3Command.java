@@ -1,16 +1,11 @@
 package togos.ccouch3;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
 import togos.ccouch3.FlowUploader.UploadTask;
-import togos.ccouch3.cmdstream.CmdWriter;
-import togos.ccouch3.cmdstream.CmdReader;
-import togos.ccouch3.repo.Repository;
-import togos.ccouch3.repo.SHA1FileRepository;
 
 public class CCouch3Command
 {
@@ -29,27 +24,6 @@ public class CCouch3Command
 		return 0;
 	}
 	
-	public int runCmdServer( List<String> args ) throws Exception {
-		String homeDir = System.getProperty("user.home");
-		if( homeDir == null ) homeDir = ".";
-		String repoDir = homeDir + "/.ccouch";
-		String sector = "cmd-server";
-		for( Iterator<String> argi=args.iterator(); argi.hasNext(); ) {
-			String arg = argi.next();
-			if( "-repo".equals(arg) ) {
-				repoDir = argi.next();
-			} else if( "-sector".equals(arg) ) {
-				sector = argi.next();
-			} else {
-				throw new RuntimeException("Error: Unrecognised cmd-server argument: " + arg);
-			}
-		}
-		Repository repo = new SHA1FileRepository( new File(repoDir + "/data"), sector);
-		CmdServer cs = new CmdServer(new CmdReader(System.in), new CmdWriter(System.out), repo);
-		cs.run();
-		return 0;
-	}
-	
 	static final <E> List<E> tail( List<E> l ) {
 		return l.subList( 1, l.size() );
 	}
@@ -64,7 +38,7 @@ public class CCouch3Command
 		if( "store".equals(cmd) ) {
 			return runStore(tail(args));
 		} else if( "cmd-server".equals(cmd) ) {
-			return runCmdServer(tail(args));
+			return CmdServer.run(tail(args));
 		} else {
 			System.err.println("Error: Unrecognised command: "+cmd);
 			return 1;

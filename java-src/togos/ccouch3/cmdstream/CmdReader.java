@@ -1,13 +1,15 @@
 package togos.ccouch3.cmdstream;
 
 import java.io.BufferedInputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CmdReader {
+public class CmdReader implements Closeable {
 	int chunkLeft = 0;
+	public String debugPrefix = null;
 	
 	protected final InputStream is;
 	public CmdReader( InputStream is ) {
@@ -55,9 +57,13 @@ public class CmdReader {
 	
 	final byte[] cmdBuffer = new byte[1024];
 	
+	protected static String unescape( String s ) {
+		return s.replace("%20", " ").replace("%25", "%");
+	}
+	
 	protected static void flushWord( StringBuilder sb, List<String> words ) {
 		if( sb.length() > 0 ) {
-			words.add(sb.toString());
+			words.add( unescape(sb.toString()) );
 			sb.setLength(0);
 		}
 	}
@@ -83,7 +89,9 @@ public class CmdReader {
 			}
 		}
 		flushWord( sb, words );
-		return words.toArray(new String[words.size()]);
+		String[] r = words.toArray(new String[words.size()]);
+		if( debugPrefix != null ) System.err.println( debugPrefix + CmdWriter.encode(r) );
+		return r;
 	}
 	
 	// chunk <size>
@@ -120,5 +128,10 @@ public class CmdReader {
 	
 	public InputStream getChunkInputStream() {
 		return new CmdChunkInputStream(this);
+	}
+	
+	@Override
+	public void close() throws IOException {
+		is.close();
 	}
 }
