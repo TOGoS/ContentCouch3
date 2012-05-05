@@ -117,4 +117,8 @@ public class CmdReader {
 		chunkLeft -= z;
 		return z;
 	}
+	
+	public InputStream getChunkInputStream() {
+		return new CmdChunkInputStream(this);
+	}
 }
