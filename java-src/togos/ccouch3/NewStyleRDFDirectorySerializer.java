@@ -34,9 +34,9 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 		if( needBzNamespace ) w.write(" xmlns:bz=\"http://bitzi.com/xmlns/2002/01/bz-core#\"");
 		if( needDcNamespace ) w.write(" xmlns:dc=\"http://purl.org/dc/terms/\"");
 		w.write(" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n");
-		w.write("\t<entries rdf:parsetype=\"Collection\">\n");
+		w.write("\t<entries rdf:parseType=\"Collection\">\n");
 		
-		for( FileInfo f : sortedEntries ) {
+		for( DirectoryEntry f : sortedEntries ) {
 			String tag;
 			boolean showSize, showMtime;
 			switch( f.fileType ) {
@@ -54,7 +54,7 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 			}
 			
 			w.write("\t\t<DirectoryEntry>\n");
-			w.write("\t\t\t<name>" + xmlEscapeText(f.path) + "</name>\n");
+			w.write("\t\t\t<name>" + xmlEscapeText(f.name) + "</name>\n");
 			w.write("\t\t\t<target>\n");
 			w.write("\t\t\t\t<" + tag + " rdf:about=\"" + xmlEscapeText(f.urn) + "\"");
 			if( showSize ) {
@@ -71,7 +71,7 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 			w.write("\t\t</DirectoryEntry>\n");
 		}
 		w.write("\t</entries>\n");
-		w.write("</Directory>");
+		w.write("</Directory>\n");
 		w.flush();
 	}
 }

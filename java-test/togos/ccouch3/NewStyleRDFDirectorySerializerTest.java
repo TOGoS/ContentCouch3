@@ -10,7 +10,7 @@ import java.util.Collection;
 import junit.framework.TestCase;
 import togos.ccouch3.util.DateUtil;
 
-public class NewStyleRDFDirecotySerializerTest extends TestCase
+public class NewStyleRDFDirectorySerializerTest extends TestCase
 {
 	NewStyleRDFDirectorySerializer serializer = new NewStyleRDFDirectorySerializer();
 	
@@ -32,7 +32,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 	
 	protected static final String blobEntryString =
 		"<Directory xmlns=\"http://ns.nuke24.net/ContentCouch/\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n" +
-		"\t<entries rdf:parsetype=\"Collection\">\n" +
+		"\t<entries rdf:parseType=\"Collection\">\n" +
 		"\t\t<DirectoryEntry>\n" +
 		"\t\t\t<name>foo</name>\n" +
 		"\t\t\t<target>\n" +
@@ -40,7 +40,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 		"\t\t\t</target>\n" +
 		"\t\t</DirectoryEntry>\n" +
 		"\t</entries>\n" +
-		"</Directory>";
+		"</Directory>\n";
 	
 	public void testBlobEntry() {
 		assertSerializesTo( blobEntryString, new DirectoryEntry[] {
@@ -50,7 +50,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 	
 	protected static final String multiBlobEntryString =
 			"<Directory xmlns=\"http://ns.nuke24.net/ContentCouch/\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n" +
-			"\t<entries rdf:parsetype=\"Collection\">\n" +
+			"\t<entries rdf:parseType=\"Collection\">\n" +
 			"\t\t<DirectoryEntry>\n" +
 			"\t\t\t<name>boo</name>\n" +
 			"\t\t\t<target>\n" +
@@ -76,7 +76,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 			"\t\t\t</target>\n" +
 			"\t\t</DirectoryEntry>\n" +
 			"\t</entries>\n" +
-			"</Directory>";
+			"</Directory>\n";
 		
 	public void testMultiBlobEntry() {
 		assertSerializesTo( multiBlobEntryString, new DirectoryEntry[] {
@@ -89,7 +89,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 		
 	protected static final String blobWithSizeEntryString =
 		"<Directory xmlns=\"http://ns.nuke24.net/ContentCouch/\" xmlns:bz=\"http://bitzi.com/xmlns/2002/01/bz-core#\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n" +
-		"\t<entries rdf:parsetype=\"Collection\">\n" +
+		"\t<entries rdf:parseType=\"Collection\">\n" +
 		"\t\t<DirectoryEntry>\n" +
 		"\t\t\t<name>foo</name>\n" +
 		"\t\t\t<target>\n" +
@@ -99,7 +99,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 		"\t\t\t</target>\n" +
 		"\t\t</DirectoryEntry>\n" +
 		"\t</entries>\n" +
-		"</Directory>";
+		"</Directory>\n";
 	
 	public void testBlobWithSizeEntry() {
 		assertSerializesTo( blobWithSizeEntryString, new DirectoryEntry[] {
@@ -109,7 +109,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 	
 	protected static final String blobWithSizeAndMtimeEntryString =
 		"<Directory xmlns=\"http://ns.nuke24.net/ContentCouch/\" xmlns:bz=\"http://bitzi.com/xmlns/2002/01/bz-core#\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n" +
-		"\t<entries rdf:parsetype=\"Collection\">\n" +
+		"\t<entries rdf:parseType=\"Collection\">\n" +
 		"\t\t<DirectoryEntry>\n" +
 		"\t\t\t<name>foo</name>\n" +
 		"\t\t\t<target>\n" +
@@ -120,7 +120,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 		"\t\t\t<dc:modified>2010-01-01 06:00:32 GMT</dc:modified>\n" +
 		"\t\t</DirectoryEntry>\n" +
 		"\t</entries>\n" +
-		"</Directory>";
+		"</Directory>\n";
 	
 	public void testBlobWithSizeAndMtimeEntry() throws ParseException {
 		assertSerializesTo( blobWithSizeAndMtimeEntryString, new DirectoryEntry[] {
@@ -130,7 +130,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 	
 	protected static final String directoryEntryString =
 		"<Directory xmlns=\"http://ns.nuke24.net/ContentCouch/\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n" +
-		"\t<entries rdf:parsetype=\"Collection\">\n" +
+		"\t<entries rdf:parseType=\"Collection\">\n" +
 		"\t\t<DirectoryEntry>\n" +
 		"\t\t\t<name>2010-01</name>\n" +
 		"\t\t\t<target>\n" +
@@ -138,7 +138,7 @@ public class NewStyleRDFDirecotySerializerTest extends TestCase
 		"\t\t\t</target>\n" +
 		"\t\t</DirectoryEntry>\n" +
 		"\t</entries>\n" +
-		"</Directory>";
+		"</Directory>\n";
 	
 	public void testDirectoryEntry() throws ParseException {
 		assertSerializesTo( directoryEntryString, new DirectoryEntry[] {
