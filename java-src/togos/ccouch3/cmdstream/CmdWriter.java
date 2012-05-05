@@ -24,6 +24,7 @@ public class CmdWriter implements Flushable, Closeable
 	}
 	
 	public void writeChunk( byte[] buf, int offset, int length ) throws IOException {
+		if( length == 0 ) return; // No reason to write zero-length chunks, and they break the reading API.
 		writeCmd( new String[]{ "chunk", String.valueOf(length) } );
 		os.write( buf, offset, length );
 		writeNewline();

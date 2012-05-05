@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CmdReader {
+	int chunkLeft = 0;
+	
 	protected final InputStream is;
 	public CmdReader( InputStream is ) {
 		if( !is.markSupported() ) is = new BufferedInputStream(is);
@@ -87,36 +89,32 @@ public class CmdReader {
 	// chunk <size>
 	// end-chunks
 	
-	public static final int MAX_CHUNK_SIZE = 1024*1024;
-	
 	/**
+	 * Read chunk data!
 	 * 
 	 * @param buffer
 	 * @return length of chunk, or -1 if we have reached the end of chunks.
 	 * @throws IOException
 	 */
-	public int readChunk( byte[] buffer ) throws IOException {
-		String[] c = readCmd();
-		if( c.length == 0 ) {
-			throw new IOException("Zero-length command!");
-		}
-		if( "end-chunks".equals(c[0]) ) {
-			return -1;
-		}
-		if( !"chunk".equals(c[0]) ) {
-			throw new IOException("Not a chunk! "+c[0]);
-		}
-		int length = Integer.parseInt(c[1]);
-		if( length < 0 ) throw new IOException("Negative chunk size: "+length);
-		if( length > buffer.length ) throw new IOException("Chunk too large for buffer: "+length+"/"+buffer.length);
-		int r = 0;
+	public int readChunk( byte[] buffer, int off, int len ) throws IOException {
 		int z;
-		while( (z = is.read( buffer, r, length - r)) > 0 ) {
-			r += z;
+		if( chunkLeft == 0 ) {
+			// Then read the next one!
+			String[] c = readCmd();
+			if( c.length == 0 ) {
+				throw new IOException("Zero-length command!");
+			}
+			if( "end-chunks".equals(c[0]) ) {
+				return -1;
+			}
+			if( !"chunk".equals(c[0]) ) {
+				throw new IOException("Not a chunk! "+c[0]);
+			}
+			chunkLeft = Integer.parseInt(c[1]);
 		}
-		if( r < length ) {
-			throw new IOException("Failed to read chunk; only read "+r+"/"+length+" bytes");
-		}
-		return r;
+		z = is.read(buffer, off, Math.min( len, chunkLeft ) );
+		if( z == -1 ) throw new IOException("Hit end of stream while reading chunk");
+		chunkLeft -= z;
+		return z;
 	}
 }
