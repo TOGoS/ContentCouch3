@@ -105,6 +105,21 @@ public class CmdReaderTest extends TestCase
 		assertEquals( -1, r.readChunk(buf, 0, buf.length) );
 	}
 	
+	public void testReadCmdWhileReadingChunk() throws IOException {
+		byte[] buf = new byte[3];
+		
+		w.writeChunk( new byte[] { 1, 2, 3, 4 }, 0, 4 );
+		w.endChunks();
+		
+		r.readChunk(buf, 0, 3);
+			
+		try {
+			r.readCmd();
+			fail( "Trying to read a command while there are chunk bytes left should have caused an IOException");
+		} catch( IOException e ) {
+			// This is proper.
+		}
+	}
 	
 	public void testChunkInputStream() throws IOException {
 		byte[] chunk = new byte[1234];

@@ -74,6 +74,8 @@ public class CmdReader implements Closeable {
 	}
 	
 	public String[] readCmd() throws IOException {
+		if( chunkLeft > 0 ) throw new IOException("Cannot read command; there are "+chunkLeft+" chunk bytes left to be read");
+		
 		int lineLength;
 		do {
 			lineLength = readLine( cmdBuffer );
