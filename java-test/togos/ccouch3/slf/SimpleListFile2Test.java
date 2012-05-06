@@ -1,4 +1,4 @@
-package togos.ccouch3.cache;
+package togos.ccouch3.slf;
 
 import java.io.File;
 import java.io.IOException;
@@ -10,8 +10,9 @@ import java.util.Random;
 import junit.framework.TestCase;
 import togos.blob.ByteChunk;
 import togos.blob.SimpleByteChunk;
-import togos.ccouch3.cache.FileUtil;
-import togos.ccouch3.util.RandomAccessFileBlob;
+import togos.ccouch3.slf.FileUtil;
+import togos.ccouch3.slf.RandomAccessFileBlob;
+import togos.ccouch3.slf.SimpleListFile2;
 
 @SuppressWarnings({"unchecked","rawtypes"})
 public class SimpleListFile2Test extends TestCase

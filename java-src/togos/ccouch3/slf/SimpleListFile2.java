@@ -1,4 +1,4 @@
-package togos.ccouch3.cache;
+package togos.ccouch3.slf;
 
 import java.io.Closeable;
 import java.io.Flushable;
@@ -9,7 +9,6 @@ import java.nio.channels.FileLock;
 
 import togos.blob.ByteChunk;
 import togos.blob.SimpleByteChunk;
-import togos.ccouch3.util.RandomAccessBlob;
 
 /**
  * Yet another key-value store, designed for speed and simplicity.

@@ -1,4 +1,4 @@
-package togos.ccouch3.util;
+package togos.ccouch3.slf;
 
 import java.io.File;
 import java.io.FileNotFoundException;
