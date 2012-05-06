@@ -20,22 +20,22 @@ import togos.ccouch3.FlowUploader.StandardTransferTracker.Counter;
 import togos.ccouch3.cmdstream.CmdReader;
 import togos.ccouch3.cmdstream.CmdWriter;
 import togos.ccouch3.hash.BitprintDigest;
-import togos.ccouch3.hash.BitprintHashFormatter;
+import togos.ccouch3.hash.BitprintHashURNFormatter;
 import togos.ccouch3.hash.HashFormatter;
 
 public class FlowUploader
 {
-	//// Utility classes ////
+	//// Hash stuff ////
 	
 	interface MessageDigestFactory {
 		public MessageDigest createMessageDigest();
 	}
 	
-	interface Digestor {
+	interface StreamURNifier {
 		public String digest( InputStream is ) throws IOException;
 	}
 
-	static class MessageDigestor implements Digestor {
+	static class MessageDigestor implements StreamURNifier {
 		final MessageDigestFactory messageDigestFactory;
 		final HashFormatter hform;
 		
@@ -59,6 +59,18 @@ public class FlowUploader
 			return hform.format( d.digest() );
 		}
 	}
+	
+	static class BitprintMessageDigestFactory implements MessageDigestFactory {
+		@Override
+		public MessageDigest createMessageDigest() {
+			return new BitprintDigest();
+		}
+	}
+	
+	public static final BitprintMessageDigestFactory BITPRINT_MESSAGE_DIGEST_FACTORY = new BitprintMessageDigestFactory(); 
+	public static final MessageDigestor BITPRINT_STREAM_URNIFIER = new MessageDigestor( BITPRINT_MESSAGE_DIGEST_FACTORY, BitprintHashURNFormatter.INSTANCE );
+	
+	//// Queue stuff ////
 	
 	interface Sink<E> {
 		public void give( E value ) throws Exception;
@@ -185,10 +197,10 @@ public class FlowUploader
 	static class Indexer
 	{
 		protected final DirectorySerializer dirSer;
-		protected final Digestor digestor;
+		protected final StreamURNifier digestor;
 		protected final Sink<Object> indexResultSink;
 		
-		public Indexer( DirectorySerializer dirSer, Digestor digestor, Sink<Object> indexedFileInfoSink ) {
+		public Indexer( DirectorySerializer dirSer, StreamURNifier digestor, Sink<Object> indexedFileInfoSink ) {
 			this.dirSer = dirSer;
 			this.digestor = digestor;
 			this.indexResultSink = indexedFileInfoSink;
@@ -394,21 +406,30 @@ public class FlowUploader
 	
 	Collection<UploadTask> tasks;
 	public boolean showTransferSummary;
+	public StreamURNifier digestor = BITPRINT_STREAM_URNIFIER;
+	public DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
+	public String[] serverProcCommand = new String[]{ "java", "-cp", "bin", "togos.ccouch3.CmdServer", "-repo", ".server-repo" };
 		
 	public FlowUploader( Collection<UploadTask> tasks ) {
 		this.tasks = tasks;
 	}
 	
-	public void runIdentify() {
-		
+	public void runIdentify() throws Exception {
+		final Indexer indexer = new Indexer( dirSer, digestor, new Sink<Object>() {
+			@Override
+			public void give(Object m) throws Exception {}
+		});
+		for( UploadTask ut : tasks ) {
+			FileInfo fi = indexer.index(ut.path);
+			System.out.println( ut.name + "\t" + fi.urn );
+		}
 	}
 	
-	public void run() {
-		String[] command = new String[]{ "java", "-cp", "bin", "togos.ccouch3.CmdServer", "-repo", "server-repo" };
+	public void runStore() {
 		Process headProc, uploadProc;
 		try {
-			headProc = Runtime.getRuntime().exec(command);
-			uploadProc = Runtime.getRuntime().exec(command);
+			headProc = Runtime.getRuntime().exec(serverProcCommand);
+			uploadProc = Runtime.getRuntime().exec(serverProcCommand);
 		} catch( IOException e ) {
 			throw new RuntimeException("Couldn't run cmdserver via exec");
 		}
@@ -433,13 +454,6 @@ public class FlowUploader
 		final LinkedBlockingQueue<Object> uploadTaskQueue     = new LinkedBlockingQueue<Object>(tasks);
 		final LinkedBlockingQueue<Object> logMessageQueue     = new LinkedBlockingQueue<Object>();
 		
-		final Digestor digestor = new MessageDigestor(new MessageDigestFactory() {
-			@Override
-			public MessageDigest createMessageDigest() {
-				return new BitprintDigest();
-			}
-		}, BitprintHashFormatter.instance );
-		final DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
 		final Indexer indexer = new Indexer( dirSer, digestor, new Sink<Object>() {
 			@Override
 			public void give(Object m) throws Exception {
@@ -520,7 +534,7 @@ public class FlowUploader
 		}
 	}
 	
-	public static int main( Iterator<String> args ) throws Exception {
+	static FlowUploader fromArgs( Iterator<String> args ) throws Exception {
 		ArrayList<UploadTask> tasks = new ArrayList<UploadTask>();
 		boolean verbose = false; // false!;
 		for( ; args.hasNext(); ) {
@@ -530,16 +544,29 @@ public class FlowUploader
 			} else if( !a.startsWith("-") ) {
 				tasks.add( new UploadTask(a, a) );
 			} else {
-				return 1;
+				return null;
 			}
 		}
 		FlowUploader fu = new FlowUploader(tasks);
 		fu.showTransferSummary = verbose;
-		fu.run();
+		return fu;
+	}
+	
+	public static int storeMain( Iterator<String> args ) throws Exception {
+		FlowUploader fu = fromArgs(args);
+		if( fu == null ) return 1;
+		fu.runStore();
+		return 0;
+	}
+	
+	public static int identifyMain( Iterator<String> args ) throws Exception {
+		FlowUploader fu = fromArgs(args);
+		if( fu == null ) return 1;
+		fu.runIdentify();
 		return 0;
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(main( Arrays.asList(args).iterator() ));
+		System.exit(identifyMain( Arrays.asList(args).iterator() ));
 	}
 }

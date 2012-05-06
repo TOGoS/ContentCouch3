@@ -13,7 +13,9 @@ public class CCouch3Command
 		}
 		String cmd = argi.next();
 		if( "store".equals(cmd) ) {
-			return FlowUploader.main(argi);
+			return FlowUploader.storeMain(argi);
+		} else if( "id".equals(cmd) ) {
+			return FlowUploader.identifyMain(argi);
 		} else if( "cmd-server".equals(cmd) ) {
 			return CmdServer.main(argi);
 		} else {
