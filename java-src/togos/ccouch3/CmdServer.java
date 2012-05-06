@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
 
 import togos.ccouch3.cmdstream.CmdReader;
 import togos.ccouch3.cmdstream.CmdWriter;
@@ -105,12 +104,12 @@ public class CmdServer
 		}
 	}
 	
-	public static int run( List<String> args ) throws Exception {
+	public static int main( Iterator<String> argi ) throws Exception {
 		String homeDir = System.getProperty("user.home");
 		if( homeDir == null ) homeDir = ".";
 		String repoDir = homeDir + "/.ccouch";
 		String sector = "cmd-server";
-		for( Iterator<String> argi=args.iterator(); argi.hasNext(); ) {
+		for( ; argi.hasNext(); ) {
 			String arg = argi.next();
 			if( "-repo".equals(arg) ) {
 				repoDir = argi.next();
@@ -127,6 +126,6 @@ public class CmdServer
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(CmdServer.run( Arrays.asList(args)));
+		System.exit(CmdServer.main( Arrays.asList(args).iterator() ));
 	}
 }
