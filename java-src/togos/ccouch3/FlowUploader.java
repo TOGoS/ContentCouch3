@@ -20,6 +20,8 @@ import togos.ccouch3.FlowUploader.StandardTransferTracker.Counter;
 import togos.ccouch3.cmdstream.CmdReader;
 import togos.ccouch3.cmdstream.CmdWriter;
 import togos.ccouch3.hash.BitprintDigest;
+import togos.ccouch3.hash.BitprintHashFormatter;
+import togos.ccouch3.hash.HashFormatter;
 
 public class FlowUploader
 {
@@ -29,10 +31,6 @@ public class FlowUploader
 		public MessageDigest createMessageDigest();
 	}
 	
-	interface HashFormatter {
-		public String format( byte[] hash );
-	}
-
 	interface Digestor {
 		public String digest( InputStream is ) throws IOException;
 	}
@@ -401,6 +399,10 @@ public class FlowUploader
 		this.tasks = tasks;
 	}
 	
+	public void runIdentify() {
+		
+	}
+	
 	public void run() {
 		String[] command = new String[]{ "java", "-cp", "bin", "togos.ccouch3.CmdServer", "-repo", "server-repo" };
 		Process headProc, uploadProc;
@@ -436,12 +438,7 @@ public class FlowUploader
 			public MessageDigest createMessageDigest() {
 				return new BitprintDigest();
 			}
-		}, new HashFormatter() {
-			@Override
-			public String format(byte[] hash) {
-				return "urn:bitprint:" + BitprintDigest.format(hash);
-			}
-		});
+		}, BitprintHashFormatter.instance );
 		final DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
 		final Indexer indexer = new Indexer( dirSer, digestor, new Sink<Object>() {
 			@Override
