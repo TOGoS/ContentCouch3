@@ -10,9 +10,6 @@ import java.util.Random;
 import junit.framework.TestCase;
 import togos.blob.ByteChunk;
 import togos.blob.SimpleByteChunk;
-import togos.ccouch3.slf.FileUtil;
-import togos.ccouch3.slf.RandomAccessFileBlob;
-import togos.ccouch3.slf.SimpleListFile2;
 
 @SuppressWarnings({"unchecked","rawtypes"})
 public class SimpleListFile2Test extends TestCase
@@ -31,9 +28,16 @@ public class SimpleListFile2Test extends TestCase
 	
 	File f = new File("junk/slf-test.slf2");
 	
+	protected static void makeParentDirs( File f ) {
+		File parentFile = f.getParentFile(); 
+		if( parentFile != null && !parentFile.exists() ) {
+			parentFile.mkdirs();
+		}
+	}
+	
 	public void setUp() throws IOException {
 		if( f.exists() ) f.delete();
-		else FileUtil.makeParentDirs(f);
+		else makeParentDirs(f);
 	}
 	
 	public void tearDown() throws IOException {
