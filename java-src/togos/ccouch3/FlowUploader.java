@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -408,7 +409,7 @@ public class FlowUploader
 	public boolean showTransferSummary;
 	public StreamURNifier digestor = BITPRINT_STREAM_URNIFIER;
 	public DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
-	public String[] serverProcCommand = new String[]{ "java", "-cp", "bin", "togos.ccouch3.CmdServer", "-repo", ".server-repo" };
+	public String[] serverCommand; // = new String[]{ "java", "-cp", "bin", "togos.ccouch3.CmdServer", "-repo", ".server-repo" };
 		
 	public FlowUploader( Collection<UploadTask> tasks ) {
 		this.tasks = tasks;
@@ -428,8 +429,8 @@ public class FlowUploader
 	public void runStore() {
 		Process headProc, uploadProc;
 		try {
-			headProc = Runtime.getRuntime().exec(serverProcCommand);
-			uploadProc = Runtime.getRuntime().exec(serverProcCommand);
+			headProc = Runtime.getRuntime().exec(serverCommand);
+			uploadProc = Runtime.getRuntime().exec(serverCommand);
 		} catch( IOException e ) {
 			throw new RuntimeException("Couldn't run cmdserver via exec");
 		}
@@ -537,24 +538,37 @@ public class FlowUploader
 	static FlowUploader fromArgs( Iterator<String> args ) throws Exception {
 		ArrayList<UploadTask> tasks = new ArrayList<UploadTask>();
 		boolean verbose = false; // false!;
+		String[] serverCommand = null;
 		for( ; args.hasNext(); ) {
 			String a = args.next();
 			if( "-v".equals(a) ) {
 				verbose = true;
+			} else if( "-server-command".equals(a) ) {
+				List<String> sc = new ArrayList<String>();
+				for( a = args.next(); a != null && !"--".equals(a); a = args.next() ) {
+					sc.add( a );
+				}
+				serverCommand = sc.toArray(new String[sc.size()]);
 			} else if( !a.startsWith("-") ) {
 				tasks.add( new UploadTask(a, a) );
 			} else {
+				System.err.println("Unrecognised argument: "+a);
 				return null;
 			}
 		}
 		FlowUploader fu = new FlowUploader(tasks);
 		fu.showTransferSummary = verbose;
+		fu.serverCommand = serverCommand;
 		return fu;
 	}
 	
 	public static int storeMain( Iterator<String> args ) throws Exception {
 		FlowUploader fu = fromArgs(args);
 		if( fu == null ) return 1;
+		if( fu.serverCommand == null ) {
+			System.err.println("No -server-command given.  Syntax: -server-command cmd arg1 arg2 ... --");
+			return 1;
+		}
 		fu.runStore();
 		return 0;
 	}
