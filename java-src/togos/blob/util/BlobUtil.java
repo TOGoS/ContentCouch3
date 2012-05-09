@@ -4,6 +4,7 @@ import java.io.UnsupportedEncodingException;
 
 // import togos.blob.ByteBlob;
 import togos.blob.ByteChunk;
+import togos.blob.SimpleByteChunk;
 
 public class BlobUtil
 {
@@ -17,6 +18,10 @@ public class BlobUtil
 		}
 	}
 	
+	public static final ByteChunk byteChunk( String str ) {
+		return new SimpleByteChunk( bytes(str) );
+	}
+	
 	public static final String string( byte[] arr, int offset, int len ) {
 		try {
 			return new String( arr, offset, len, "UTF-8" );
@@ -25,6 +30,10 @@ public class BlobUtil
 		}
 	}
 	
+	public static final String string( ByteChunk bc ) {
+		return string( bc.getBuffer(), bc.getOffset(), bc.getSize() );
+	}
+
 	/**
 	 * Should be compatible with Arrays.hashCode( byte[] data ),
 	 * which is supposedly compatible with List<Byte>#hashCode.

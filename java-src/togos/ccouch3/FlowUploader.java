@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
@@ -17,12 +18,16 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import togos.blob.ByteChunk;
+import togos.blob.util.BlobUtil;
 import togos.ccouch3.FlowUploader.StandardTransferTracker.Counter;
 import togos.ccouch3.cmdstream.CmdReader;
 import togos.ccouch3.cmdstream.CmdWriter;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.BitprintHashURNFormatter;
 import togos.ccouch3.hash.HashFormatter;
+import togos.ccouch3.slf.RandomAccessFileBlob;
+import togos.ccouch3.slf.SimpleListFile2;
 
 public class FlowUploader
 {
@@ -191,20 +196,127 @@ public class FlowUploader
 	
 	////
 	
+	static final ByteChunk YES_MARKER = BlobUtil.byteChunk("Y");
+	
+	protected static void mkParentDirs( File f ) {
+		File p = f.getParentFile();
+		if( p != null && !p.exists() ) p.mkdirs();
+	}
+	
+	protected static SimpleListFile2 mkSlf( File f ) {
+		mkParentDirs(f);
+		try {
+			return new SimpleListFile2( new RandomAccessFileBlob(f, "rw"), 16, true );
+		} catch( FileNotFoundException e ) {
+			// This should not happen!
+			throw new RuntimeException(e);
+		}
+	}
+		
 	static final String[] IGNORE_FILENAMES = {
 		"thumbs.db", "desktop.ini"
 	};
+	
+	// TODO: split into URN cache and upload cache; they are sometimes needed independently
+	
+	interface UploadCache {
+		public String getFileUrn( File f ) throws Exception;
+		public void cacheFileUrn( File f, String urn ) throws Exception;
+		public boolean isFullyUploaded( String urn ) throws Exception;
+		public void markFullyUploaded( String urn ) throws Exception;
+	}
+	
+	class SLFUploadCache implements UploadCache {
+		final File fileUrnCacheFile;
+		final File dirUrnCacheFile;
+		final File uploadedCacheFile;
 		
+		SimpleListFile2 fileUrnCache;
+		SimpleListFile2 dirUrnCache;
+		SimpleListFile2 uploadedCache;
+		
+		public SLFUploadCache( File cacheDir, String serverName ) {
+			this.fileUrnCacheFile = new File(cacheDir + "/file-urns.slf2");
+			this.dirUrnCacheFile = new File(cacheDir + "/dir-urns.slf2");
+			this.uploadedCacheFile = new File(cacheDir + "/uploaded-to-"+serverName+".slf2");
+		}
+		
+		protected synchronized SimpleListFile2 getFileUrnCache() {
+			if( fileUrnCache == null ) {
+				fileUrnCache = mkSlf(fileUrnCacheFile);
+			}
+			return fileUrnCache;
+		}
+		
+		protected synchronized SimpleListFile2 getDirUrnCache() {
+			if( dirUrnCache == null ) {
+				dirUrnCache = mkSlf(dirUrnCacheFile);
+			}
+			return dirUrnCache;
+		}
+		
+		protected SimpleListFile2 getUrnCache( File f ) {
+			return f.isDirectory() ? getDirUrnCache() : getFileUrnCache(); 
+		}
+
+		protected synchronized SimpleListFile2 getUploadedCache() {
+			if( uploadedCache == null ) {
+				uploadedCache = mkSlf(uploadedCacheFile);
+			}
+			return uploadedCache;
+		}
+		
+		protected ByteChunk fileIdChunk( File f ) throws IOException {
+			String fileId = f.getCanonicalPath() + ";mtime=" + f.lastModified() + ";size=" + f.length();
+			return BlobUtil.byteChunk(fileId);
+		}
+		
+		@Override
+		public void cacheFileUrn(File f, String urn) throws IOException {
+			SimpleListFile2 c = getUrnCache(f);
+			ByteChunk fileIdChunk = fileIdChunk(f);
+			ByteChunk urnChunk = BlobUtil.byteChunk(urn);
+			synchronized( c ) { c.put( fileIdChunk, urnChunk ); }
+		}
+		
+		@Override
+		public String getFileUrn(File f) throws Exception {
+			SimpleListFile2 c = getUrnCache(f);
+			ByteChunk fileIdChunk = fileIdChunk(f);
+			ByteChunk urnChunk;
+			synchronized( c ) { urnChunk = c.get( fileIdChunk ); }
+			return urnChunk != null ? BlobUtil.string( urnChunk ) : null;
+		}
+		
+		@Override
+		public void markFullyUploaded(String urn) throws Exception {
+			SimpleListFile2 c = getUploadedCache();
+			ByteChunk urnChunk = BlobUtil.byteChunk(urn);
+			synchronized( c ) { c.put(urnChunk, YES_MARKER); }
+		}
+		
+		@Override
+		public boolean isFullyUploaded(String urn) throws Exception {
+			SimpleListFile2 c = getUploadedCache();
+			ByteChunk urnChunk = BlobUtil.byteChunk(urn);
+			ByteChunk storedMarker;
+			synchronized( c ) { storedMarker = c.get(urnChunk); }
+			return YES_MARKER.equals(storedMarker);
+		}
+	}
+	
 	static class Indexer
 	{
 		protected final DirectorySerializer dirSer;
 		protected final StreamURNifier digestor;
 		protected final Sink<Object> indexResultSink;
+		protected final UploadCache uploadCache;
 		
-		public Indexer( DirectorySerializer dirSer, StreamURNifier digestor, Sink<Object> indexedFileInfoSink ) {
+		public Indexer( DirectorySerializer dirSer, StreamURNifier digestor, Sink<Object> indexedFileInfoSink, UploadCache uploadCache ) {
 			this.dirSer = dirSer;
 			this.digestor = digestor;
 			this.indexResultSink = indexedFileInfoSink;
+			this.uploadCache = uploadCache;
 		}
 		
 		protected boolean shouldIgnore( File f ) {
@@ -225,28 +337,55 @@ public class FlowUploader
 		}
 		
 		protected FileInfo index( File file ) throws Exception {
-			// TODO: If a file or directory is fully stored, skip it!
-			// TODO: Skip even hashing files or directories if they can be identified as a URN that is already fully stored.
-			//   Don't try to skip ones where the hashes are known but they are not fully stored, because we need to pass
-			//   those on to the uploader.
+			String cachedUrn = uploadCache.getFileUrn( file );
+			if( cachedUrn != null && uploadCache.isFullyUploaded(cachedUrn) ) {
+				return new FileInfo(
+					file.getCanonicalPath(),
+					cachedUrn,
+					file.isDirectory() ? FileInfo.FILETYPE_DIRECTORY : FileInfo.FILETYPE_BLOB,
+					file.length(),
+					file.lastModified()
+				);
+			}
 			
 			FileInfo fi;
 			if( file.isFile() ) {
-				FileInputStream fis = new FileInputStream( file );
-				try {
-					fi = new FileInfo(
-						file.getCanonicalPath(),
-						digestor.digest(fis),
-						FileInfo.FILETYPE_BLOB,
-						file.length(),
-						file.lastModified()
-					);
-				} finally {
-					fis.close();
+				String fileUrn;
+				if( cachedUrn != null ) {
+					fileUrn = cachedUrn;
+				} else {
+					FileInputStream fis = new FileInputStream( file );
+					try {
+						fileUrn = digestor.digest(fis);
+					} finally {
+						fis.close();
+					}
 				}
+				
+				fi = new FileInfo(
+					file.getCanonicalPath(),
+					fileUrn,
+					FileInfo.FILETYPE_BLOB,
+					file.length(),
+					file.lastModified()
+				);
+				
+				uploadCache.cacheFileUrn( file, fileUrn );
+				
 				indexResultSink.give( fi );
 			} else if( file.isDirectory() ) {
+				// Even if we already know the URN, we still need to walk the entire
+				// directory to push all non-fully-uploaded subfiles/directories to the uploader.
 				Collection<DirectoryEntry> entries = indexDirectoryEntries( file );
+				
+				// Will become true if it has subdirectories *that we want to index*.
+				// If so, we *cannot* rely on the hash cache, and will not store it.
+				boolean includesSubDirs = false;
+				for( DirectoryEntry e : entries ) {
+					if( e.fileType == DirectoryEntry.FILETYPE_DIRECTORY ) {
+						includesSubDirs = true;
+					}
+				}
 				
 				ByteArrayOutputStream baos = new ByteArrayOutputStream();
 				dirSer.serialize(entries, baos);
@@ -262,6 +401,13 @@ public class FlowUploader
 					file.length(),
 					file.lastModified()
 				);
+				
+				if( !includesSubDirs && treeUrn != cachedUrn ) {
+					uploadCache.cacheFileUrn( file, treeUrn );
+				}
+				if( uploadCache.isFullyUploaded(treeUrn) ) {
+					return fi;
+				}
 				
 				BlobInfo blobInfo = new BlobInfo( rdfBlobUrn, baos.toByteArray() );
 				indexResultSink.give( blobInfo );
@@ -279,20 +425,11 @@ public class FlowUploader
 	
 	class HeadRequestSender implements Sink<Object> {
 		protected final CmdWriter w;
-		protected final Sink<Object> shortCut;
 		protected final TransferTracker tt;
 		
-		boolean sentAnything = false;
-		
-		public HeadRequestSender( CmdWriter w, Sink<Object> shortCut, TransferTracker tt ) {
+		public HeadRequestSender( CmdWriter w, TransferTracker tt ) {
 			this.w = w;
-			this.shortCut = shortCut;
 			this.tt = tt;
-		}
-		
-		protected void bye() throws Exception {
-			if( !sentAnything ) shortCut.give(EndMessage.INSTANCE);
-			w.bye();
 		}
 		
 		@Override
@@ -310,12 +447,11 @@ public class FlowUploader
 				FullyStoredMarker fsm = (FullyStoredMarker)m;
 				w.writeCmd( new String[]{ "echo", "fully-stored", fsm.urn} );
 			} else if( m instanceof EndMessage ) {
-				bye();
+				w.bye();
 			} else {
-				bye();
+				w.bye();
 				throw new RuntimeException("Don't know what to do with "+m.getClass());
 			}
-			sentAnything = true;
 		}
 	}
 	
@@ -350,9 +486,10 @@ public class FlowUploader
 							messageSink.give( new FullyStoredMarker(m[3]) );
 						} else if( "echo".equals(m[1]) && m.length == 4 && "fully-stored".equals(m[2]) ) {
 							// 0:ok 1:echo 2:fully-stored 3:<urn>
-							messageSink.give( new FullyStoredMarker(m[2]) );
+							messageSink.give( new FullyStoredMarker(m[3]) );
 						} else if( "bye".equals(m[1]) ) {
 							// Goodbye!
+							messageSink.give( EndMessage.INSTANCE );
 						} else {
 							throw new RuntimeException("Unexpected result line from server: "+CmdWriter.encode(m));
 						}
@@ -394,10 +531,12 @@ public class FlowUploader
 				w.endChunks();
 				tt.transferred( 0, 1, "file" );
 			} else if( m instanceof FullyStoredMarker ) {
-				// TODO: Mark the stuff as stored!
+				FullyStoredMarker fsm = (FullyStoredMarker)m;
+				w.writeCmd( new String[]{ "echo", "fully-stored", fsm.urn} );
 			} else if( m instanceof EndMessage ) {
 				w.bye();
 			} else {
+				w.bye();
 				throw new RuntimeException("Unexpected message: "+m.toString());
 			}
 		}
@@ -407,19 +546,39 @@ public class FlowUploader
 	
 	Collection<UploadTask> tasks;
 	public boolean showTransferSummary;
+	public boolean reportPathUrnMapping = false;
+	public boolean reportUrn = false;
 	public StreamURNifier digestor = BITPRINT_STREAM_URNIFIER;
 	public DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
+	public File cacheDir;
+	public String serverName;
 	public String[] serverCommand; // = new String[]{ "java", "-cp", "bin", "togos.ccouch3.CmdServer", "-repo", ".server-repo" };
 		
 	public FlowUploader( Collection<UploadTask> tasks ) {
 		this.tasks = tasks;
 	}
 	
+	UploadCache uc;
+	protected synchronized UploadCache getUploadCache() {
+		if( cacheDir == null ) {
+			return new UploadCache() {
+				@Override public void markFullyUploaded(String urn) throws Exception {}
+				@Override public boolean isFullyUploaded(String urn) throws Exception { return false; }
+				@Override public String getFileUrn(File f) throws Exception { return null; }
+				@Override public void cacheFileUrn(File f, String urn) throws Exception {}
+			};
+		}
+		if( uc == null ) {
+			uc = new SLFUploadCache(cacheDir, serverName);
+		}
+		return uc;
+	}
+	
 	public void runIdentify() throws Exception {
 		final Indexer indexer = new Indexer( dirSer, digestor, new Sink<Object>() {
 			@Override
 			public void give(Object m) throws Exception {}
-		});
+		}, getUploadCache());
 		for( UploadTask ut : tasks ) {
 			FileInfo fi = indexer.index(ut.path);
 			System.out.println( ut.name + "\t" + fi.urn );
@@ -427,7 +586,7 @@ public class FlowUploader
 	}
 	
 	public void runStore() {
-		Process headProc, uploadProc;
+		final Process headProc, uploadProc;
 		try {
 			headProc = Runtime.getRuntime().exec(serverCommand);
 			uploadProc = Runtime.getRuntime().exec(serverCommand);
@@ -436,14 +595,19 @@ public class FlowUploader
 		}
 		final StandardTransferTracker tt = new StandardTransferTracker();
 		final Uploader uploader = new Uploader( new CmdWriter(uploadProc.getOutputStream()), tt );
-		final HeadRequestSender headRequestor = new HeadRequestSender( new CmdWriter(headProc.getOutputStream()), uploader, tt );
+		final HeadRequestSender headRequestor = new HeadRequestSender( new CmdWriter(headProc.getOutputStream()), tt );
 		final CmdResponseReader headResponseReader = new CmdResponseReader(
 			new CmdReader(headProc.getInputStream()),
 			uploader
 		);
 		final CmdResponseReader uploadResponseReader = new CmdResponseReader(
 			new CmdReader(uploadProc.getInputStream()),
-			new Sink<Object>() { public void give(Object value) throws Exception {} }
+			new Sink<Object>() { public void give(Object value) throws Exception {
+				if( value instanceof FullyStoredMarker ) {
+					FullyStoredMarker fsm = (FullyStoredMarker)value;
+					getUploadCache().markFullyUploaded( fsm.urn );
+				}
+			} }
 		);
 		/*
 		headRequestor.w.debugPrefix = "Write to head proc: ";
@@ -453,20 +617,20 @@ public class FlowUploader
 		*/
 		
 		final LinkedBlockingQueue<Object> uploadTaskQueue     = new LinkedBlockingQueue<Object>(tasks);
-		final LinkedBlockingQueue<Object> logMessageQueue     = new LinkedBlockingQueue<Object>();
+		final LinkedBlockingQueue<Object> indexOutput         = new LinkedBlockingQueue<Object>();
 		
-		final Indexer indexer = new Indexer( dirSer, digestor, new Sink<Object>() {
-			@Override
-			public void give(Object m) throws Exception {
-				headRequestor.give(m);
-			}
-		});
+		final Indexer indexer = new Indexer( dirSer, digestor, new QueueSink<Object>(indexOutput), getUploadCache());
 		final QueueRunner indexRunner = new QueueRunner( uploadTaskQueue ) {
 			public boolean handleMessage( Object m ) throws Exception {
 				if( m instanceof UploadTask ) {
 					UploadTask ut = (UploadTask)m;
 					FileInfo fi = indexer.index(ut.path);
-					logMessageQueue.put(new DirectoryEntry( ut.name, fi ));
+					if( reportUrn ) {
+						System.out.println(fi.urn);
+					}
+					if( reportPathUrnMapping ) {
+						System.out.println(fi.path+"\t"+fi.urn);
+					}
 					return true;
 				} else if( m instanceof EndMessage ) {
 					return false;
@@ -477,51 +641,52 @@ public class FlowUploader
 			
 			@Override
 			protected void cleanUp() throws Exception {
-				headRequestor.give( EndMessage.INSTANCE );
-				logMessageQueue.add( EndMessage.INSTANCE );
+				indexOutput.put( EndMessage.INSTANCE );
 			}
-		};
-
-		final QueueRunner logRunner   = new QueueRunner( logMessageQueue ) {
-			@Override
-			protected boolean handleMessage(Object m) throws Exception {
-				if( m instanceof DirectoryEntry ) {
-					DirectoryEntry de = (DirectoryEntry)m;
-					System.err.println("Indexed root " + de.name + " = " + de.urn);
-					return true;
-				} else if( m instanceof EndMessage ) {
-					return false;
-				} else {
-					throw new RuntimeException("Unrecognised message type "+m.getClass());
-				}
-			}
-			
-			@Override
-			protected void cleanUp() throws Exception {}
 		};
 		
 		final Thread indexThread = new Thread( indexRunner, "Indexer" );
 		final Thread headResponseReaderThread = new Thread( headResponseReader, "Head Response Reader" );
 		final Thread uploadResponseReaderThread = new Thread( uploadResponseReader, "Upload Response Reader" );
-		final Thread logThread = new Thread( logRunner, "Log Writer" );
+		final Thread indexOutputThread = new Thread( new QueueRunner( indexOutput ) {
+			boolean anythingSent;
+			
+			@Override
+			protected void cleanUp() throws Exception {}
+			
+			@Override
+			public boolean handleMessage(Object m) throws Exception {
+				// If nothing's been sent before EndMessage, then there's nothing
+				// for other processes to do and we can quit early!
+				if( !anythingSent && m instanceof EndMessage ) {
+					// Close the processes so that read threads will return immediately
+					headProc.destroy();
+					uploadProc.destroy();
+				} else {
+					anythingSent = true;
+					headRequestor.give(m);
+				}
+				return !(m instanceof EndMessage);
+			}
+		}, "Index Output Filter" );
 		
 		indexThread.start();
 		headResponseReaderThread.start();
 		uploadResponseReaderThread.start();
-		logThread.start();
+		indexOutputThread.start();
 		
 		uploadTaskQueue.add( EndMessage.INSTANCE );
 		
 		try {
 			indexThread.join();
+			indexOutputThread.join();
 			headResponseReaderThread.join();
 			uploadResponseReaderThread.join();
-			logThread.join();
 		} catch( InterruptedException e ) {
 			indexThread.interrupt();
+			indexOutputThread.interrupt();
 			headResponseReaderThread.interrupt();
 			uploadResponseReaderThread.interrupt();
-			logThread.interrupt();
 			Thread.currentThread().interrupt();
 		}
 		
@@ -538,11 +703,19 @@ public class FlowUploader
 	static FlowUploader fromArgs( Iterator<String> args ) throws Exception {
 		ArrayList<UploadTask> tasks = new ArrayList<UploadTask>();
 		boolean verbose = false; // false!;
+		String cacheDir = null;
+		String serverName = null;
 		String[] serverCommand = null;
 		for( ; args.hasNext(); ) {
 			String a = args.next();
 			if( "-v".equals(a) ) {
 				verbose = true;
+			} else if( "-no-cache".equals(a) ) {
+				cacheDir = "DO-NOT-CACHE";
+			} else if( "-cache-dir".equals(a) ) {
+				cacheDir = args.next();
+			} else if( "-server-name".equals(a) ) {
+				serverName = args.next();
 			} else if( "-server-command".equals(a) ) {
 				List<String> sc = new ArrayList<String>();
 				for( a = args.next(); a != null && !"--".equals(a); a = args.next() ) {
@@ -556,8 +729,23 @@ public class FlowUploader
 				return null;
 			}
 		}
+		
 		FlowUploader fu = new FlowUploader(tasks);
+		
+		if( "DO-NOT-CACHE".equals(cacheDir) ) {
+			fu.cacheDir = null;
+		} else if( cacheDir == null ) {
+			String homeDir = System.getProperty("user.home");
+			if( homeDir == null ) homeDir = ".";
+			fu.cacheDir = new File(homeDir + "/.ccouch/cache/flow-uploader");
+		} else {
+			fu.cacheDir = new File(cacheDir);
+		}
+		
 		fu.showTransferSummary = verbose;
+		fu.reportPathUrnMapping = verbose && tasks.size() != 1;
+		fu.reportUrn = verbose && tasks.size() == 1;
+		fu.serverName = serverName;
 		fu.serverCommand = serverCommand;
 		return fu;
 	}
@@ -566,7 +754,11 @@ public class FlowUploader
 		FlowUploader fu = fromArgs(args);
 		if( fu == null ) return 1;
 		if( fu.serverCommand == null ) {
-			System.err.println("No -server-command given.  Syntax: -server-command cmd arg1 arg2 ... --");
+			System.err.println("No -server-command given.  Syntax: -server-command <cmd> <arg1> <arg2> ... --");
+			return 1;
+		}
+		if( fu.serverName == null ) {
+			System.err.println("No -server-name given.  Syntax: -server-name <name>");
 			return 1;
 		}
 		fu.runStore();
@@ -581,6 +773,6 @@ public class FlowUploader
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(identifyMain( Arrays.asList(args).iterator() ));
+		System.exit(storeMain( Arrays.asList(args).iterator() ));
 	}
 }

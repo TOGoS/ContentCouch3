@@ -42,7 +42,7 @@ import togos.blob.SimpleByteChunk;
  * 
  * Chunks in the recycle list have no format; the data they contain is garbage.
  */
-public class SimpleListFile2 implements Flushable, Closeable
+public class SimpleListFile2 implements Flushable, Closeable, SimpleMap<ByteChunk,ByteChunk>
 {
 	static final byte[] slf2 = {'S','L','F','2'};
 	static final byte[] indx = {'I','N','D','X'};
@@ -482,6 +482,10 @@ public class SimpleListFile2 implements Flushable, Closeable
 		}
 	}
 	
+	/**
+	 * Force changes to go be physically written to disk.
+	 * This may be mislabeled, as 'flush' usually just means sent to the OS...
+	 **/
 	public void flush() throws IOException {
 		if( this.fileChannel != null ) this.fileChannel.force(true);
 	}
