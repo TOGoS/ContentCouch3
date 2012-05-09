@@ -585,7 +585,7 @@ public class FlowUploader
 		}
 	}
 	
-	public void runStore() {
+	public void runUpload() {
 		final Process headProc, uploadProc;
 		try {
 			headProc = Runtime.getRuntime().exec(serverCommand);
@@ -750,7 +750,7 @@ public class FlowUploader
 		return fu;
 	}
 	
-	public static int storeMain( Iterator<String> args ) throws Exception {
+	public static int uploadMain( Iterator<String> args ) throws Exception {
 		FlowUploader fu = fromArgs(args);
 		if( fu == null ) return 1;
 		if( fu.serverCommand == null ) {
@@ -761,7 +761,7 @@ public class FlowUploader
 			System.err.println("No -server-name given.  Syntax: -server-name <name>");
 			return 1;
 		}
-		fu.runStore();
+		fu.runUpload();
 		return 0;
 	}
 	
@@ -773,6 +773,6 @@ public class FlowUploader
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(storeMain( Arrays.asList(args).iterator() ));
+		System.exit(uploadMain( Arrays.asList(args).iterator() ));
 	}
 }
