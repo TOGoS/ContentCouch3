@@ -12,6 +12,7 @@ import togos.ccouch3.util.DateUtil;
 
 public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 {
+	// TODO: Centralize and make better
 	public static String xmlEscapeText( String text ) {
 		return text.replaceAll("&","&amp;").replaceAll("<", "&lt;").replaceAll(">","&gt;");
 	}
