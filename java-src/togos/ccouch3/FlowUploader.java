@@ -143,13 +143,28 @@ public class FlowUploader
 	
 	//// Message types ////
 	
+	static class CommitMetadata {
+		public final String description;
+		public final String authorName;
+		public final String[] tags;
+		
+		public CommitMetadata( String description, String authorName, String[] tags ) {
+			this.description = description;
+			this.authorName = authorName;
+			this.tags = tags;
+		}
+	}
+	
 	static class UploadTask {
 		public final String name;
 		public final String path;
+		/** If non-null, will be used to create commits */
+		public final CommitMetadata commitInfo;
 		
 		public UploadTask( String name, String path ) {
 			this.name = name;
 			this.path = path;
+			this.commitInfo = null;
 		}
 		
 		@Override
