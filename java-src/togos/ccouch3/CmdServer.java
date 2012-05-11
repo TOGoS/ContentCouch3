@@ -1,7 +1,10 @@
 package togos.ccouch3;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Iterator;
 
@@ -10,17 +13,20 @@ import togos.ccouch3.cmdstream.CmdWriter;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.repo.StoreException;
+import togos.ccouch3.util.FileUtil;
 
 public class CmdServer
 {
 	protected final CmdReader r;
 	protected final CmdWriter w;
 	protected final Repository repo;
+	protected final OutputStream incomingLogStream;
 	
-	public CmdServer( CmdReader r, CmdWriter w, Repository repo ) {
+	public CmdServer( CmdReader r, CmdWriter w, Repository repo, OutputStream incomingLogStream ) {
 		this.r = r;
 		this.w = w;
 		this.repo = repo;
+		this.incomingLogStream = incomingLogStream;
 	}
 	
 	/*
@@ -80,6 +86,24 @@ public class CmdServer
 		} else if( "head".equals(cmdName) && cmd.length == 3 ) {
 			String urn = cmd[2];
 			w.writeCmd( new String[] { "ok", "head", reqId, urn, repo.contains(urn) ? "found" : "missing" } );
+		} else if( "post".equals(cmdName) && cmd.length == 5 && "chunk".equals(cmd[3]) ) {
+			String urn = cmd[2];
+			if( urn.equals("incoming-log") ) {
+				int z;
+				byte[] buffer = new byte[65536];
+				InputStream in = r.getChunkInputStream();
+				boolean needsNewline = false;
+				while( (z = in.read(buffer)) > 0 ) {
+					incomingLogStream.write( buffer, 0, z );
+					needsNewline = buffer[z-1] != '\n';
+				}
+				if( needsNewline ) {
+					incomingLogStream.write('\n');
+				}
+				incomingLogStream.write('\n');
+				incomingLogStream.flush();
+			}
+			w.writeCmd( new String[] { "ok", "post", reqId, urn, "accepted" } );
 		} else if( "put".equals(cmdName) && cmd.length == 5 && "chunk".equals(cmd[3]) ) {
 			String urn = cmd[2];
 			try {
@@ -120,8 +144,12 @@ public class CmdServer
 			}
 		}
 		Repository repo = new SHA1FileRepository( new File(repoDir + "/data"), sector);
-		CmdServer cs = new CmdServer(new CmdReader(System.in), new CmdWriter(System.out), repo);
+		File incomingLogFile = new File(repoDir + "/log/incoming.log");
+		FileUtil.mkParentDirs(incomingLogFile);
+		FileOutputStream incomingLogStream = new FileOutputStream(incomingLogFile, true);
+		CmdServer cs = new CmdServer(new CmdReader(System.in), new CmdWriter(System.out), repo, incomingLogStream);
 		cs.run();
+		incomingLogStream.close();
 		return 0;
 	}
 	

@@ -1,20 +1,21 @@
 package togos.ccouch3.cmdstream;
 
-import java.io.BufferedInputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-public class CmdReader implements Closeable {
+import togos.ccouch3.util.StreamUtil;
+
+public class CmdReader implements Closeable
+{
 	int chunkLeft = 0;
 	public String debugPrefix = null;
 	
 	protected final InputStream is;
 	public CmdReader( InputStream is ) {
-		if( !is.markSupported() ) is = new BufferedInputStream(is);
-		this.is = is;
+		this.is = StreamUtil.markableInputStream(is);
 	}
 	
 	protected int readFully( InputStream is, byte[] buffer ) throws IOException {

@@ -5,6 +5,8 @@ import java.io.Flushable;
 import java.io.IOException;
 import java.io.OutputStream;
 
+import togos.blob.ByteChunk;
+
 public class CmdWriter implements Flushable, Closeable
 {
 	public static final String[] BYE_CMD = new String[]{ "bye" };
@@ -49,6 +51,10 @@ public class CmdWriter implements Flushable, Closeable
 		writeCmd( new String[]{ "chunk", String.valueOf(length) } );
 		os.write( buf, offset, length );
 		writeNewline();
+	}
+	
+	public void writeChunk( ByteChunk bc ) throws IOException {
+		writeChunk( bc.getBuffer(), bc.getOffset(), bc.getSize() );
 	}
 	
 	public void endChunks() throws IOException {

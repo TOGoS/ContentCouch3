@@ -12,6 +12,8 @@ import java.util.regex.Pattern;
 
 import org.bitpedia.util.Base32;
 
+import togos.ccouch3.util.FileUtil;
+
 
 public class SHA1FileRepository implements Repository
 {
@@ -42,13 +44,6 @@ public class SHA1FileRepository implements Repository
 		return false;
 	}
 	
-	protected void mkParentDirs( File f ) {
-		File p = f.getParentFile();
-		if( p == null ) return;
-		if( p.exists() ) return;
-		p.mkdirs();
-	}
-	
 	public void put(String urn, InputStream is) throws StoreException {
 		try {
 			if( !contains(urn) ) {
@@ -60,7 +55,7 @@ public class SHA1FileRepository implements Repository
 				
 				File tempFile = new File(dataDir + "/" + storeSector + "/." + sha1Base32 + "-" + r.nextInt(Integer.MAX_VALUE) + ".temp" );
 				try {
-					mkParentDirs( tempFile );
+					FileUtil.mkParentDirs( tempFile );
 					FileOutputStream fos = new FileOutputStream( tempFile );
 					MessageDigest digestor;
 					try {
@@ -81,7 +76,7 @@ public class SHA1FileRepository implements Repository
 						throw new HashMismatchException( "Given and calculated hashes do not match" );
 					}
 					File finalFile = new File(dataDir + "/" + storeSector + "/" + sha1Base32.substring(0,2) + "/" + sha1Base32);
-					mkParentDirs( finalFile );
+					FileUtil.mkParentDirs( finalFile );
 					if( !tempFile.renameTo(finalFile) ) {
 						throw new StoreException( "Failed to move temp file to final location" );
 					}

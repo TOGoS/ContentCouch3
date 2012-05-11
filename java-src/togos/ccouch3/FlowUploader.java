@@ -11,6 +11,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -194,6 +195,21 @@ public class FlowUploader
 		public FullyStoredMarker( String urn ) { this.urn = urn; }
 	}
 	
+	static class LogMessage {
+		public final byte[] message;
+		public LogMessage( byte[] message ) { this.message = message; }
+	}
+	
+	static class IndexResult {
+		public final FileInfo fileInfo;
+		public final boolean anyNewData;
+		
+		public IndexResult( FileInfo fi, boolean anyNewData ) {
+			this.fileInfo = fi;
+			this.anyNewData = anyNewData;
+		}
+	}
+	
 	static class FileMissing {
 		public final String path;
 		public final String urn;
@@ -345,21 +361,23 @@ public class FlowUploader
 			ArrayList<DirectoryEntry> entries = new ArrayList<DirectoryEntry>();
 			
 			for( File c : file.listFiles() ) {
-				if( !shouldIgnore(c) ) entries.add( new DirectoryEntry( c.getName(), index(c) ) );
+				if( !shouldIgnore(c) ) entries.add( new DirectoryEntry( c.getName(), index(c).fileInfo ) );
 			}
 			
 			return entries;
 		}
 		
-		protected FileInfo index( File file ) throws Exception {
+		protected IndexResult index( File file ) throws Exception {
 			String cachedUrn = uploadCache.getFileUrn( file );
 			if( cachedUrn != null && uploadCache.isFullyUploaded(cachedUrn) ) {
-				return new FileInfo(
-					file.getCanonicalPath(),
-					cachedUrn,
-					file.isDirectory() ? FileInfo.FILETYPE_DIRECTORY : FileInfo.FILETYPE_BLOB,
-					file.length(),
-					file.lastModified()
+				return new IndexResult(
+					new FileInfo(
+						file.getCanonicalPath(),
+						cachedUrn,
+						file.isDirectory() ? FileInfo.FILETYPE_DIRECTORY : FileInfo.FILETYPE_BLOB,
+						file.length(),
+						file.lastModified()
+					), false
 				);
 			}
 			
@@ -421,7 +439,7 @@ public class FlowUploader
 					uploadCache.cacheFileUrn( file, treeUrn );
 				}
 				if( uploadCache.isFullyUploaded(treeUrn) ) {
-					return fi;
+					return new IndexResult( fi, false );
 				}
 				
 				BlobInfo blobInfo = new BlobInfo( rdfBlobUrn, baos.toByteArray() );
@@ -430,10 +448,10 @@ public class FlowUploader
 			} else {
 				throw new RuntimeException("Don't know how to index "+file);
 			}
-			return fi;
+			return new IndexResult( fi, true );
 		}
 		
-		protected FileInfo index( String path ) throws Exception {
+		protected IndexResult index( String path ) throws Exception {
 			return index( new File(path) );
 		}
 	}
@@ -461,6 +479,11 @@ public class FlowUploader
 			} else if( m instanceof FullyStoredMarker ) {
 				FullyStoredMarker fsm = (FullyStoredMarker)m;
 				w.writeCmd( new String[]{ "echo", "fully-stored", fsm.urn} );
+			} else if( m instanceof LogMessage ) {
+				LogMessage lm = (LogMessage)m;
+				w.writeCmd( new String[]{ "post", "x", "incoming-log", "chunk", String.valueOf(lm.message.length) } );
+				w.writeChunk( lm.message, 0, lm.message.length );
+				w.endChunks();
 			} else if( m instanceof EndMessage ) {
 				w.bye();
 			} else {
@@ -495,6 +518,8 @@ public class FlowUploader
 							} else {
 								messageSink.give( new FileMissing(m[2], m[3]) );
 							}
+						} else if( "post".equals(m[1]) ) {
+							// Great!
 						} else if( "put".equals(m[1]) && m.length >= 3 ) {
 							// 0:ok 1:put 2:<urn> 3:<urn>
 							// Then one of our blobs went through; woot.
@@ -595,7 +620,7 @@ public class FlowUploader
 			public void give(Object m) throws Exception {}
 		}, getUploadCache());
 		for( UploadTask ut : tasks ) {
-			FileInfo fi = indexer.index(ut.path);
+			FileInfo fi = indexer.index(ut.path).fileInfo;
 			System.out.println( ut.name + "\t" + fi.urn );
 		}
 	}
@@ -639,12 +664,21 @@ public class FlowUploader
 			public boolean handleMessage( Object m ) throws Exception {
 				if( m instanceof UploadTask ) {
 					UploadTask ut = (UploadTask)m;
-					FileInfo fi = indexer.index(ut.path);
+					IndexResult indexResult = indexer.index(ut.path);
 					if( reportUrn ) {
-						System.out.println(fi.urn);
+						System.out.println(indexResult.fileInfo.urn);
 					}
 					if( reportPathUrnMapping ) {
-						System.out.println(fi.path+"\t"+fi.urn);
+						System.out.println(indexResult.fileInfo.path+"\t"+indexResult.fileInfo.urn);
+					}
+					if( indexResult.anyNewData ) {
+						// If any new data was uploaded, send the name -> URN mapping to the server
+						// to be logged.  We want to NOT do this if we are only indexing and not
+						// sending!  In this case anyNewData will also be false.
+						String message =
+							"[" + new Date(System.currentTimeMillis()).toString() + "] Indexed file/directory\n" +
+							ut.name+" as "+indexResult.fileInfo.urn;
+						indexOutput.add( new LogMessage(BlobUtil.bytes(message)) );
 					}
 					return true;
 				} else if( m instanceof EndMessage ) {
