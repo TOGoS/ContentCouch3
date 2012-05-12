@@ -1,0 +1,5 @@
+- Online help text
+
+- When -n (name) is given, report that instead of path in log
+- When -m and/or -a are given, create a commit and log its URN in addition or in place of the file URN 
+- Upload to multiple servers at once
