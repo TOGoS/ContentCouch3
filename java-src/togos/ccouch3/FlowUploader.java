@@ -661,7 +661,9 @@ public class FlowUploader
 			}
 		}
 	}
-	
+
+	boolean anythingSent = false;
+		
 	/**
 	 * This method creates, starts, and waits for a bunch of threads that comminicate via
 	 * pipes and queues.  The code does not make this super obvious, but the flow
@@ -751,8 +753,6 @@ public class FlowUploader
 		final Thread headResponseReaderThread = new Thread( headResponseReader, "Head Response Reader" );
 		final Thread uploadResponseReaderThread = new Thread( uploadResponseReader, "Upload Response Reader" );
 		final Thread indexOutputThread = new Thread( new QueueRunner( indexOutput ) {
-			boolean anythingSent;
-			
 			@Override
 			protected void cleanUp() throws Exception {}
 			
@@ -790,14 +790,18 @@ public class FlowUploader
 			headErrorPiper.join();
 			uploadErrorPiper.join();
 			
-			int z;
-			if( (z = headProc.waitFor()) != 0 ) {
-				System.err.println("Error: Head process exited with code "+z);
-				error = true;
-			}
-			if( (z = uploadProc.waitFor()) != 0 ) {
-				System.err.println("Error: Upload process exited with code "+z);
-				error = true;
+			int headProcExitCode = headProc.waitFor();
+			int uploadProcExitCode = uploadProc.waitFor();
+			
+			if( anythingSent ) {
+				if( headProcExitCode != 0 ) {
+					System.err.println("Error: Head process exited with code "+headProcExitCode);
+					error = true;
+				}
+				if( uploadProcExitCode != 0 ) {
+					System.err.println("Error: Upload process exited with code "+uploadProcExitCode);
+					error = true;
+				}
 			}
 		} catch( InterruptedException e ) {
 			indexThread.interrupt();
