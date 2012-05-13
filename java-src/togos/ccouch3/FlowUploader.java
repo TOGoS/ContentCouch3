@@ -791,7 +791,7 @@ public class FlowUploader
 		}
 	}
 	
-	static FlowUploaderCommand fromArgs( Iterator<String> args ) throws Exception {
+	static FlowUploaderCommand fromArgs( Iterator<String> args, boolean requireServer ) throws Exception {
 		ArrayList<UploadTask> tasks = new ArrayList<UploadTask>();
 		boolean verbose = false; // false!;
 		String cacheDir = null;
@@ -835,11 +835,13 @@ public class FlowUploader
 			cacheDirFile = new File(cacheDir);
 		}
 		
-		if( serverCommand == null ) {
-			return FlowUploaderCommand.error("No -server-command given.");
-		}
-		if( serverName == null ) {
-			return FlowUploaderCommand.error("No -server-name given.");
+		if( requireServer ) {
+			if( serverCommand == null ) {
+				return FlowUploaderCommand.error("No -server-command given.");
+			}
+			if( serverName == null ) {
+				return FlowUploaderCommand.error("No -server-name given.");
+			}
 		}
 		
 		FlowUploader fu = new FlowUploader(tasks);
@@ -872,7 +874,7 @@ public class FlowUploader
 		"    /home/tom/directory-full-of-files-to-back-up/";
 	
 	public static int uploadMain( Iterator<String> args ) throws Exception {
-		FlowUploaderCommand fuc = fromArgs(args);
+		FlowUploaderCommand fuc = fromArgs(args, true);
 		switch( fuc.mode ) {
 		case( FlowUploaderCommand.MODE_ERROR ):
 			System.err.println( "Error: " + fuc.errorMessage + "\n" );
@@ -900,7 +902,7 @@ public class FlowUploader
 		"  ccouch3 id something.txt some-directory/ somethingelse.zip";
 	
 	public static int identifyMain( Iterator<String> args ) throws Exception {
-		FlowUploaderCommand fuc = fromArgs(args);
+		FlowUploaderCommand fuc = fromArgs(args, false);
 		switch( fuc.mode ) {
 		case( FlowUploaderCommand.MODE_ERROR ):
 			System.err.println( "Error: " + fuc.errorMessage + "\n" );
