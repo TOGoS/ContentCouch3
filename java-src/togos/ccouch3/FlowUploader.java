@@ -675,9 +675,10 @@ public class FlowUploader
 						// If any new data was uploaded, send the name -> URN mapping to the server
 						// to be logged.  We want to NOT do this if we are only indexing and not
 						// sending!  In this case anyNewData will also be false.
+						String objectTypeName = indexResult.fileInfo.fileType == FileInfo.FILETYPE_BLOB ? "File" : "Directory";
 						String message =
 							"[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
-							"File '" + ut.name + "' = " + indexResult.fileInfo.urn;
+							objectTypeName + " '" + ut.name + "' = " + indexResult.fileInfo.urn;
 						indexOutput.add( new LogMessage(BlobUtil.bytes(message)) );
 					}
 					return true;
