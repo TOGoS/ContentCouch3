@@ -7,6 +7,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -625,11 +626,62 @@ public class FlowUploader
 		}
 	}
 	
-	public void runUpload() {
+	protected static void pipe( InputStream is, OutputStream os ) throws IOException {
+		byte[] buffer = new byte[65536];
+		for( int z = is.read(buffer); z>0; z = is.read(buffer) ) {
+			os.write(buffer, 0, z);
+		}
+	}
+	
+	static class Piper extends Thread {
+		protected final InputStream is;
+		protected final OutputStream os;
+		
+		public Piper( InputStream is, OutputStream os ) {
+			this.is = is;
+			this.os = os;
+		}
+		
+		@Override
+		public void interrupt() {
+			super.interrupt();
+			try {
+				is.close();
+			} catch( IOException e ) {
+				e.printStackTrace();
+			}
+		}
+		
+		@Override
+		public void run() {
+			try {
+				pipe(is,os);
+			} catch( IOException e ) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
+	
+	/**
+	 * This method creates, starts, and waits for a bunch of threads that comminicate via
+	 * pipes and queues.  The code does not make this super obvious, but the flow
+	 * is fairly simple:
+	 * 
+	 * indexer -> head requestor -> head response handler -> uploader -> upload response handler
+	 *                                \-> head error piper                 \-> upload error piper
+	 *                                
+	 * if indexer finishes without sending anything on to the next process, the other threads
+	 * are aborted.
+	 */
+	
+	public int runUpload() {
+		final Thread headErrorPiper, uploadErrorPiper;
 		final Process headProc, uploadProc;
 		try {
 			headProc = Runtime.getRuntime().exec(serverCommand);
 			uploadProc = Runtime.getRuntime().exec(serverCommand);
+			headErrorPiper = new Piper( headProc.getErrorStream(), System.err );
+			uploadErrorPiper = new Piper( uploadProc.getErrorStream(), System.err );
 		} catch( IOException e ) {
 			throw new RuntimeException("Couldn't run cmdserver via exec");
 		}
@@ -721,23 +773,40 @@ public class FlowUploader
 		}, "Index Output Filter" );
 		
 		indexThread.start();
+		headErrorPiper.start();
+		uploadErrorPiper.start();
 		headResponseReaderThread.start();
 		uploadResponseReaderThread.start();
 		indexOutputThread.start();
 		
 		uploadTaskQueue.add( EndMessage.INSTANCE );
 		
+		boolean error = false;
 		try {
 			indexThread.join();
 			indexOutputThread.join();
 			headResponseReaderThread.join();
 			uploadResponseReaderThread.join();
+			headErrorPiper.join();
+			uploadErrorPiper.join();
+			
+			int z;
+			if( (z = headProc.waitFor()) != 0 ) {
+				System.err.println("Error: Head process exited with code "+z);
+				error = true;
+			}
+			if( (z = uploadProc.waitFor()) != 0 ) {
+				System.err.println("Error: Upload process exited with code "+z);
+				error = true;
+			}
 		} catch( InterruptedException e ) {
 			indexThread.interrupt();
 			indexOutputThread.interrupt();
 			headResponseReaderThread.interrupt();
 			uploadResponseReaderThread.interrupt();
 			Thread.currentThread().interrupt();
+			headErrorPiper.interrupt();
+			uploadErrorPiper.interrupt();
 		}
 		
 		if( showTransferSummary ) {
@@ -748,6 +817,8 @@ public class FlowUploader
 				System.err.println( "Transferred "+thing.getValue().byteCount+" bytes in "+thing.getValue().unitCount+" "+thing.getKey()+"s");
 			}
 		}
+		
+		return error ? 1 : 0;
 	}
 	
 	static String stripTrailingSlash( String path ) {
@@ -811,8 +882,11 @@ public class FlowUploader
 				serverName = args.next();
 			} else if( "-server-command".equals(a) ) {
 				List<String> sc = new ArrayList<String>();
-				for( a = args.next(); a != null && !"--".equals(a); a = args.next() ) {
+				for( a = args.hasNext() ? args.next() : null; a != null && !"--".equals(a); a = args.hasNext() ? args.next() : null ) {
 					sc.add( a );
+				}
+				if( a == null ) {
+					System.err.println("Warning: no ending '--' found after '-server-command'.");
 				}
 				serverCommand = sc.toArray(new String[sc.size()]);
 			} else if( CCouch3Command.isHelpArgument(a) ) {
@@ -884,8 +958,7 @@ public class FlowUploader
 			System.out.println( UPLOAD_USAGE );
 			return 0;
 		default:
-			fuc.flowUploader.runUpload();
-			return 0;
+			return fuc.flowUploader.runUpload();
 		}
 	}
 	
