@@ -122,6 +122,9 @@ public class CmdReader implements Closeable
 				throw new IOException("Not a chunk! "+c[0]);
 			}
 			chunkLeft = Integer.parseInt(c[1]);
+			if( chunkLeft == 0 ) {
+				throw new IOException("Command stream contains zero-length chunk, which is not allowed!");
+			}
 		}
 		z = is.read(buffer, off, Math.min( len, chunkLeft ) );
 		if( z == -1 ) throw new IOException("Hit end of stream while reading chunk");

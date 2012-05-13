@@ -565,7 +565,7 @@ public class FlowUploader
 				w.writeCmd( new String[] { "put", fm.urn, fm.urn, "chunk", String.valueOf(f.length()) } );
 				byte[] buffer = new byte[(int)Math.min(1024*1024, f.length())];
 				FileInputStream fis = new FileInputStream(f);
-				for( int z = fis.read(buffer); z >= 0; z = fis.read(buffer) ) {
+				for( int z = fis.read(buffer); z > 0; z = fis.read(buffer) ) {
 					w.writeChunk( buffer, 0, z );
 					tt.transferred( z, 0, "file" );
 				}

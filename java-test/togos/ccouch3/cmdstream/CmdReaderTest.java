@@ -80,7 +80,17 @@ public class CmdReaderTest extends TestCase
 		
 		assertEquals( -1, r.readChunk(buf, 0, buf.length) );
 	}
-
+	
+	public void testReadZeroLengthChunks() throws IOException {
+		byte[] buf = new byte[10];
+		
+		w.writeChunk( new byte[] { 5, 0, 1, 2, 3, 6 }, 1, 0 );
+		w.writeChunk( new byte[] { 5, 0, 1, 2, 3, 6 }, 1, 0 );
+		w.endChunks();
+		
+		assertEquals( -1, r.readChunk(buf, 0, buf.length) );
+	}
+	
 	public void testReadChunkInSmallerPieces() throws IOException {
 		byte[] buf = new byte[3];
 		
