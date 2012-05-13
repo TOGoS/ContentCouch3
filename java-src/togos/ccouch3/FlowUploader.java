@@ -676,8 +676,8 @@ public class FlowUploader
 						// to be logged.  We want to NOT do this if we are only indexing and not
 						// sending!  In this case anyNewData will also be false.
 						String message =
-							"[" + new Date(System.currentTimeMillis()).toString() + "] Indexed file/directory\n" +
-							ut.name+" as "+indexResult.fileInfo.urn;
+							"[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
+							"File '" + ut.name + "' = " + indexResult.fileInfo.urn;
 						indexOutput.add( new LogMessage(BlobUtil.bytes(message)) );
 					}
 					return true;
@@ -749,7 +749,48 @@ public class FlowUploader
 		}
 	}
 	
-	static FlowUploader fromArgs( Iterator<String> args ) throws Exception {
+	static String stripTrailingSlash( String path ) {
+		return ( path.length() > 0 && path.charAt(path.length()-1) == '/' ) ?
+			path.substring(0, path.length()-1) : path;
+	}
+	
+	/**
+	 * Returns an appropriate directory for storing cache files
+	 * within the repository at the given path.
+	 */
+	static String repoCacheDir( String repoPath ) {
+		return stripTrailingSlash(repoPath) + "/cache/flow-uploader";
+	}
+	
+	static class FlowUploaderCommand {
+		public static final int MODE_RUN   = 0;
+		public static final int MODE_ERROR = 1;
+		public static final int MODE_HELP  = 2;
+		
+		public static FlowUploaderCommand error( String errorMessage ) {
+			return new FlowUploaderCommand( MODE_ERROR, errorMessage, null );
+		}
+		
+		public static FlowUploaderCommand normal( FlowUploader up ) {
+			return new FlowUploaderCommand( MODE_RUN, null, up );
+		}
+
+		public static FlowUploaderCommand help() {
+			return new FlowUploaderCommand( MODE_HELP, null, null );
+		}
+		
+		public final int mode;
+		public final String errorMessage;
+		public final FlowUploader flowUploader;
+		
+		public FlowUploaderCommand( int mode, String errorMessage, FlowUploader fu ) {
+			this.mode = mode;
+			this.errorMessage = errorMessage;
+			this.flowUploader = fu;
+		}
+	}
+	
+	static FlowUploaderCommand fromArgs( Iterator<String> args ) throws Exception {
 		ArrayList<UploadTask> tasks = new ArrayList<UploadTask>();
 		boolean verbose = false; // false!;
 		String cacheDir = null;
@@ -761,6 +802,8 @@ public class FlowUploader
 				verbose = true;
 			} else if( "-no-cache".equals(a) ) {
 				cacheDir = "DO-NOT-CACHE";
+			} else if( "-repo".equals(a) ) {
+				cacheDir = repoCacheDir( args.next() );
 			} else if( "-cache-dir".equals(a) ) {
 				cacheDir = args.next();
 			} else if( "-server-name".equals(a) ) {
@@ -771,54 +814,104 @@ public class FlowUploader
 					sc.add( a );
 				}
 				serverCommand = sc.toArray(new String[sc.size()]);
+			} else if( CCouch3Command.isHelpArgument(a) ) {
+				return FlowUploaderCommand.help();
 			} else if( !a.startsWith("-") ) {
 				tasks.add( new UploadTask(a, a) );
 			} else {
-				System.err.println("Unrecognised argument: "+a);
-				return null;
+				return FlowUploaderCommand.error("Unrecognised argument: "+a);
 			}
 		}
 		
-		FlowUploader fu = new FlowUploader(tasks);
-		
+		File cacheDirFile;
 		if( "DO-NOT-CACHE".equals(cacheDir) ) {
-			fu.cacheDir = null;
+			cacheDirFile = null;
 		} else if( cacheDir == null ) {
 			String homeDir = System.getProperty("user.home");
 			if( homeDir == null ) homeDir = ".";
-			fu.cacheDir = new File(homeDir + "/.ccouch/cache/flow-uploader");
+			cacheDirFile = new File(repoCacheDir(homeDir + "/.ccouch"));
 		} else {
-			fu.cacheDir = new File(cacheDir);
+			cacheDirFile = new File(cacheDir);
 		}
 		
+		if( serverCommand == null ) {
+			return FlowUploaderCommand.error("No -server-command given.");
+		}
+		if( serverName == null ) {
+			return FlowUploaderCommand.error("No -server-name given.");
+		}
+		
+		FlowUploader fu = new FlowUploader(tasks);
+		fu.cacheDir = cacheDirFile;
 		fu.showTransferSummary = verbose;
 		fu.reportPathUrnMapping = verbose && tasks.size() != 1;
 		fu.reportUrn = verbose && tasks.size() == 1;
 		fu.serverName = serverName;
 		fu.serverCommand = serverCommand;
-		return fu;
+		return FlowUploaderCommand.normal( fu );
 	}
+	
+	static final String UPLOAD_USAGE =
+		"Usage: ccouch3 upload <options> <file/dir> ...\n" +
+		"\n" +
+		"Upload files and directories to a repository by piping cmd-server commands\n" +
+		"to another program (probably 'ssh somewhere \"ccouch3 cmd-server\"').\n" +
+		"\n" +
+		"Options:\n" +
+		"  -repo <path> ; Path to local ccouch repository to store cache in.\n" +
+		"  -no-cache    ; Do not cache file hashes or upload records.\n" +
+		"  -server-name <name> ; name of repository you are uploading to;\n" +
+		"    this is used for tracking which files have already been uploaded where.\n" +
+		"  -server-command <cmd> <arg> <arg> ... -- ; Command to pipe cmd-server\n" +
+		"    commands to.\n" +
+		"\n" +
+		"Example usage:\n" +
+		"  ccouch3 upload -server-name example.org \\\n" +
+		"    -server-command ssh tom@example.org \"ccouch3 cmd-server\" --\n" +
+		"    /home/tom/directory-full-of-files-to-back-up/";
 	
 	public static int uploadMain( Iterator<String> args ) throws Exception {
-		FlowUploader fu = fromArgs(args);
-		if( fu == null ) return 1;
-		if( fu.serverCommand == null ) {
-			System.err.println("No -server-command given.  Syntax: -server-command <cmd> <arg1> <arg2> ... --");
+		FlowUploaderCommand fuc = fromArgs(args);
+		switch( fuc.mode ) {
+		case( FlowUploaderCommand.MODE_ERROR ):
+			System.err.println( "Error: " + fuc.errorMessage + "\n" );
+			System.err.println( UPLOAD_USAGE );
 			return 1;
+		case( FlowUploaderCommand.MODE_HELP ):
+			System.out.println( UPLOAD_USAGE );
+			return 0;
+		default:
+			fuc.flowUploader.runUpload();
+			return 0;
 		}
-		if( fu.serverName == null ) {
-			System.err.println("No -server-name given.  Syntax: -server-name <name>");
-			return 1;
-		}
-		fu.runUpload();
-		return 0;
 	}
 	
+	static final String IDENTIFY_USAGE =
+		"Usage: ccouch3 id <file/dir> ...\n" +
+		"\n" +
+		"Identify files and directories without copying them anywhere.\n" +
+		"\n" +
+		"Options:\n" +
+		"  -repo <path> ; Path to local ccouch repository to store cache in.\n" +
+		"  -no-cache    ; Do not cache file hashes or upload records.\n" +
+		"\n" +
+		"Example usage:\n" +
+		"  ccouch3 id something.txt some-directory/ somethingelse.zip";
+	
 	public static int identifyMain( Iterator<String> args ) throws Exception {
-		FlowUploader fu = fromArgs(args);
-		if( fu == null ) return 1;
-		fu.runIdentify();
-		return 0;
+		FlowUploaderCommand fuc = fromArgs(args);
+		switch( fuc.mode ) {
+		case( FlowUploaderCommand.MODE_ERROR ):
+			System.err.println( "Error: " + fuc.errorMessage + "\n" );
+			System.err.println( IDENTIFY_USAGE );
+			return 1;
+		case( FlowUploaderCommand.MODE_HELP ):
+			System.out.println( IDENTIFY_USAGE );
+			return 0;
+		default:
+			fuc.flowUploader.runIdentify();
+			return 0;
+		}
 	}
 	
 	public static void main( String[] args ) throws Exception {

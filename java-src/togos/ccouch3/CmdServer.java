@@ -128,6 +128,15 @@ public class CmdServer
 		}
 	}
 	
+	public static final String USAGE =
+		"Usage: ccouch3 cmd-server [options]\n" +
+		"\n" +
+		"Handles commands and incoming data from 'ccouch3 upload'.\n" +
+		"\n" +
+		"Options:\n" +
+		"  -repo <path>   ; path to repo in which to store blobs, caches, and logs.\n" +
+		"  -sector <name> ; name of sector in which to store incoming data";
+	
 	public static int main( Iterator<String> argi ) throws Exception {
 		String homeDir = System.getProperty("user.home");
 		if( homeDir == null ) homeDir = ".";
@@ -139,8 +148,13 @@ public class CmdServer
 				repoDir = argi.next();
 			} else if( "-sector".equals(arg) ) {
 				sector = argi.next();
+			} else if( CCouch3Command.isHelpArgument(arg) ) {
+				System.out.println( USAGE );
+				return 0;
 			} else {
-				throw new RuntimeException("Error: Unrecognised cmd-server argument: " + arg);
+				System.err.println( "Error: Unrecognised argument: " + arg );
+				System.err.println( USAGE );
+				return 1;
 			}
 		}
 		Repository repo = new SHA1FileRepository( new File(repoDir + "/data"), sector);
