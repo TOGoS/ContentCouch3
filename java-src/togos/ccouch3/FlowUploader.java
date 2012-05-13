@@ -615,14 +615,23 @@ public class FlowUploader
 		return uc;
 	}
 	
+	protected void report( FileInfo fileInfo ) {
+		if( reportUrn ) {
+			System.out.println(fileInfo.urn);
+		}
+		if( reportPathUrnMapping ) {
+			System.out.println(fileInfo.path+"\t"+fileInfo.urn);
+		}
+	}
+	
 	public void runIdentify() throws Exception {
 		final Indexer indexer = new Indexer( dirSer, digestor, new Sink<Object>() {
 			@Override
 			public void give(Object m) throws Exception {}
 		}, getUploadCache());
 		for( UploadTask ut : tasks ) {
-			FileInfo fi = indexer.index(ut.path).fileInfo;
-			System.out.println( ut.name + "\t" + fi.urn );
+			IndexResult indexResult = indexer.index(ut.path);
+			report( indexResult.fileInfo );
 		}
 	}
 	
@@ -719,12 +728,7 @@ public class FlowUploader
 				if( m instanceof UploadTask ) {
 					UploadTask ut = (UploadTask)m;
 					IndexResult indexResult = indexer.index(ut.path);
-					if( reportUrn ) {
-						System.out.println(indexResult.fileInfo.urn);
-					}
-					if( reportPathUrnMapping ) {
-						System.out.println(indexResult.fileInfo.path+"\t"+indexResult.fileInfo.urn);
-					}
+					report( indexResult.fileInfo );
 					if( indexResult.anyNewData ) {
 						// If any new data was uploaded, send the name -> URN mapping to the server
 						// to be logged.  We want to NOT do this if we are only indexing and not
