@@ -39,7 +39,6 @@ public class CmdWriter implements Flushable, Closeable
 			os.write( escape(cmd[i]).getBytes() );
 			os.write( i == cmd.length - 1 ? '\n' : ' ');
 		}
-		os.flush();
 	}
 	
 	public void writeNewline() throws IOException {
@@ -69,6 +68,7 @@ public class CmdWriter implements Flushable, Closeable
 	 */
 	public void bye() throws IOException {
 		if( !closing ) writeCmd( BYE_CMD );
+		flush();
 		closing = true;
 	}
 	

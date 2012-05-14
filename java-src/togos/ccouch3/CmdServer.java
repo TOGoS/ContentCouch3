@@ -72,51 +72,55 @@ public class CmdServer
 		String cmdName = cmd[0];
 		String reqId = cmd.length >= 2 ? cmd[1] : "null";
 		
-		if( "bye".equals(cmdName) ) {
-			w.writeCmd( new String[] { "ok","bye",reqId,"and","farewell" } );
-			w.close();
-			return false;
-		} else if( "echo".equals(cmdName) ) {
-			int tokenCount = Math.max(0, cmd.length - 2);
-			String[] res = new String[tokenCount+3];
-			res[0] = "ok"; res[1] = "echo"; res[2] = reqId;
-			for( int i=0; i<tokenCount; ++i ) res[i+3] = cmd[i+2];
-			w.writeCmd( res );
-			return true;
-		} else if( "head".equals(cmdName) && cmd.length == 3 ) {
-			String urn = cmd[2];
-			w.writeCmd( new String[] { "ok", "head", reqId, urn, repo.contains(urn) ? "found" : "missing" } );
-		} else if( "post".equals(cmdName) && cmd.length == 5 && "chunk".equals(cmd[3]) ) {
-			String urn = cmd[2];
-			if( urn.equals("incoming-log") ) {
-				int z;
-				byte[] buffer = new byte[65536];
-				InputStream in = r.getChunkInputStream();
-				boolean needsNewline = false;
-				while( (z = in.read(buffer)) > 0 ) {
-					incomingLogStream.write( buffer, 0, z );
-					needsNewline = buffer[z-1] != '\n';
-				}
-				if( needsNewline ) {
+		try {
+			if( "bye".equals(cmdName) ) {
+				w.writeCmd( new String[] { "ok","bye",reqId,"and","farewell" } );
+				w.close();
+				return false;
+			} else if( "echo".equals(cmdName) ) {
+				int tokenCount = Math.max(0, cmd.length - 2);
+				String[] res = new String[tokenCount+3];
+				res[0] = "ok"; res[1] = "echo"; res[2] = reqId;
+				for( int i=0; i<tokenCount; ++i ) res[i+3] = cmd[i+2];
+				w.writeCmd( res );
+				return true;
+			} else if( "head".equals(cmdName) && cmd.length == 3 ) {
+				String urn = cmd[2];
+				w.writeCmd( new String[] { "ok", "head", reqId, urn, repo.contains(urn) ? "found" : "missing" } );
+			} else if( "post".equals(cmdName) && cmd.length == 5 && "chunk".equals(cmd[3]) ) {
+				String urn = cmd[2];
+				if( urn.equals("incoming-log") ) {
+					int z;
+					byte[] buffer = new byte[65536];
+					InputStream in = r.getChunkInputStream();
+					boolean needsNewline = false;
+					while( (z = in.read(buffer)) > 0 ) {
+						incomingLogStream.write( buffer, 0, z );
+						needsNewline = buffer[z-1] != '\n';
+					}
+					if( needsNewline ) {
+						incomingLogStream.write('\n');
+					}
 					incomingLogStream.write('\n');
+					incomingLogStream.flush();
 				}
-				incomingLogStream.write('\n');
-				incomingLogStream.flush();
-			}
-			w.writeCmd( new String[] { "ok", "post", reqId, urn, "accepted" } );
-		} else if( "put".equals(cmdName) && cmd.length == 5 && "chunk".equals(cmd[3]) ) {
-			String urn = cmd[2];
-			try {
-				repo.put( urn, r.getChunkInputStream() );
-				w.writeCmd( new String[] { "ok", "put", reqId, urn, "accepted" } );
-			} catch( StoreException e ) {
-				w.writeCmd( new String[] { "error", "put", reqId, urn, "rejected", tokenize(e.getMessage()) } );
+				w.writeCmd( new String[] { "ok", "post", reqId, urn, "accepted" } );
+			} else if( "put".equals(cmdName) && cmd.length == 5 && "chunk".equals(cmd[3]) ) {
+				String urn = cmd[2];
+				try {
+					repo.put( urn, r.getChunkInputStream() );
+					w.writeCmd( new String[] { "ok", "put", reqId, urn, "accepted" } );
+				} catch( StoreException e ) {
+					w.writeCmd( new String[] { "error", "put", reqId, urn, "rejected", tokenize(e.getMessage()) } );
+				}
+				return true;
+			} else {
+				w.writeCmd( new String[] { "error", cmdName, reqId, "unrecognised-command" } );
 			}
 			return true;
-		} else {
-			w.writeCmd( new String[] { "error", cmdName, reqId, "unrecognised-command" } );
+		} finally {
+			w.flush();
 		}
-		return true;
 	}
 	
 	public void run() {
