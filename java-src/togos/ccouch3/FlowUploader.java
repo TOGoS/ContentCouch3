@@ -2,6 +2,7 @@ package togos.ccouch3;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -30,6 +31,7 @@ import togos.ccouch3.hash.BitprintHashURNFormatter;
 import togos.ccouch3.hash.HashFormatter;
 import togos.ccouch3.slf.RandomAccessFileBlob;
 import togos.ccouch3.slf.SimpleListFile2;
+import togos.service.Service;
 
 public class FlowUploader
 {
@@ -457,7 +459,7 @@ public class FlowUploader
 		}
 	}
 	
-	class HeadRequestSender implements Sink<Object> {
+	static class HeadRequestSender implements Sink<Object> {
 		protected final CmdWriter w;
 		protected final TransferTracker tt;
 		
@@ -494,19 +496,44 @@ public class FlowUploader
 		}
 	}
 	
-	class CmdResponseReader implements Runnable {
+	static class CmdResponseReader implements Runnable, Closeable {
 		protected final CmdReader r;
 		protected final Sink<Object> messageSink;
+		protected boolean closing;
 		
 		public CmdResponseReader( CmdReader r, Sink<Object> messageSink ) {
 			this.r = r;
 			this.messageSink = messageSink;
 		}
 		
+		public void close() throws IOException {
+			synchronized( this ) {
+				closing = true;
+			}
+			r.close();
+		}
+		
+		protected String[] readCmd() throws IOException {
+			// Sometimes if underlying streams get closed the 'wrong way'
+			// (e.g. by killing a process that you're reading from) read() returns
+			// IOExceptions.  To prevent these from propagating to the rest of
+			// the program, use CmdResponseReader#close() before killing the command
+			// process.  Then if an exception is caught, here, we just return null to
+			// indicate 'no more messages'.
+			try {
+				return r.readCmd();
+			} catch( IOException e ) {
+				synchronized( this ) {
+					if( !closing ) throw e;
+				}
+				return null;
+			}
+		}
+		
 		public void run() {
 			String[] m;
 			try {
-				while( (m = r.readCmd()) != null ) {
+				while( (m = readCmd()) != null ) {
 					String responseType = m[0];
 					if( "error".equals(responseType) ) {
 						throw new RuntimeException("Error from server: "+CmdWriter.encode(m));
@@ -547,7 +574,7 @@ public class FlowUploader
 		}
 	}
 	
-	class Uploader implements Sink<Object> {
+	static class Uploader implements Sink<Object> {
 		protected final CmdWriter w;
 		protected final TransferTracker tt;
 		public Uploader( CmdWriter w, TransferTracker tt ) {
@@ -580,6 +607,114 @@ public class FlowUploader
 				w.bye();
 				throw new RuntimeException("Unexpected message: "+m.toString());
 			}
+		}
+	}
+	
+	static class UploadClient implements Service, Sink<Object> {
+		public final String serverName;
+		public final String[] serverCommand;
+		protected final TransferTracker transferTracker;
+		protected final UploadCache uploadCache;
+		
+		protected boolean started;
+		protected boolean anythingSent;
+		Process headProc, uploadProc;
+		HeadRequestSender headRequestSender;
+		CmdResponseReader headResponseReader;
+		Piper headErrorPiper;
+		Thread headResponseReaderThread;
+		Uploader uploader;
+		CmdResponseReader uploadResponseReader;
+		Thread uploadResponseReaderThread;
+		Piper uploadErrorPiper;
+		
+		public int headProcExitCode = 0;
+		public int uploadProcExitCode = 0;
+		
+		public UploadClient( String serverName, String[] serverCommand, UploadCache uc, TransferTracker tt ) {
+			this.serverName = serverName;
+			this.serverCommand = serverCommand;
+			this.transferTracker = tt;
+			this.uploadCache = uc;
+		}
+		
+		public void give( Object m ) throws Exception {
+			if( !anythingSent && m instanceof EndMessage ) {
+				// Then we can quit without waiting for the server to
+				// forward our EndMessages back to us!
+				halt();
+			} else {
+				headRequestSender.give(m);
+				anythingSent = true;
+			}
+		}
+		
+		public void start() {
+			synchronized( this ) {
+				if( started ) return;
+				started = true;
+			}
+			
+			try {
+				headProc = Runtime.getRuntime().exec(serverCommand);
+				uploadProc = Runtime.getRuntime().exec(serverCommand);
+			} catch( IOException e ) {
+				throw new RuntimeException("Failed to start '"+serverName+"' command server process", e);
+			}
+			
+			headErrorPiper = new Piper( headProc.getErrorStream(), System.err );
+			uploadErrorPiper = new Piper( uploadProc.getErrorStream(), System.err );
+			
+			uploader = new Uploader( new CmdWriter(uploadProc.getOutputStream()), transferTracker );
+			headRequestSender = new HeadRequestSender( new CmdWriter(headProc.getOutputStream()), transferTracker );
+			headResponseReader = new CmdResponseReader(
+				new CmdReader(headProc.getInputStream()),
+				uploader
+			);
+			final CmdResponseReader uploadResponseReader = new CmdResponseReader(
+				new CmdReader(uploadProc.getInputStream()),
+				new Sink<Object>() { public void give(Object value) throws Exception {
+					if( value instanceof FullyStoredMarker ) {
+						FullyStoredMarker fsm = (FullyStoredMarker)value;
+						uploadCache.markFullyUploaded( fsm.urn );
+					}
+				} }
+			);
+			
+			headResponseReaderThread = new Thread( headResponseReader, "Head Response Reader" );
+			uploadResponseReaderThread = new Thread( uploadResponseReader, "Upload Response Reader" );
+			
+			headErrorPiper.start();
+			uploadErrorPiper.start();
+			headResponseReaderThread.start();
+			uploadResponseReaderThread.start();
+		}
+		
+		protected void close( Closeable c, String description ) {
+			try {
+				if( c != null ) c.close();
+			} catch( IOException e ) {
+				System.err.println("Error closing "+description+":\n");
+				e.printStackTrace(System.err);
+			}
+		}
+		
+		public void halt() {
+			// Close the processes so that read threads will return immediately
+			close( headResponseReader, "head response reader" );
+			close( uploadResponseReader, "upload response reader" );
+			if( headProc != null ) headProc.destroy();
+			if( uploadProc != null ) uploadProc.destroy();
+			if( headErrorPiper != null ) headErrorPiper.interrupt();
+			if( uploadErrorPiper != null ) uploadErrorPiper.interrupt();
+		}
+		
+		public void join() throws InterruptedException {
+			headProcExitCode = headProc.waitFor();
+			headResponseReaderThread.join();
+			uploadResponseReaderThread.join();
+			headErrorPiper.join();
+			uploadErrorPiper.join();
 		}
 	}
 	
@@ -675,32 +810,9 @@ public class FlowUploader
 	 */
 	
 	public int runUpload() {
-		final Thread headErrorPiper, uploadErrorPiper;
-		final Process headProc, uploadProc;
-		try {
-			headProc = Runtime.getRuntime().exec(serverCommand);
-			uploadProc = Runtime.getRuntime().exec(serverCommand);
-			headErrorPiper = new Piper( headProc.getErrorStream(), System.err );
-			uploadErrorPiper = new Piper( uploadProc.getErrorStream(), System.err );
-		} catch( IOException e ) {
-			throw new RuntimeException("Couldn't run cmdserver via exec");
-		}
 		final StandardTransferTracker tt = new StandardTransferTracker();
-		final Uploader uploader = new Uploader( new CmdWriter(uploadProc.getOutputStream()), tt );
-		final HeadRequestSender headRequestor = new HeadRequestSender( new CmdWriter(headProc.getOutputStream()), tt );
-		final CmdResponseReader headResponseReader = new CmdResponseReader(
-			new CmdReader(headProc.getInputStream()),
-			uploader
-		);
-		final CmdResponseReader uploadResponseReader = new CmdResponseReader(
-			new CmdReader(uploadProc.getInputStream()),
-			new Sink<Object>() { public void give(Object value) throws Exception {
-				if( value instanceof FullyStoredMarker ) {
-					FullyStoredMarker fsm = (FullyStoredMarker)value;
-					getUploadCache().markFullyUploaded( fsm.urn );
-				}
-			} }
-		);
+		final UploadClient uploadClient = new UploadClient(serverName, serverCommand, getUploadCache(), tt);
+		
 		/*
 		headRequestor.w.debugPrefix = "Write to head proc: ";
 		headResponseReader.r.debugPrefix = "Read from head proc: ";
@@ -709,9 +821,9 @@ public class FlowUploader
 		*/
 		
 		final LinkedBlockingQueue<Object> uploadTaskQueue     = new LinkedBlockingQueue<Object>(tasks);
-		final LinkedBlockingQueue<Object> indexOutput         = new LinkedBlockingQueue<Object>();
+		final Sink<Object> indexOutput = uploadClient;
 		
-		final Indexer indexer = new Indexer( dirSer, digestor, new QueueSink<Object>(indexOutput), getUploadCache());
+		final Indexer indexer = new Indexer( dirSer, digestor, indexOutput, getUploadCache());
 		final QueueRunner indexRunner = new QueueRunner( uploadTaskQueue ) {
 			public boolean handleMessage( Object m ) throws Exception {
 				if( m instanceof UploadTask ) {
@@ -731,7 +843,7 @@ public class FlowUploader
 						String message =
 							"[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
 							objectTypeName + " '" + ut.name + "' = " + indexResult.fileInfo.urn;
-						indexOutput.add( new LogMessage(BlobUtil.bytes(message)) );
+						indexOutput.give( new LogMessage(BlobUtil.bytes(message)) );
 					}
 					return true;
 				} else if( m instanceof EndMessage ) {
@@ -743,70 +855,34 @@ public class FlowUploader
 			
 			@Override
 			protected void cleanUp() throws Exception {
-				indexOutput.put( EndMessage.INSTANCE );
+				indexOutput.give( EndMessage.INSTANCE );
 			}
 		};
 		
 		final Thread indexThread = new Thread( indexRunner, "Indexer" );
-		final Thread headResponseReaderThread = new Thread( headResponseReader, "Head Response Reader" );
-		final Thread uploadResponseReaderThread = new Thread( uploadResponseReader, "Upload Response Reader" );
-		final Thread indexOutputThread = new Thread( new QueueRunner( indexOutput ) {
-			boolean anythingSent;
-			
-			@Override
-			protected void cleanUp() throws Exception {}
-			
-			@Override
-			public boolean handleMessage(Object m) throws Exception {
-				// If nothing's been sent before EndMessage, then there's nothing
-				// for other processes to do and we can quit early!
-				if( !anythingSent && m instanceof EndMessage ) {
-					// Close the processes so that read threads will return immediately
-					headProc.destroy();
-					uploadProc.destroy();
-				} else {
-					anythingSent = true;
-					headRequestor.give(m);
-				}
-				return !(m instanceof EndMessage);
-			}
-		}, "Index Output Filter" );
 		
 		indexThread.start();
-		headErrorPiper.start();
-		uploadErrorPiper.start();
-		headResponseReaderThread.start();
-		uploadResponseReaderThread.start();
-		indexOutputThread.start();
+		uploadClient.start();
 		
 		uploadTaskQueue.add( EndMessage.INSTANCE );
 		
 		boolean error = false;
 		try {
 			indexThread.join();
-			indexOutputThread.join();
-			headResponseReaderThread.join();
-			uploadResponseReaderThread.join();
-			headErrorPiper.join();
-			uploadErrorPiper.join();
+			uploadClient.join();
 			
-			int z;
-			if( (z = headProc.waitFor()) != 0 ) {
-				System.err.println("Error: Head process exited with code "+z);
+			if( uploadClient.headProcExitCode != 0 ) {
+				System.err.println("Error: Head process exited with code "+uploadClient.headProcExitCode);
 				error = true;
 			}
-			if( (z = uploadProc.waitFor()) != 0 ) {
-				System.err.println("Error: Upload process exited with code "+z);
+			if( uploadClient.uploadProcExitCode != 0 ) {
+				System.err.println("Error: Upload process exited with code "+uploadClient.uploadProcExitCode);
 				error = true;
 			}
 		} catch( InterruptedException e ) {
 			indexThread.interrupt();
-			indexOutputThread.interrupt();
-			headResponseReaderThread.interrupt();
-			uploadResponseReaderThread.interrupt();
+			uploadClient.halt();
 			Thread.currentThread().interrupt();
-			headErrorPiper.interrupt();
-			uploadErrorPiper.interrupt();
 		}
 		
 		if( showTransferSummary ) {
