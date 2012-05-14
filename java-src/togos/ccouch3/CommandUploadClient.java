@@ -209,6 +209,10 @@ class CommandUploadClient implements UploadClient
 			// forward our EndMessages back to us!
 			halt();
 		} else {
+			if( headRequestSender == null ) {
+				throw new RuntimeException("This CmdResponseReader has not been started; cannot write to it!");
+			}
+			
 			headRequestSender.give(m);
 			anythingSent = true;
 		}
