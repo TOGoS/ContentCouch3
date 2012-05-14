@@ -499,7 +499,7 @@ public class FlowUploader
 	static class CmdResponseReader implements Runnable, Closeable {
 		protected final CmdReader r;
 		protected final Sink<Object> messageSink;
-		protected boolean closing;
+		protected boolean closing = false;
 		
 		public CmdResponseReader( CmdReader r, Sink<Object> messageSink ) {
 			this.r = r;
@@ -671,7 +671,7 @@ public class FlowUploader
 				new CmdReader(headProc.getInputStream()),
 				uploader
 			);
-			final CmdResponseReader uploadResponseReader = new CmdResponseReader(
+			uploadResponseReader = new CmdResponseReader(
 				new CmdReader(uploadProc.getInputStream()),
 				new Sink<Object>() { public void give(Object value) throws Exception {
 					if( value instanceof FullyStoredMarker ) {
@@ -690,7 +690,7 @@ public class FlowUploader
 			uploadResponseReaderThread.start();
 		}
 		
-		protected void close( Closeable c, String description ) {
+		protected static void close( Closeable c, String description ) {
 			try {
 				if( c != null ) c.close();
 			} catch( IOException e ) {
@@ -711,6 +711,7 @@ public class FlowUploader
 		
 		public void join() throws InterruptedException {
 			headProcExitCode = headProc.waitFor();
+			uploadProcExitCode = uploadProc.waitFor();
 			headResponseReaderThread.join();
 			uploadResponseReaderThread.join();
 			headErrorPiper.join();
@@ -871,13 +872,15 @@ public class FlowUploader
 			indexThread.join();
 			uploadClient.join();
 			
-			if( uploadClient.headProcExitCode != 0 ) {
-				System.err.println("Error: Head process exited with code "+uploadClient.headProcExitCode);
-				error = true;
-			}
-			if( uploadClient.uploadProcExitCode != 0 ) {
-				System.err.println("Error: Upload process exited with code "+uploadClient.uploadProcExitCode);
-				error = true;
+			if( uploadClient.anythingSent ) {
+				if( uploadClient.headProcExitCode != 0 ) {
+					System.err.println("Error: Head process exited with code "+uploadClient.headProcExitCode);
+					error = true;
+				}
+				if( uploadClient.uploadProcExitCode != 0 ) {
+					System.err.println("Error: Upload process exited with code "+uploadClient.uploadProcExitCode);
+					error = true;
+				}
 			}
 		} catch( InterruptedException e ) {
 			indexThread.interrupt();
