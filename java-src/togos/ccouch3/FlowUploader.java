@@ -118,6 +118,7 @@ public class FlowUploader
 	interface TransferTracker {
 		// Units = e.g. files, or whatever you want to track.
 		public void transferred( long byteCount, int unitCount, String tag );
+		public void sendingFile( String filename );
 	}
 	
 	static class StandardTransferTracker implements TransferTracker {
@@ -126,7 +127,10 @@ public class FlowUploader
 			long unitCount = 0;
 		}
 		
-		HashMap<String,Counter> counters = new HashMap<String,Counter>();
+		protected long totalByteCount = 0, totalUnitCount = 0;
+		protected HashMap<String,Counter> counters = new HashMap<String,Counter>();
+		protected String currentFilename;
+		
 		protected Counter getCounter( String name ) {
 			Counter c = counters.get(name);
 			if( c == null ) counters.put( name, c = new Counter() );
@@ -135,11 +139,18 @@ public class FlowUploader
 		
 		@Override
 		public synchronized void transferred(long byteCount, int unitCount, String tag) {
+			totalByteCount += byteCount;
+			totalUnitCount += unitCount;
 			Counter c = getCounter(tag);
 			c.byteCount += byteCount;
 			c.unitCount += unitCount;
-			
 		}
+		
+		public void sendingFile( String filename ) {  currentFilename = filename;  }
+		
+		public String getCurrentFilename() {  return currentFilename;  }
+		public long getTotalByteCount() {  return totalByteCount;  }
+		public long getTotalUnitCount() {  return totalUnitCount;  }
 	}
 	
 	//// Message types ////
@@ -487,6 +498,8 @@ public class FlowUploader
 						d.give( new FullyStoredMarker(treeUrn) );
 					}
 				}
+			} else if( !file.exists() ) {
+				throw new RuntimeException(file+" does not exist");
 			} else {
 				throw new RuntimeException("Don't know how to index "+file);
 			}
@@ -502,6 +515,7 @@ public class FlowUploader
 	
 	Collection<UploadTask> tasks;
 	public boolean showTransferSummary;
+	public boolean showProgress;
 	public boolean reportPathUrnMapping = false;
 	public boolean reportUrn = false;
 	public StreamURNifier digestor = BITPRINT_STREAM_URNIFIER;
@@ -543,11 +557,20 @@ public class FlowUploader
 		return uc;
 	}
 	
+	protected void report( FileInfo fileInfo ) {
+		if( reportUrn ) {
+			System.out.println(fileInfo.urn);
+		}
+		if( reportPathUrnMapping ) {
+			System.out.println(fileInfo.path+"\t"+fileInfo.urn);
+		}
+	}
+	
 	public void runIdentify() throws Exception {
 		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), new IndexedObjectSink[0]);
 		for( UploadTask ut : tasks ) {
-			FileInfo fi = indexer.index(ut.path).fileInfo;
-			System.out.println( ut.name + "\t" + fi.urn );
+			IndexResult indexResult = indexer.index(ut.path);
+			report( indexResult.fileInfo );
 		}
 	}
 	
@@ -586,6 +609,8 @@ public class FlowUploader
 			}
 		}
 	}
+
+	boolean anythingSent = false;
 	
 	/**
 	 * This method creates, starts, and waits for a bunch of threads that comminicate via
@@ -617,12 +642,7 @@ public class FlowUploader
 				if( m instanceof UploadTask ) {
 					UploadTask ut = (UploadTask)m;
 					IndexResult indexResult = indexer.index(ut.path);
-					if( reportUrn ) {
-						System.out.println(indexResult.fileInfo.urn);
-					}
-					if( reportPathUrnMapping ) {
-						System.out.println(indexResult.fileInfo.path+"\t"+indexResult.fileInfo.urn);
-					}
+					report( indexResult.fileInfo );
 					if( indexResult.anyNewData ) {
 						// If any new data was uploaded, send the name -> URN mapping to the server
 						// to be logged.  We want to NOT do this if we are only indexing and not
@@ -652,18 +672,37 @@ public class FlowUploader
 		};
 		
 		final Thread indexThread = new Thread( indexRunner, "Indexer" );
+		final Thread progressThread = new Thread() {
+			public void run() {
+				try {
+					while( !Thread.interrupted() ) {
+						String fn = tt.getCurrentFilename();
+						if( fn == null ) fn = "";
+						if( fn.length() > 53 ) fn = "..."+fn.substring( fn.length()-50 );
+						System.err.print( String.format("% 10d / % 7d ; %50s\r", tt.getTotalByteCount(), tt.getTotalUnitCount(), fn) );
+						System.err.flush();
+						Thread.sleep(1000);
+					}
+				} catch( InterruptedException e ) {}
+			}
+		};
 		
 		for( UploadClient uc : uploadClients ) uc.start();
 		// UploadClients must be initialized (uc.start() must take care of this before it returns)
-		// before anything can be written to them.
+		// before anything can be written to them, which is why I start them before starting
+		// the index thread!
 		indexThread.start();
+		if( showProgress ) progressThread.start();
 		
 		uploadTaskQueue.add( EndMessage.INSTANCE );
 		
 		boolean error = false;
 		try {
 			indexThread.join();
+			
 			for( UploadClient uc : uploadClients ) uc.join();
+			
+			progressThread.interrupt();
 			
 			for( UploadClient uc : uploadClients ) {
 				if( uc instanceof CommandUploadClient ) {
@@ -684,6 +723,7 @@ public class FlowUploader
 			indexThread.interrupt();
 			for( UploadClient uc : uploadClients ) uc.halt();
 			Thread.currentThread().interrupt();
+			progressThread.interrupt();
 		}
 		
 		if( showTransferSummary ) {
@@ -772,9 +812,10 @@ public class FlowUploader
 		return sc.toArray(new String[sc.size()]);
 	}
 	
-	static FlowUploaderCommand fromArgs( Iterator<String> args, boolean requireServer ) throws Exception {
+	static FlowUploaderCommand fromArgs( Iterator<String> args, boolean requireServer, boolean alwaysShowUrns ) throws Exception {
 		ArrayList<UploadTask> tasks = new ArrayList<UploadTask>();
-		boolean verbose = false; // false!;
+		boolean verbose = false;
+		boolean showProgress = false;
 		String cacheDir = null;
 		String serverName = null;
 		String[] serverCommand = null;
@@ -783,6 +824,9 @@ public class FlowUploader
 			String a = args.next();
 			if( "-v".equals(a) ) {
 				verbose = true;
+				showProgress = true;
+			} else if( "-show-progress".equals(a) ) {
+				showProgress = true;
 			} else if( "-no-cache".equals(a) ) {
 				cacheDir = "DO-NOT-CACHE";
 			} else if( "-repo".equals(a) ) {
@@ -830,11 +874,14 @@ public class FlowUploader
 			}
 		}
 		
+		boolean showUrns = verbose || alwaysShowUrns;
+		
 		FlowUploader fu = new FlowUploader(tasks);
 		fu.cacheDir = cacheDirFile;
+		fu.showProgress = showProgress;
 		fu.showTransferSummary = verbose;
-		fu.reportPathUrnMapping = verbose && tasks.size() != 1;
-		fu.reportUrn = verbose && tasks.size() == 1;
+		fu.reportPathUrnMapping = showUrns && tasks.size() != 1;
+		fu.reportUrn = showUrns && tasks.size() == 1;
 		fu.uploadClientSpecs = uploadClientSpecs.toArray(new UploadClientSpec[uploadClientSpecs.size()]);
 		return FlowUploaderCommand.normal( fu );
 	}
@@ -848,12 +895,13 @@ public class FlowUploader
 		"Options:\n" +
 		"  -repo <path> ; Path to local ccouch repository to store cache in.\n" +
 		"  -no-cache    ; Do not cache file hashes or upload records.\n" +
-		"  -cmd-server:<name> <cmd> <arg> <arg> ... -- ; Add a command to pipe\n" +
+		"  -command-server:<name> <cmd> <arg> <arg> ... -- ; Add a command to pipe\n" +
 		"    cmd-server commands to\n" +
 		//"  -server-name <name> ; name of repository you are uploading to;\n" +
 		//"    this is used for tracking which files have already been uploaded where.\n" +
 		//"  -server-command <cmd> <arg> <arg> ... -- ; Command to pipe cmd-server\n" +
 		//"    commands to.\n" +
+		"  -show-progress ; show progress information on stderr.\n" +
 		"\n" +
 		"Example usage:\n" +
 		"  ccouch3 upload -server-name example.org \\\n" +
@@ -861,7 +909,7 @@ public class FlowUploader
 		"    /home/tom/directory-full-of-files-to-back-up/";
 	
 	public static int uploadMain( Iterator<String> args ) throws Exception {
-		FlowUploaderCommand fuc = fromArgs(args, true);
+		FlowUploaderCommand fuc = fromArgs(args, true, false);
 		switch( fuc.mode ) {
 		case( FlowUploaderCommand.MODE_ERROR ):
 			System.err.println( "Error: " + fuc.errorMessage + "\n" );
@@ -888,7 +936,7 @@ public class FlowUploader
 		"  ccouch3 id something.txt some-directory/ somethingelse.zip";
 	
 	public static int identifyMain( Iterator<String> args ) throws Exception {
-		FlowUploaderCommand fuc = fromArgs(args, false);
+		FlowUploaderCommand fuc = fromArgs(args, false, true);
 		switch( fuc.mode ) {
 		case( FlowUploaderCommand.MODE_ERROR ):
 			System.err.println( "Error: " + fuc.errorMessage + "\n" );

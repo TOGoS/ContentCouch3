@@ -178,6 +178,8 @@ class CommandUploadClient implements UploadClient
 	
 	public final String serverName;
 	public final String[] serverCommand;
+	public boolean debug = false;
+	public boolean dieWhenNothingToSend;
 	protected final TransferTracker transferTracker;
 	protected final UploadCache uploadCache;
 	
@@ -204,7 +206,7 @@ class CommandUploadClient implements UploadClient
 	}
 	
 	public void give( Object m ) throws Exception {
-		if( !anythingSent && m instanceof EndMessage ) {
+		if( !anythingSent && m instanceof EndMessage && dieWhenNothingToSend ) {
 			// Then we can quit without waiting for the server to
 			// forward our EndMessages back to us!
 			halt();
@@ -249,6 +251,13 @@ class CommandUploadClient implements UploadClient
 				}
 			} }
 		);
+		
+		if( debug ) {
+			uploader.w.debugPrefix = "Send upload command: ";
+			headRequestSender.w.debugPrefix = "Send head command: ";
+			headResponseReader.r.debugPrefix = "Read head response: ";
+			uploadResponseReader.r.debugPrefix = "Read upload response: ";
+		}
 		
 		headResponseReaderThread = new Thread( headResponseReader, "Head Response Reader" );
 		uploadResponseReaderThread = new Thread( uploadResponseReader, "Upload Response Reader" );

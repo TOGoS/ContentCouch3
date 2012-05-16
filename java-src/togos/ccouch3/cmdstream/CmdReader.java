@@ -122,6 +122,9 @@ public class CmdReader implements Closeable
 				throw new IOException("Not a chunk! "+c[0]);
 			}
 			chunkLeft = Integer.parseInt(c[1]);
+			if( chunkLeft == 0 ) {
+				throw new IOException("Command stream contains zero-length chunk, which is not allowed!");
+			}
 		}
 		z = is.read(buffer, off, Math.min( len, chunkLeft ) );
 		if( z == -1 ) throw new IOException("Hit end of stream while reading chunk");
@@ -135,6 +138,9 @@ public class CmdReader implements Closeable
 	
 	@Override
 	public void close() throws IOException {
+		/* Oh, dear.  It seems calling close() can hang sometimes (this happens on Windows, anyway)
+		 * when closing from a different thread than I'm reading from.
+		 * Leave CommandUploadClient#dieWhenNothingToSend = false to get around this. */
 		is.close();
 	}
 }
