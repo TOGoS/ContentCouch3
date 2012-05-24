@@ -12,7 +12,7 @@ import togos.ccouch3.util.XMLUtil;
 
 public class RDFCommitSerializer
 {
-	public void serializeCommit( Commit m, OutputStream os ) throws IOException {
+	public static void serializeCommit( Commit m, OutputStream os ) throws IOException {
 		boolean needDcNamespace = m.authorName != null || m.description != null || m.timestamp != Commit.TIMESTAMP_NONE;
 		
 		OutputStreamWriter w = new OutputStreamWriter(os);

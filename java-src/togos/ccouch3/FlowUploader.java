@@ -27,6 +27,8 @@ import togos.ccouch3.FlowUploader.StandardTransferTracker.Counter;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.BitprintHashURNFormatter;
 import togos.ccouch3.hash.HashFormatter;
+import togos.ccouch3.repo.Repository;
+import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.slf.RandomAccessFileBlob;
 import togos.ccouch3.slf.SimpleListFile2;
 
@@ -179,12 +181,12 @@ public class FlowUploader
 		public final String name;
 		public final String path;
 		/** If non-null, will be used to create commits */
-		public final CommitConfig commitInfo;
+		public final CommitConfig commitConfig;
 		
-		public UploadTask( String name, String path ) {
+		public UploadTask( String name, String path, CommitConfig commitInfo ) {
 			this.name = name;
 			this.path = path;
-			this.commitInfo = null;
+			this.commitConfig = commitInfo;
 		}
 		
 		@Override
@@ -202,10 +204,24 @@ public class FlowUploader
 	static class BlobInfo {
 		public final String urn;
 		public final byte[] blob;
+		public final int offset, length;
 		
-		public BlobInfo( String urn, byte[] blob ) {
+		public BlobInfo( String urn, byte[] blob, int offset, int length ) {
+			assert offset > 0;
+			assert offset <= blob.length;
+			assert offset + length <= blob.length;
 			this.urn = urn;
 			this.blob = blob;
+			this.offset = offset;
+			this.length = length;
+		}
+		
+		public BlobInfo( String urn, ByteChunk c ) {
+			this( urn, c.getBuffer(), c.getOffset(), c.getSize() );
+		}
+		
+		public BlobInfo( String urn, byte[] blob ) {
+			this( urn, blob, 0, blob.length );
 		}
 	}
 	
@@ -530,6 +546,11 @@ public class FlowUploader
 	public DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
 	public File cacheDir;
 	
+	// Used when creating commits:
+	public File dataDir;
+	public String storeSector;
+	
+	// Used when uploading:
 	public UploadClientSpec[] uploadClientSpecs;
 	
 	public FlowUploader( Collection<UploadTask> tasks ) {
@@ -563,6 +584,24 @@ public class FlowUploader
 			uploadCaches.put( serverName, uc = new SLFUploadCache(cacheDir, serverName) );
 		}
 		return uc;
+	}
+	
+	protected Repository localRepository;
+	protected synchronized Repository getLocalRepository() {
+		if( localRepository == null ) {
+			if( dataDir == null ) throw new RuntimeException("Can't instantiate local repository; dataDir is null");
+			if( storeSector == null ) throw new RuntimeException("Can't instantiate local repository; storeSector is null");
+			localRepository = new SHA1FileRepository(dataDir, storeSector);
+		}
+		return localRepository;
+	}
+	
+	protected CommitManager cman;
+	protected synchronized CommitManager getCommitManager() {
+		if( cman == null ) {
+			cman = new CommitManager( getLocalRepository(), digestor );
+		}
+		return cman;
 	}
 	
 	protected void report( FileInfo fileInfo ) {
@@ -617,7 +656,7 @@ public class FlowUploader
 			}
 		}
 	}
-
+	
 	boolean anythingSent = false;
 	
 	/**
@@ -631,7 +670,6 @@ public class FlowUploader
 	 * if indexer finishes without sending anything on to the next process, the other threads
 	 * are aborted.
 	 */
-	
 	public int runUpload() {
 		final StandardTransferTracker tt = new StandardTransferTracker();
 		final UploadClient[] uploadClients = new UploadClient[uploadClientSpecs.length];
@@ -650,6 +688,7 @@ public class FlowUploader
 				if( m instanceof UploadTask ) {
 					UploadTask ut = (UploadTask)m;
 					IndexResult indexResult = indexer.index(ut.path);
+					long timestamp = System.currentTimeMillis();
 					report( indexResult.fileInfo );
 					if( indexResult.anyNewData ) {
 						// If any new data was uploaded, send the name -> URN mapping to the server
@@ -659,10 +698,24 @@ public class FlowUploader
 						String message =
 							"[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
 							objectTypeName + " '" + ut.name + "' = " + indexResult.fileInfo.urn;
-						for( IndexedObjectSink d : indexedObjectSinks ) {
-							d.give( new LogMessage(BlobUtil.bytes(message)) );
+						LogMessage lm = new LogMessage(BlobUtil.bytes(message));
+						for( IndexedObjectSink d : indexedObjectSinks ) d.give( lm );
+					}
+					
+					if( ut.commitConfig != null ) {
+						CommitManager.CommitSaveResult csr = getCommitManager().saveCommit(
+							new File(ut.path), indexResult.fileInfo.urn, timestamp, ut.commitConfig );
+						if( csr.newCommitCreated ) {
+							String message =
+								"[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
+								"Commit '" + ut.name + "' = " + csr.latestCommitUrn;
+							LogMessage lm = new LogMessage(BlobUtil.bytes(message));
+							BlobInfo commitBlobInfo = new BlobInfo( csr.latestCommitDataUrn, csr.latestCommitData );
+							for( IndexedObjectSink d : indexedObjectSinks ) d.give( commitBlobInfo );
+							for( IndexedObjectSink d : indexedObjectSinks ) d.give(lm);
 						}
 					}
+					
 					return true;
 				} else if( m instanceof EndMessage ) {
 					return false;
@@ -759,6 +812,15 @@ public class FlowUploader
 		return stripTrailingSlash(repoPath) + "/cache/flow-uploader";
 	}
 	
+	/**
+	 * Returns an appropriate directory for storing data files
+	 * (this directory will contain 'sector' directories)
+	 * within the repository at the given path.
+	 */
+	static String repoDataDir( String repoPath ) {
+		return stripTrailingSlash(repoPath) + "/data";
+	}
+	
 	static class FlowUploaderCommand {
 		public static final int MODE_RUN   = 0;
 		public static final int MODE_ERROR = 1;
@@ -825,22 +887,41 @@ public class FlowUploader
 		boolean verbose = false;
 		boolean showProgress = false;
 		String cacheDir = null;
+		String dataDir = null;
+		String storeSector = "user";
 		String serverName = null;
 		String[] serverCommand = null;
+		
+		// Optional commit info
+		String commitName = null;
+		String commitAuthor = null;
+		String commitMessage = null;
+		
 		ArrayList<UploadClientSpec> uploadClientSpecs = new ArrayList<UploadClientSpec>(); 
 		for( ; args.hasNext(); ) {
 			String a = args.next();
 			if( "-v".equals(a) ) {
 				verbose = true;
 				showProgress = true;
+			} else if( "-m".equals(a) ) {
+				commitMessage = args.next();
+			} else if( "-a".equals(a) ) {
+				commitAuthor = args.next();
+			} else if( "-n".equals(a) ) {
+				commitName = args.next();
 			} else if( "-show-progress".equals(a) ) {
 				showProgress = true;
 			} else if( "-no-cache".equals(a) ) {
 				cacheDir = "DO-NOT-CACHE";
 			} else if( "-repo".equals(a) ) {
 				cacheDir = repoCacheDir( args.next() );
+				dataDir = repoDataDir( args.next() );
 			} else if( "-cache-dir".equals(a) ) {
 				cacheDir = args.next();
+			} else if( "-data-dir".equals(a) ) {
+				dataDir = args.next();
+			} else if( "-sector".equals(a) ) {
+				storeSector = args.next();
 			} else if( "-server-name".equals(a) ) {
 				serverName = args.next();
 			} else if( a.startsWith("-command-server:") ) {
@@ -851,7 +932,16 @@ public class FlowUploader
 			} else if( CCouch3Command.isHelpArgument(a) ) {
 				return FlowUploaderCommand.help();
 			} else if( !a.startsWith("-") ) {
-				tasks.add( new UploadTask(a, a) );
+				CommitConfig commitConfig;
+				if( commitAuthor == null && commitMessage == null && commitName == null ) {
+					commitConfig = null;
+				} else {
+					commitConfig = new CommitConfig( commitMessage, commitAuthor, new String[0] );
+					commitMessage = null;
+					commitName = null;
+				}
+				
+				tasks.add( new UploadTask(a, a, commitConfig) );
 			} else {
 				return FlowUploaderCommand.error("Unrecognised argument: "+a);
 			}
@@ -866,6 +956,15 @@ public class FlowUploader
 			cacheDirFile = new File(repoCacheDir(homeDir + "/.ccouch"));
 		} else {
 			cacheDirFile = new File(cacheDir);
+		}
+		
+		File dataDirFile;
+		if( dataDir == null ) {
+			String homeDir = System.getProperty("user.home");
+			if( homeDir == null ) homeDir = ".";
+			dataDirFile = new File(repoDataDir(homeDir + "/.ccouch"));
+		} else {
+			dataDirFile = new File(dataDir);
 		}
 		
 		// Set up upload clients //
@@ -886,6 +985,8 @@ public class FlowUploader
 		
 		FlowUploader fu = new FlowUploader(tasks);
 		fu.cacheDir = cacheDirFile;
+		fu.dataDir = dataDirFile;
+		fu.storeSector = storeSector;
 		fu.showProgress = showProgress;
 		fu.showTransferSummary = verbose;
 		fu.reportPathUrnMapping = showUrns && tasks.size() != 1;
@@ -901,6 +1002,9 @@ public class FlowUploader
 		"to another program (probably 'ssh somewhere \"ccouch3 cmd-server\"').\n" +
 		"\n" +
 		"Options:\n" +
+		"  -n <name>    ; Give a name for the next commit\n" +
+		"  -a <author>  ; Give an author name for the next commit\n" +
+		"  -m <message> ; Give a description for the next commit\n" +
 		"  -repo <path> ; Path to local ccouch repository to store cache in.\n" +
 		"  -no-cache    ; Do not cache file hashes or upload records.\n" +
 		"  -command-server:<name> <cmd> <arg> <arg> ... -- ; Add a command to pipe\n" +
@@ -911,9 +1015,14 @@ public class FlowUploader
 		//"    commands to.\n" +
 		"  -show-progress ; show progress information on stderr.\n" +
 		"\n" +
+		"Note that commit info (besides author) must be given separately for each file\n" +
+		"listed that is to have a commit created for it, and commit information must\n" +
+		"be given *before* the path to the file/directory to be uploaded\n" +
+		"\n" +
 		"Example usage:\n" +
 		"  ccouch3 upload -server-name example.org \\\n" +
-		"    -server-command ssh tom@example.org \"ccouch3 cmd-server\" --\n" +
+		"    -server-command ssh tom@example.org \"ccouch3 cmd-server\" -- \\\n" +
+		"    -a Tom -n archives/mah-files -m 'Backup of my cool files' \\\n" +
 		"    /home/tom/directory-full-of-files-to-back-up/";
 	
 	public static int uploadMain( Iterator<String> args ) throws Exception {

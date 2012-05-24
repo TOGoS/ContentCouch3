@@ -36,8 +36,8 @@ class CommandUploadClient implements UploadClient
 					w.writeCmd( new String[]{ "head", fi.path, fi.urn } );
 				} else if( m instanceof BlobInfo ) {
 					BlobInfo bi = (BlobInfo)m;
-					w.writeCmd( new String[]{ "put", bi.urn, bi.urn, "chunk", String.valueOf(bi.blob.length) } );
-					w.writeChunk( bi.blob, 0, bi.blob.length );
+					w.writeCmd( new String[]{ "put", bi.urn, bi.urn, "chunk", String.valueOf(bi.length) } );
+					w.writeChunk( bi.blob, bi.offset, bi.length );
 					w.endChunks();
 					tt.transferred( bi.blob.length, 1, "treenode" );
 				} else if( m instanceof FullyStoredMarker ) {
