@@ -6,7 +6,7 @@ import java.text.ParseException;
 import junit.framework.TestCase;
 import togos.ccouch3.util.DateUtil;
 
-public class CommitSerializerTest extends TestCase
+public class RDFCommitSerializerTest extends TestCase
 {
 	protected static final String SOME_COMMIT_XML =
 		"<Commit xmlns=\"http://ns.nuke24.net/ContentCouch/\" xmlns:dc=\"http://purl.org/dc/terms/\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n" +
@@ -86,7 +86,7 @@ public class CommitSerializerTest extends TestCase
 	
 	protected void assertCommitSerializesTo( String expected, Commit c ) throws Exception {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		new CommitSerializer().serializeCommit( c, baos );
+		new RDFCommitSerializer().serializeCommit( c, baos );
 		String serialized = baos.toString("UTF-8");
 		assertEquals( expected, serialized );
 	}

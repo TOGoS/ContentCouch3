@@ -155,15 +155,23 @@ public class FlowUploader
 	
 	//// Message types ////
 	
-	static class CommitMetadata {
+	/**
+	 * Information about a commit not including the target URN and date
+	 * (which may have yet to be calculated)
+	 */
+	static class CommitConfig {
 		public final String description;
 		public final String authorName;
 		public final String[] tags;
 		
-		public CommitMetadata( String description, String authorName, String[] tags ) {
+		public CommitConfig( String description, String authorName, String[] tags ) {
 			this.description = description;
 			this.authorName = authorName;
 			this.tags = tags;
+		}
+		
+		public Commit toCommit( String targetUrn, String[] parentCommitUrns, long timestamp ) {
+			return new Commit( targetUrn, parentCommitUrns, tags, authorName, description, timestamp );
 		}
 	}
 	
@@ -171,7 +179,7 @@ public class FlowUploader
 		public final String name;
 		public final String path;
 		/** If non-null, will be used to create commits */
-		public final CommitMetadata commitInfo;
+		public final CommitConfig commitInfo;
 		
 		public UploadTask( String name, String path ) {
 			this.name = name;

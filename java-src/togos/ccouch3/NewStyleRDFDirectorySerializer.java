@@ -9,14 +9,10 @@ import java.util.Collection;
 import java.util.Collections;
 
 import togos.ccouch3.util.DateUtil;
+import togos.ccouch3.util.XMLUtil;
 
 public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 {
-	// TODO: Centralize and make better
-	public static String xmlEscapeText( String text ) {
-		return text.replaceAll("&","&amp;").replaceAll("<", "&lt;").replaceAll(">","&gt;");
-	}
-	
 	@Override
 	public void serialize(Collection<DirectoryEntry> entries, OutputStream os) throws IOException {
 		ArrayList<DirectoryEntry> sortedEntries = new ArrayList<DirectoryEntry>( entries );
@@ -55,9 +51,9 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 			}
 			
 			w.write("\t\t<DirectoryEntry>\n");
-			w.write("\t\t\t<name>" + xmlEscapeText(f.name) + "</name>\n");
+			w.write("\t\t\t<name>" + XMLUtil.xmlEscapeText(f.name) + "</name>\n");
 			w.write("\t\t\t<target>\n");
-			w.write("\t\t\t\t<" + tag + " rdf:about=\"" + xmlEscapeText(f.urn) + "\"");
+			w.write("\t\t\t\t<" + tag + " rdf:about=\"" + XMLUtil.xmlEscapeAttribute(f.urn) + "\"");
 			if( showSize ) {
 				w.write(">\n");
 				w.write( "\t\t\t\t\t<bz:fileLength>" + String.valueOf(f.size) + "</bz:fileLength>\n" );
