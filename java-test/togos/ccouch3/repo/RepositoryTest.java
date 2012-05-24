@@ -5,6 +5,7 @@ import java.util.Random;
 
 import junit.framework.TestCase;
 
+import togos.blob.ByteChunk;
 import togos.ccouch3.hash.BitprintDigest;
 
 public abstract class RepositoryTest extends TestCase
@@ -44,6 +45,27 @@ public abstract class RepositoryTest extends TestCase
 		assertTrue(repo.contains(urn));
 	}
 
+	public void testGetChunk() throws StoreException {
+		byte[] b = new byte[128];
+		r.nextBytes(b);
+		BitprintDigest dig = new BitprintDigest();
+		dig.update(b);
+		String urn = bitprintUrn( dig.digest() );
+		
+		repo.put( urn, new ByteArrayInputStream(b) );
+		
+		ByteChunk bc = repo.getChunk( urn, 128 );
+		assertNotNull( bc );
+		assertEquals( 128, bc.getSize() );
+
+		bc = repo.getChunk( urn, 144 );
+		assertNotNull( bc );
+		assertEquals( 128, bc.getSize() );
+		
+		bc = repo.getChunk( urn, 96 );
+		assertNull( bc );
+	}
+	
 	public void testHashMismatch() throws StoreException {
 		byte[] b = "Hello, world!".getBytes();
 		
