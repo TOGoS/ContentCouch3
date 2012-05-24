@@ -13,6 +13,8 @@ public class Commit
 	public final long timestamp;
 	
 	public Commit( String targetUrn, String[] parentCommitUrns, String[] tags, String authorName, String description, long timestamp ) {
+		assert parentCommitUrns != null;
+		assert tags != null;
 		this.targetUrn        = targetUrn;
 		this.parentCommitUrns = parentCommitUrns;
 		this.tags             = tags;
