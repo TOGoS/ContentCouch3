@@ -921,8 +921,9 @@ public class FlowUploader
 			} else if( "-no-cache".equals(a) ) {
 				cacheDir = "DO-NOT-CACHE";
 			} else if( "-repo".equals(a) ) {
-				cacheDir = repoCacheDir( args.next() );
-				dataDir = repoDataDir( args.next() );
+				String repoDir = args.next();
+				cacheDir = repoCacheDir( repoDir );
+				dataDir  = repoDataDir( repoDir );
 			} else if( "-cache-dir".equals(a) ) {
 				cacheDir = args.next();
 			} else if( "-data-dir".equals(a) ) {
