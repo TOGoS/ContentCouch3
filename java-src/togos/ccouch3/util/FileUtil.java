@@ -10,4 +10,14 @@ public class FileUtil
 		if( p.exists() ) return;
 		p.mkdirs();
 	}
+	
+	public static void deltree( File f ) {
+		if( f.isDirectory() ) {
+			for( File s : f.listFiles() ) {
+				if( "..".equals(s.getName()) || ".".equals(s.getName())) continue;
+				deltree(s);
+			}
+		}
+		f.delete();
+	}
 }
