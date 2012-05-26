@@ -12,9 +12,9 @@ public class CCouch3Command
 	public static String USAGE =
 		"Usage: ccouch3 <subcommand> <subcommand-arguments>\n" +
 		"Subcommands:\n" +
-		"  id                ; identify files/directories\n" +
+		"  identify          ; identify files/directories\n" +
 		"  upload            ; upload files to a repository\n" +
-		"  cmd-server        ; run a command server\n" +
+		"  command-server    ; run a command server\n" +
 		"  <subcommand> -?   ; get help on a specific command";
 	
 	public static int main( Iterator<String> argi ) throws Exception {
@@ -26,9 +26,9 @@ public class CCouch3Command
 		String cmd = argi.next();
 		if( "upload".equals(cmd) ) {
 			return FlowUploader.uploadMain(argi);
-		} else if( "id".equals(cmd) ) {
+		} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
 			return FlowUploader.identifyMain(argi);
-		} else if( "cmd-server".equals(cmd) ) {
+		} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {
 			return CmdServer.main(argi);
 		} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
 			System.out.println(USAGE);

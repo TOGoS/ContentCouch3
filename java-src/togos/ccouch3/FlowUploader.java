@@ -162,11 +162,13 @@ public class FlowUploader
 	 * (which may have yet to be calculated)
 	 */
 	static class CommitConfig {
+		public final String headName;
 		public final String description;
 		public final String authorName;
 		public final String[] tags;
 		
-		public CommitConfig( String description, String authorName, String[] tags ) {
+		public CommitConfig( String headName, String description, String authorName, String[] tags ) {
+			this.headName = headName;
 			this.description = description;
 			this.authorName = authorName;
 			this.tags = tags;
@@ -207,7 +209,7 @@ public class FlowUploader
 		public final int offset, length;
 		
 		public BlobInfo( String urn, byte[] blob, int offset, int length ) {
-			assert offset > 0;
+			assert offset >= 0;
 			assert offset <= blob.length;
 			assert offset + length <= blob.length;
 			this.urn = urn;
@@ -555,6 +557,7 @@ public class FlowUploader
 	
 	// Used when creating commits:
 	public File dataDir;
+	public File headDir;
 	public String storeSector;
 	
 	// Used when uploading:
@@ -609,6 +612,15 @@ public class FlowUploader
 			cman = new CommitManager( getLocalRepository(), digestor );
 		}
 		return cman;
+	}
+	
+	protected HeadManager hman;
+	protected synchronized HeadManager getHeadManager() {
+		if( hman == null ) {
+			if( headDir == null ) throw new RuntimeException("Can't instantiate head manager; headDir is null");
+			hman = new HeadManager(headDir);
+		}
+		return hman;
 	}
 	
 	protected void report( FileInfo fileInfo ) {
@@ -710,6 +722,7 @@ public class FlowUploader
 					}
 					
 					if( ut.commitConfig != null ) {
+						System.err.println( "Commit config; name="+ut.commitConfig.headName );
 						CommitManager.CommitSaveResult csr = getCommitManager().saveCommit(
 							new File(ut.path), indexResult.fileInfo.urn, timestamp, ut.commitConfig );
 						if( csr.newCommitCreated ) {
@@ -720,6 +733,9 @@ public class FlowUploader
 							BlobInfo commitBlobInfo = new BlobInfo( csr.latestCommitDataUrn, csr.latestCommitData );
 							for( IndexedObjectSink d : indexedObjectSinks ) d.give( commitBlobInfo );
 							for( IndexedObjectSink d : indexedObjectSinks ) d.give(lm);
+						}
+						if( ut.commitConfig.headName != null ) {
+							getHeadManager().addHead(ut.commitConfig.headName, csr.latestCommitData);
 						}
 					}
 					
@@ -828,6 +844,14 @@ public class FlowUploader
 		return stripTrailingSlash(repoPath) + "/data";
 	}
 	
+	/**
+	 * Returns an appropriate directory for storing head files
+	 * within the repository at the given path.
+	 */
+	static String repoHeadDir( String repoPath ) {
+		return stripTrailingSlash(repoPath) + "/heads";
+	}
+	
 	static class FlowUploaderCommand {
 		public static final int MODE_RUN   = 0;
 		public static final int MODE_ERROR = 1;
@@ -880,7 +904,7 @@ public class FlowUploader
 	static String[] readSubCommandArguments( Iterator<String> args ) {
 		String a;
 		List<String> sc = new ArrayList<String>();
-		for( a = args.hasNext() ? args.next() : null; a != null && !"--".equals(a); a = args.hasNext() ? args.next() : null ) {
+		for( a = args.hasNext() ? args.next() : null; a != null && !"--".equals(a) && !";".equals(a); a = args.hasNext() ? args.next() : null ) {
 			sc.add( a );
 		}
 		if( a == null ) {
@@ -895,10 +919,11 @@ public class FlowUploader
 		boolean showProgress = false;
 		String cacheDir = null;
 		String dataDir = null;
+		String headDir = null;
 		String storeSector = "user";
 		String serverName = null;
 		String[] serverCommand = null;
-		
+				
 		// Optional commit info
 		String commitName = null;
 		String commitAuthor = null;
@@ -920,14 +945,18 @@ public class FlowUploader
 				showProgress = true;
 			} else if( "-no-cache".equals(a) ) {
 				cacheDir = "DO-NOT-CACHE";
+			
 			} else if( "-repo".equals(a) ) {
 				String repoDir = args.next();
 				cacheDir = repoCacheDir( repoDir );
 				dataDir  = repoDataDir( repoDir );
+				headDir  = repoHeadDir( repoDir ); 
+				
 			} else if( "-cache-dir".equals(a) ) {
 				cacheDir = args.next();
 			} else if( "-data-dir".equals(a) ) {
 				dataDir = args.next();
+				
 			} else if( "-sector".equals(a) ) {
 				storeSector = args.next();
 			} else if( "-server-name".equals(a) ) {
@@ -944,7 +973,7 @@ public class FlowUploader
 				if( commitAuthor == null && commitMessage == null && commitName == null ) {
 					commitConfig = null;
 				} else {
-					commitConfig = new CommitConfig( commitMessage, commitAuthor, new String[0] );
+					commitConfig = new CommitConfig( commitName, commitMessage, commitAuthor, new String[0] );
 					commitMessage = null;
 					commitName = null;
 				}
@@ -975,6 +1004,15 @@ public class FlowUploader
 			dataDirFile = new File(dataDir);
 		}
 		
+		File headDirFile;
+		if( headDir == null ) {
+			String homeDir = System.getProperty("user.home");
+			if( homeDir == null ) homeDir = ".";
+			headDirFile = new File(repoHeadDir(homeDir + "/.ccouch"));
+		} else {
+			headDirFile = new File(headDir);
+		}
+		
 		// Set up upload clients //
 		
 		if( (serverName == null) != (serverCommand == null) ) {
@@ -994,6 +1032,7 @@ public class FlowUploader
 		FlowUploader fu = new FlowUploader(tasks);
 		fu.cacheDir = cacheDirFile;
 		fu.dataDir = dataDirFile;
+		fu.headDir = headDirFile;
 		fu.storeSector = storeSector;
 		fu.showProgress = showProgress;
 		fu.showTransferSummary = verbose;
@@ -1015,7 +1054,7 @@ public class FlowUploader
 		"  -m <message> ; Give a description for the next commit\n" +
 		"  -repo <path> ; Path to local ccouch repository to store cache in.\n" +
 		"  -no-cache    ; Do not cache file hashes or upload records.\n" +
-		"  -command-server:<name> <cmd> <arg> <arg> ... -- ; Add a command to pipe\n" +
+		"  -command-server:<name> <cmd> <arg> <arg> ... ';' ; Add a command to pipe\n" +
 		"    cmd-server commands to\n" +
 		//"  -server-name <name> ; name of repository you are uploading to;\n" +
 		//"    this is used for tracking which files have already been uploaded where.\n" +

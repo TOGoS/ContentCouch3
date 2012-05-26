@@ -102,12 +102,14 @@ public class CommitManager
 	protected CommitSaveResult saveCommit( File target, String targetUrn, long timestamp, CommitConfig cc )
 		throws IOException, StoreException
 	{
+		assert targetUrn != null;
+		
 		String[] oldCommitUrns = getOldCommitUrns( target );
 		for( String oldCommitUrn : oldCommitUrns ) {
 			String blobUrn = stripSubjectPrefix(oldCommitUrn);
 			ByteChunk data = repo.getChunk( blobUrn, 4096 );
 			Commit c = getBasicCommitInfo( data );
-			if( targetUrn.equals(c.targetUrn) ) {
+			if( c != null && targetUrn.equals(c.targetUrn) ) {
 				return new CommitSaveResult( oldCommitUrn, blobUrn, data, false );
 			}
 		}
