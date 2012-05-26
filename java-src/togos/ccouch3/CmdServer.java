@@ -8,6 +8,7 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Iterator;
 
+import togos.blob.ByteChunk;
 import togos.ccouch3.cmdstream.CmdReader;
 import togos.ccouch3.cmdstream.CmdWriter;
 import togos.ccouch3.repo.Repository;
@@ -20,12 +21,14 @@ public class CmdServer
 	protected final CmdReader r;
 	protected final CmdWriter w;
 	protected final Repository repo;
+	protected final File headDir;
 	protected final OutputStream incomingLogStream;
 	
-	public CmdServer( CmdReader r, CmdWriter w, Repository repo, OutputStream incomingLogStream ) {
+	public CmdServer( CmdReader r, CmdWriter w, Repository repo, File headDir, OutputStream incomingLogStream ) {
 		this.r = r;
 		this.w = w;
 		this.repo = repo;
+		this.headDir = headDir;
 		this.incomingLogStream = incomingLogStream;
 	}
 	
@@ -114,6 +117,29 @@ public class CmdServer
 					w.writeCmd( new String[] { "error", "put", reqId, urn, "rejected", tokenize(e.getMessage()) } );
 				}
 				return true;
+			} else if( "put".equals(cmdName) && cmd.length == 5 && cmd[2].startsWith("ccouch-head:") && "by-urn".equals(cmd[3]) ) {
+				String headName = cmd[2].substring(12);
+				String headUrn = cmd[4];
+				ByteChunk headData = repo.getChunk( headUrn, 4096 );
+				if( headData == null ) {
+					w.writeCmd( new String[] { "error", "put", reqId, cmd[2], "could-not-load-by-urn", headUrn } );
+					return true;
+				}
+				File newHeadFile = new File( headDir + "/" + headName );
+				if( newHeadFile.isDirectory() ) {
+					w.writeCmd( new String[] { "error", "put", reqId, cmd[2], "destination-is-a-directory", headName } );
+					return true;
+				}
+				FileUtil.mkParentDirs( newHeadFile );
+				if( newHeadFile.exists() ) {
+					if( !headData.equals(FileUtil.read(newHeadFile)) ) {
+						w.writeCmd( new String[] { "error", "put", reqId, cmd[2], "destination-exists-and-is-different", headName } );
+						return true;
+					}
+				} else {
+					FileUtil.writeAtomic( newHeadFile, headData );
+				}
+				w.writeCmd( new String[] { "ok", "put", reqId, cmd[2], "accepted" } );
 			} else {
 				w.writeCmd( new String[] { "error", cmdName, reqId, "unrecognised-command" } );
 			}
@@ -165,7 +191,7 @@ public class CmdServer
 		File incomingLogFile = new File(repoDir + "/log/incoming.log");
 		FileUtil.mkParentDirs(incomingLogFile);
 		FileOutputStream incomingLogStream = new FileOutputStream(incomingLogFile, true);
-		CmdServer cs = new CmdServer(new CmdReader(System.in), new CmdWriter(System.out), repo, incomingLogStream);
+		CmdServer cs = new CmdServer(new CmdReader(System.in), new CmdWriter(System.out), repo, new File(repoDir+"/heads"), incomingLogStream);
 		cs.run();
 		incomingLogStream.close();
 		return 0;

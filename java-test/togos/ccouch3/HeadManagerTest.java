@@ -29,7 +29,7 @@ public class HeadManagerTest extends TestCase
 	}
 	
 	public void testNewHead() throws IOException {
-		assertTrue( hman.addHead("zap/hap/tap", HEAD1) );
+		assertEquals( 1, hman.addHead("zap/hap/tap", 0, HEAD1) );
 		assertNotNull( hman.getLatestFile("zap/hap/tap") );
 		assertEquals( "1", hman.getLatestFile("zap/hap/tap").getName() );
 		assertEquals( HEAD1, hman.getLatest("zap/hap/tap") );
@@ -39,14 +39,26 @@ public class HeadManagerTest extends TestCase
 		assertNull( hman.getLatest("zap") );
 		
 		// Adding the same head again should not create a new file:
-		assertFalse( hman.addHead("zap/hap/tap", HEAD1) );
+		assertEquals( 1, hman.addHead("zap/hap/tap", 0, HEAD1) );
 		assertEquals( "1", hman.getLatestFile("zap/hap/tap").getName() );
 		assertEquals( HEAD1, hman.getLatest("zap/hap/tap") );
 		assertNull( hman.getLatest("zap/hap") );
 		
 		// But adding a different one should:
-		assertTrue( hman.addHead("zap/hap/tap", HEAD2) );
+		assertEquals( 2, hman.addHead("zap/hap/tap", 0, HEAD2) );
 		assertEquals( "2", hman.getLatestFile("zap/hap/tap").getName() );
+		assertEquals( HEAD2, hman.getLatest("zap/hap/tap") );
+		assertNull( hman.getLatest("zap/hap") );
+
+		// Adding it again should keep the same ID:
+		assertEquals( 2, hman.addHead("zap/hap/tap", 0, HEAD2) );
+		assertEquals( "2", hman.getLatestFile("zap/hap/tap").getName() );
+		assertEquals( HEAD2, hman.getLatest("zap/hap/tap") );
+		assertNull( hman.getLatest("zap/hap") );
+		
+		// Unless we force a higher one:
+		assertEquals( 3, hman.addHead("zap/hap/tap", 3, HEAD2) );
+		assertEquals( "3", hman.getLatestFile("zap/hap/tap").getName() );
 		assertEquals( HEAD2, hman.getLatest("zap/hap/tap") );
 		assertNull( hman.getLatest("zap/hap") );
 	}

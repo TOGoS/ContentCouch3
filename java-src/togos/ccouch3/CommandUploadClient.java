@@ -11,6 +11,7 @@ import togos.ccouch3.FlowUploader.FileMissing;
 import togos.ccouch3.FlowUploader.FullyStoredMarker;
 import togos.ccouch3.FlowUploader.LogMessage;
 import togos.ccouch3.FlowUploader.Piper;
+import togos.ccouch3.FlowUploader.PutHead;
 import togos.ccouch3.FlowUploader.Sink;
 import togos.ccouch3.FlowUploader.TransferTracker;
 import togos.ccouch3.FlowUploader.UploadCache;
@@ -48,6 +49,9 @@ class CommandUploadClient implements UploadClient
 					w.writeCmd( new String[]{ "post", "x", "incoming-log", "chunk", String.valueOf(lm.message.length) } );
 					w.writeChunk( lm.message, 0, lm.message.length );
 					w.endChunks();
+				} else if( m instanceof PutHead ) {
+					PutHead ph = (PutHead)m;
+					w.writeCmd( new String[]{ "put", "x", "ccouch-head:"+ph.name+"/"+ph.number, "by-urn", ph.headDataUrn } );
 				} else if( m instanceof EndMessage ) {
 					w.bye();
 				} else {

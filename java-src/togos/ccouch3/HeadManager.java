@@ -25,61 +25,31 @@ public class HeadManager
 		return name;
 	}
 	
-	protected static ByteChunk read( File f ) throws IOException {
-		if( f == null ) return null;
-		
-		long len = f.length();
-		if( len > 65536 ) throw new IOException( "Head size is way too big (max is 65k): "+len);
-		
-		byte[] data = new byte[(int)len];
-		FileInputStream fis = new FileInputStream(f);
-		try {
-			int z, r=0;
-			while( (z=fis.read(data,r,(int)len-r)) > 0 ) r += z;
-			if( r < len ) {
-				throw new IOException( "Failed to read all data from "+f+" (read "+r+" / "+len+" bytes)");
-			}
-			return new SimpleByteChunk(data);
-		} finally {
-			fis.close();
-		}
-	}
-	
-	protected static File tempFile( File f ) {
-		String ext = ".temp-" + System.currentTimeMillis() + "-" + (new Random()).nextInt(Integer.MAX_VALUE);
-		return new File( f + ext );
-	}
-	
-	protected static void write( File f, ByteChunk c ) throws IOException {
-		FileUtil.mkParentDirs( f );
-		File tempFile = tempFile( f );
-		FileOutputStream fos = new FileOutputStream( tempFile );
-		try {
-			fos.write( c.getBuffer(), c.getOffset(), c.getSize() );
-			if( !tempFile.renameTo( f ) ) {
-				throw new IOException("Failed to rename "+tempFile+" to "+f);
-			}
-		} finally {
-			if( tempFile.exists() ) tempFile.delete();
-		}
-	}
-	
-	public boolean addHead( String name, ByteChunk data ) throws IOException {
+	public int addHead( String name, int minId, ByteChunk data ) throws IOException {
 		name = cleanName( name );
 		File latest = getLatestFile( name );
 		
 		int newId;
 		if( latest != null ) {
-			ByteChunk existing = read( latest );
-			if( data.equals(existing) ) return false;
+			int latestId = Integer.parseInt( latest.getName() );
 			
-			newId = Integer.parseInt( latest.getName() )+1;
+			// Always create a new head if min is greater than the latest ID.
+			// Otherwise, only create a new one if it would be different
+			// than the latest one.
+			if( minId <= latestId ) {
+				ByteChunk existing = FileUtil.read( latest );
+				if( data.equals(existing) ) return latestId;
+			}
+			
+			newId = latestId + 1;
 		} else {
 			newId = 1;
 		}
 		
-		write( new File( headRoot + "/" + name + "/" + newId ), data );
-		return true;
+		if( newId < minId ) newId = minId;
+		
+		FileUtil.writeAtomic( new File( headRoot + "/" + name + "/" + newId ), data );
+		return newId;
 	}
 	
 	Pattern HEAD_NAME_PAT = Pattern.compile("\\d+");
@@ -101,7 +71,13 @@ public class HeadManager
 		return maxFile;
 	}
 	
+	public int getLatestNumber( String name ) throws IOException {
+		File f = getLatestFile(name);
+		if( f == null ) return 0;
+		return Integer.parseInt(f.getName());
+	}
+	
 	public ByteChunk getLatest( String name ) throws IOException {
-		return read( getLatestFile(name) );
+		return FileUtil.read( getLatestFile(name) );
 	}
 }

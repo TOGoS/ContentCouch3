@@ -262,6 +262,18 @@ public class FlowUploader
 		}
 	}
 	
+	static class PutHead {
+		public final String name;
+		public final int number;
+		public final String headDataUrn;
+		
+		public PutHead( String name, int minNumber, String headDataUrn ) {
+			this.name = name;
+			this.number = minNumber;
+			this.headDataUrn = headDataUrn;
+		}
+	}
+	
 	////
 	
 	static final ByteChunk YES_MARKER = BlobUtil.byteChunk("Y");
@@ -722,7 +734,6 @@ public class FlowUploader
 					}
 					
 					if( ut.commitConfig != null ) {
-						System.err.println( "Commit config; name="+ut.commitConfig.headName );
 						CommitManager.CommitSaveResult csr = getCommitManager().saveCommit(
 							new File(ut.path), indexResult.fileInfo.urn, timestamp, ut.commitConfig );
 						if( csr.newCommitCreated ) {
@@ -735,7 +746,9 @@ public class FlowUploader
 							for( IndexedObjectSink d : indexedObjectSinks ) d.give(lm);
 						}
 						if( ut.commitConfig.headName != null ) {
-							getHeadManager().addHead(ut.commitConfig.headName, csr.latestCommitData);
+							int headNum = getHeadManager().addHead(ut.commitConfig.headName, 0, csr.latestCommitData);
+							PutHead ph = new PutHead( ut.commitConfig.headName, headNum, csr.latestCommitDataUrn );
+							for( IndexedObjectSink d : indexedObjectSinks ) d.give(ph);
 						}
 					}
 					

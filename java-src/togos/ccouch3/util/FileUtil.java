@@ -1,6 +1,13 @@
 package togos.ccouch3.util;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Random;
+
+import togos.blob.ByteChunk;
+import togos.blob.SimpleByteChunk;
 
 public class FileUtil
 {
@@ -19,5 +26,44 @@ public class FileUtil
 			}
 		}
 		f.delete();
+	}
+	
+	public static ByteChunk read( File f ) throws IOException {
+		if( f == null ) return null;
+		
+		long len = f.length();
+		if( len > 65536 ) throw new IOException( "Head size is way too big (max is 65k): "+len);
+		
+		byte[] data = new byte[(int)len];
+		FileInputStream fis = new FileInputStream(f);
+		try {
+			int z, r=0;
+			while( (z=fis.read(data,r,(int)len-r)) > 0 ) r += z;
+			if( r < len ) {
+				throw new IOException( "Failed to read all data from "+f+" (read "+r+" / "+len+" bytes)");
+			}
+			return new SimpleByteChunk(data);
+		} finally {
+			fis.close();
+		}
+	}
+	
+	public static File tempFile( File f ) {
+		String ext = ".temp-" + System.currentTimeMillis() + "-" + (new Random()).nextInt(Integer.MAX_VALUE);
+		return new File( f + ext );
+	}
+	
+	public static void writeAtomic( File f, ByteChunk c ) throws IOException {
+		FileUtil.mkParentDirs( f );
+		File tempFile = tempFile( f );
+		FileOutputStream fos = new FileOutputStream( tempFile );
+		try {
+			fos.write( c.getBuffer(), c.getOffset(), c.getSize() );
+			if( !tempFile.renameTo( f ) ) {
+				throw new IOException("Failed to rename "+tempFile+" to "+f);
+			}
+		} finally {
+			if( tempFile.exists() ) tempFile.delete();
+		}
 	}
 }
