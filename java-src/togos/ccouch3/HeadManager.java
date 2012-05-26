@@ -1,14 +1,10 @@
 package togos.ccouch3;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Random;
 import java.util.regex.Pattern;
 
 import togos.blob.ByteChunk;
-import togos.blob.SimpleByteChunk;
 import togos.ccouch3.util.FileUtil;
 
 public class HeadManager

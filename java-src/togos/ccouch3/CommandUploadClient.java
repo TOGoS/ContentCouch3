@@ -183,7 +183,7 @@ class CommandUploadClient implements UploadClient
 	public final String serverName;
 	public final String[] serverCommand;
 	public boolean debug = false;
-	public boolean dieWhenNothingToSend;
+	public boolean dieWhenNothingToSend = true;
 	protected final TransferTracker transferTracker;
 	protected final UploadCache uploadCache;
 	
@@ -213,6 +213,7 @@ class CommandUploadClient implements UploadClient
 		if( !anythingSent && m instanceof EndMessage && dieWhenNothingToSend ) {
 			// Then we can quit without waiting for the server to
 			// forward our EndMessages back to us!
+			if( debug ) System.err.println(serverName + " uploader quitting early!");
 			halt();
 		} else {
 			if( headRequestSender == null ) {

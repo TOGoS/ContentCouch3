@@ -721,6 +721,7 @@ public class FlowUploader
 					IndexResult indexResult = indexer.index(ut.path);
 					long timestamp = System.currentTimeMillis();
 					report( indexResult.fileInfo );
+					
 					if( indexResult.anyNewData ) {
 						// If any new data was uploaded, send the name -> URN mapping to the server
 						// to be logged.  We want to NOT do this if we are only indexing and not
@@ -736,19 +737,33 @@ public class FlowUploader
 					if( ut.commitConfig != null ) {
 						CommitManager.CommitSaveResult csr = getCommitManager().saveCommit(
 							new File(ut.path), indexResult.fileInfo.urn, timestamp, ut.commitConfig );
-						if( csr.newCommitCreated ) {
-							String message =
-								"[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
-								"Commit '" + ut.name + "' = " + csr.latestCommitUrn;
-							LogMessage lm = new LogMessage(BlobUtil.bytes(message));
-							BlobInfo commitBlobInfo = new BlobInfo( csr.latestCommitDataUrn, csr.latestCommitData );
-							for( IndexedObjectSink d : indexedObjectSinks ) d.give( commitBlobInfo );
-							for( IndexedObjectSink d : indexedObjectSinks ) d.give(lm);
+						
+						BlobInfo commitBlobInfo = new BlobInfo( csr.latestCommitDataUrn, csr.latestCommitData );
+						for( IndexedObjectSink d : indexedObjectSinks ) {
+							// Log the commit and send the data to any server that doesn't have it
+							if( !d.isFullyUploaded(csr.latestCommitDataUrn) ) {
+								String message =
+										"[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
+										"Commit '" + ut.name + "' = " + csr.latestCommitUrn;
+									LogMessage lm = new LogMessage(BlobUtil.bytes(message));
+									d.give( lm );
+								d.give( commitBlobInfo );
+								d.give( new FullyStoredMarker(csr.latestCommitDataUrn) );
+							}
+							
 						}
+						
 						if( ut.commitConfig.headName != null ) {
 							int headNum = getHeadManager().addHead(ut.commitConfig.headName, 0, csr.latestCommitData);
 							PutHead ph = new PutHead( ut.commitConfig.headName, headNum, csr.latestCommitDataUrn );
-							for( IndexedObjectSink d : indexedObjectSinks ) d.give(ph);
+							String headNameUrn = "ccouch-head:"+ut.commitConfig.headName+"/"+headNum;
+							for( IndexedObjectSink d : indexedObjectSinks ) {
+								// Send the head to any server that doesn't have it
+								if( !d.isFullyUploaded(headNameUrn) ) {
+									d.give( ph );
+									d.give( new FullyStoredMarker(headNameUrn) );
+								}
+							}
 						}
 					}
 					
@@ -936,7 +951,9 @@ public class FlowUploader
 		String storeSector = "user";
 		String serverName = null;
 		String[] serverCommand = null;
-				
+		
+		String repoName = null;
+		
 		// Optional commit info
 		String commitName = null;
 		String commitAuthor = null;
@@ -959,7 +976,11 @@ public class FlowUploader
 			} else if( "-no-cache".equals(a) ) {
 				cacheDir = "DO-NOT-CACHE";
 			
-			} else if( "-repo".equals(a) ) {
+			} else if( "-repo".equals(a) || a.startsWith("-local-repo:") ) {
+				if( a.startsWith("-local-repo:") ) {
+					repoName = a.substring(12);
+				}
+				
 				String repoDir = args.next();
 				cacheDir = repoCacheDir( repoDir );
 				dataDir  = repoDataDir( repoDir );
@@ -986,7 +1007,11 @@ public class FlowUploader
 				if( commitAuthor == null && commitMessage == null && commitName == null ) {
 					commitConfig = null;
 				} else {
-					commitConfig = new CommitConfig( commitName, commitMessage, commitAuthor, new String[0] );
+					if( commitName != null && repoName == null ) {
+						return FlowUploaderCommand.error("Must specify a local repo name (with -local-repo:<repo-name> <repo-path>) before -n <head-name> or use -full-head-name <full-head-name>");
+					}
+					
+					commitConfig = new CommitConfig( repoName + "/" + commitName, commitMessage, commitAuthor, new String[0] );
 					commitMessage = null;
 					commitName = null;
 				}
