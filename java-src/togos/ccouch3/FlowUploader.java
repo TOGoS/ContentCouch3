@@ -1090,10 +1090,12 @@ public class FlowUploader
 		"  -n <name>    ; Give a name for the next commit\n" +
 		"  -a <author>  ; Give an author name for the next commit\n" +
 		"  -m <message> ; Give a description for the next commit\n" +
-		"  -repo <path> ; Path to local ccouch repository to store cache in.\n" +
+		"  -local-repo <path> ; Path to local ccouch repository to store cache in.\n" +
+		"  -local-repo:<name> <path> ; Path to a named local repository; this is needed\n" +
+		"                 when creating a named commit with '-n'\n" +
 		"  -no-cache    ; Do not cache file hashes or upload records.\n" +
 		"  -command-server:<name> <cmd> <arg> <arg> ... ';' ; Add a command to pipe\n" +
-		"    cmd-server commands to\n" +
+		"                 cmd-server commands to\n" +
 		//"  -server-name <name> ; name of repository you are uploading to;\n" +
 		//"    this is used for tracking which files have already been uploaded where.\n" +
 		//"  -server-command <cmd> <arg> <arg> ... -- ; Command to pipe cmd-server\n" +
@@ -1104,11 +1106,19 @@ public class FlowUploader
 		"listed that is to have a commit created for it, and commit information must\n" +
 		"be given *before* the path to the file/directory to be uploaded\n" +
 		"\n" +
+		"Local repository names are used as the first path component of heads.\n" +
+		"Remote repository names are used to keep track of what files have already\n" +
+		"been uploaded where.\n" +
+		"\n" +
+		"You can specify more than one remote server, and files will be uploaded to\n" +
+		"all of them.\n" +
+		"\n" +
 		"Example usage:\n" +
-		"  ccouch3 upload -server-name example.org \\\n" +
-		"    -server-command ssh tom@example.org \"ccouch3 cmd-server\" -- \\\n" +
-		"    -a Tom -n archives/mah-files -m 'Backup of my cool files' \\\n" +
-		"    /home/tom/directory-full-of-files-to-back-up/";
+		"  ccouch3 upload \\\n" +
+		"    -command-server:example.org ssh tom@example.org \"ccouch3 cmd-server\" ';' \\\n" +
+		"    -local-repo:/home/tom/ccouch \\\n" +
+		"    -a Tom -n archives/tom/pictures -m \"Tom's pictures\" /home/tom/pics/ \\\n" +
+		"    -a Tom -n archives/tom/docs -m \"Tom's documents\" /home/tom/docs/";
 	
 	public static int uploadMain( Iterator<String> args ) throws Exception {
 		FlowUploaderCommand fuc = fromArgs(args, true, false);
