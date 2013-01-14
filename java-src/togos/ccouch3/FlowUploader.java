@@ -496,13 +496,14 @@ public class FlowUploader
 				if( cachedUrn != null ) {
 					fileUrn = cachedUrn;
 				} else {
-					FileInputStream fis = new FileInputStream( file );
+					FileInputStream fis = null;
 					try {
+						fis = new FileInputStream( file );
 						fileUrn = digestor.digest(fis);
 					} catch( IOException e ) {
 						throw new FileReadError( file, e );
 					} finally {
-						fis.close();
+						if( fis != null ) fis.close();
 					}
 				}
 				
