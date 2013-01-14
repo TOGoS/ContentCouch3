@@ -34,6 +34,14 @@ import togos.ccouch3.slf.SimpleListFile2;
 
 public class FlowUploader
 {
+	static class FileReadError extends IOException {
+		public final File file;
+		public FileReadError( File file, Exception cause ) {
+			super(cause);
+			this.file = file;
+		}
+	}
+	
 	//// Hash stuff ////
 	
 	interface MessageDigestFactory {
@@ -414,16 +422,21 @@ public class FlowUploader
 			}
 		}
 		
+		public static final int THROW_AN_EXCEPTION = 1;
+		public static final int SKIP_THE_FILE = 2;
+		
 		protected final DirectorySerializer dirSer;
 		protected final StreamURNifier digestor;
 		protected final HashCache hashCache;
 		protected final IndexedObjectSink[] destinations;
+		protected final int howToHandleFileReadErrors;
 		
-		public Indexer( DirectorySerializer dirSer, StreamURNifier digestor, HashCache hashCache, IndexedObjectSink[] destinations ) {
+		public Indexer( DirectorySerializer dirSer, StreamURNifier digestor, HashCache hashCache, IndexedObjectSink[] destinations, int howToHandleFileReadErrors ) {
 			this.dirSer = dirSer;
 			this.digestor = digestor;
 			this.destinations = destinations;
 			this.hashCache = hashCache;
+			this.howToHandleFileReadErrors = howToHandleFileReadErrors;
 		}
 		
 		protected boolean shouldIgnore( File f ) {
@@ -436,8 +449,20 @@ public class FlowUploader
 		public Collection<DirectoryEntry> indexDirectoryEntries( File file ) throws Exception {
 			ArrayList<DirectoryEntry> entries = new ArrayList<DirectoryEntry>();
 			
-			for( File c : file.listFiles() ) {
-				if( !shouldIgnore(c) ) entries.add( new DirectoryEntry( c.getName(), index(c).fileInfo ) );
+			for( File c : file.listFiles() ) if( !shouldIgnore(c) ) {
+				IndexResult indexResult;
+				try {
+					indexResult = index(c);
+				} catch( FileReadError e ) {
+					switch( howToHandleFileReadErrors ) {
+					case SKIP_THE_FILE:
+						System.err.println("Skipping file due to read errors: "+e.file+": "+e.getCause().getMessage());
+						continue;
+					case THROW_AN_EXCEPTION: throw e;
+					default: throw new Exception("Invalid file read error handling option: "+howToHandleFileReadErrors);
+					}
+				}
+				entries.add( new DirectoryEntry( c.getName(), indexResult.fileInfo ) );
 			}
 			
 			return entries;
@@ -474,6 +499,8 @@ public class FlowUploader
 					FileInputStream fis = new FileInputStream( file );
 					try {
 						fileUrn = digestor.digest(fis);
+					} catch( IOException e ) {
+						throw new FileReadError( file, e );
 					} finally {
 						fis.close();
 					}
@@ -559,6 +586,7 @@ public class FlowUploader
 	//// Put it all together ////
 	
 	Collection<UploadTask> tasks;
+	public int howToHandleFileReadErrors = Indexer.THROW_AN_EXCEPTION;
 	public boolean showTransferSummary;
 	public boolean showProgress;
 	public boolean reportPathUrnMapping = false;
@@ -645,7 +673,7 @@ public class FlowUploader
 	}
 	
 	public void runIdentify() throws Exception {
-		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), new IndexedObjectSink[0]);
+		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), new IndexedObjectSink[0], howToHandleFileReadErrors );
 		for( UploadTask ut : tasks ) {
 			IndexResult indexResult = indexer.index(ut.path);
 			report( indexResult.fileInfo );
@@ -713,7 +741,7 @@ public class FlowUploader
 		
 		final LinkedBlockingQueue<Object> uploadTaskQueue     = new LinkedBlockingQueue<Object>(tasks);
 		
-		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), indexedObjectSinks);
+		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors );
 		final QueueRunner indexRunner = new QueueRunner( uploadTaskQueue ) {
 			public boolean handleMessage( Object m ) throws Exception {
 				if( m instanceof UploadTask ) {
@@ -953,6 +981,7 @@ public class FlowUploader
 		String[] serverCommand = null;
 		
 		String repoName = null;
+		int howToHandleReadErrors = Indexer.THROW_AN_EXCEPTION;
 		
 		// Optional commit info
 		String commitName = null;
@@ -1000,6 +1029,8 @@ public class FlowUploader
 				uploadClientSpecs.add( new CommandUploadClientSpec(sn, readSubCommandArguments(args)) );
 			} else if( "-server-command".equals(a) ) {
 				serverCommand = readSubCommandArguments(args);
+			} else if( "-skip-files-with-read-errors".equals(a) ) {
+				howToHandleReadErrors = Indexer.SKIP_THE_FILE;
 			} else if( CCouch3Command.isHelpArgument(a) ) {
 				return FlowUploaderCommand.help();
 			} else if( !a.startsWith("-") ) {
@@ -1077,6 +1108,7 @@ public class FlowUploader
 		fu.reportPathUrnMapping = showUrns && tasks.size() != 1;
 		fu.reportUrn = showUrns && tasks.size() == 1;
 		fu.uploadClientSpecs = uploadClientSpecs.toArray(new UploadClientSpec[uploadClientSpecs.size()]);
+		fu.howToHandleFileReadErrors = howToHandleReadErrors;
 		return FlowUploaderCommand.normal( fu );
 	}
 	
