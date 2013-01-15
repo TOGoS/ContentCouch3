@@ -34,7 +34,13 @@ import togos.ccouch3.slf.SimpleListFile2;
 
 public class FlowUploader
 {
+	static class Actions {
+		public static final int SKIP_THE_FILE = 2;
+		public static final int THROW_AN_EXCEPTION = 1;
+	}
+	
 	static class FileReadError extends IOException {
+		private static final long serialVersionUID = 4457136769951017923L;
 		public final File file;
 		public FileReadError( File file, Exception cause ) {
 			super(cause);
@@ -422,9 +428,6 @@ public class FlowUploader
 			}
 		}
 		
-		public static final int THROW_AN_EXCEPTION = 1;
-		public static final int SKIP_THE_FILE = 2;
-		
 		protected final DirectorySerializer dirSer;
 		protected final StreamURNifier digestor;
 		protected final HashCache hashCache;
@@ -455,10 +458,10 @@ public class FlowUploader
 					indexResult = index(c);
 				} catch( FileReadError e ) {
 					switch( howToHandleFileReadErrors ) {
-					case SKIP_THE_FILE:
+					case Actions.SKIP_THE_FILE:
 						System.err.println("Skipping file due to read errors: "+e.file+": "+e.getCause().getMessage());
 						continue;
-					case THROW_AN_EXCEPTION: throw e;
+					case Actions.THROW_AN_EXCEPTION: throw e;
 					default: throw new Exception("Invalid file read error handling option: "+howToHandleFileReadErrors);
 					}
 				}
@@ -587,7 +590,7 @@ public class FlowUploader
 	//// Put it all together ////
 	
 	Collection<UploadTask> tasks;
-	public int howToHandleFileReadErrors = Indexer.THROW_AN_EXCEPTION;
+	public int howToHandleFileReadErrors = Actions.THROW_AN_EXCEPTION;
 	public boolean showTransferSummary;
 	public boolean showProgress;
 	public boolean reportPathUrnMapping = false;
@@ -982,7 +985,7 @@ public class FlowUploader
 		String[] serverCommand = null;
 		
 		String repoName = null;
-		int howToHandleReadErrors = Indexer.THROW_AN_EXCEPTION;
+		int howToHandleReadErrors = Actions.THROW_AN_EXCEPTION;
 		
 		// Optional commit info
 		String commitName = null;
@@ -1031,7 +1034,7 @@ public class FlowUploader
 			} else if( "-server-command".equals(a) ) {
 				serverCommand = readSubCommandArguments(args);
 			} else if( "-skip-files-with-read-errors".equals(a) ) {
-				howToHandleReadErrors = Indexer.SKIP_THE_FILE;
+				howToHandleReadErrors = Actions.SKIP_THE_FILE;
 			} else if( CCouch3Command.isHelpArgument(a) ) {
 				return FlowUploaderCommand.help();
 			} else if( !a.startsWith("-") ) {
