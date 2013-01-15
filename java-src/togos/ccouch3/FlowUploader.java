@@ -433,13 +433,19 @@ public class FlowUploader
 		protected final HashCache hashCache;
 		protected final IndexedObjectSink[] destinations;
 		protected final int howToHandleFileReadErrors;
-		
-		public Indexer( DirectorySerializer dirSer, StreamURNifier digestor, HashCache hashCache, IndexedObjectSink[] destinations, int howToHandleFileReadErrors ) {
+		protected final boolean debug;
+
+		public Indexer(
+			DirectorySerializer dirSer, StreamURNifier digestor,
+			HashCache hashCache, IndexedObjectSink[] destinations,
+			int howToHandleFileReadErrors, boolean debug
+		) {
 			this.dirSer = dirSer;
 			this.digestor = digestor;
 			this.destinations = destinations;
 			this.hashCache = hashCache;
 			this.howToHandleFileReadErrors = howToHandleFileReadErrors;
+			this.debug = debug;
 		}
 		
 		protected boolean shouldIgnore( File f ) {
@@ -479,8 +485,10 @@ public class FlowUploader
 		}
 		
 		protected IndexResult index( File file ) throws Exception {
+			if( debug ) System.err.println("Indexer: "+file+"...");
 			String cachedUrn = hashCache.getFileUrn( file );
 			if( cachedUrn != null && isFullyUploadedEverywhere(cachedUrn) ) {
+				if( debug ) System.err.println("Indexer: "+file+": already hashed+uploaded: "+cachedUrn);
 				// Then we don't need to recurse into subdirectories!
 				return new IndexResult(
 					new FileInfo(
@@ -563,6 +571,7 @@ public class FlowUploader
 					hashCache.cacheFileUrn( file, treeUrn );
 				}
 				if( isFullyUploadedEverywhere(treeUrn) ) {
+					if( debug ) System.err.println("Indexer: "+file+": already uploaded: "+treeUrn); 
 					return new IndexResult( fi, false );
 				}
 				
@@ -579,6 +588,7 @@ public class FlowUploader
 			} else {
 				throw new RuntimeException("Don't know how to index "+file);
 			}
+			if( debug ) System.err.println("Indexer: "+file+": done: "+cachedUrn);
 			return new IndexResult( fi, true );
 		}
 		
@@ -591,6 +601,7 @@ public class FlowUploader
 	
 	Collection<UploadTask> tasks;
 	public int howToHandleFileReadErrors = Actions.THROW_AN_EXCEPTION;
+	public boolean debug;
 	public boolean showTransferSummary;
 	public boolean showProgress;
 	public boolean reportPathUrnMapping = false;
@@ -677,7 +688,7 @@ public class FlowUploader
 	}
 	
 	public void runIdentify() throws Exception {
-		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), new IndexedObjectSink[0], howToHandleFileReadErrors );
+		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), new IndexedObjectSink[0], howToHandleFileReadErrors, debug );
 		for( UploadTask ut : tasks ) {
 			IndexResult indexResult = indexer.index(ut.path);
 			report( indexResult.fileInfo );
@@ -745,7 +756,7 @@ public class FlowUploader
 		
 		final LinkedBlockingQueue<Object> uploadTaskQueue     = new LinkedBlockingQueue<Object>(tasks);
 		
-		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors );
+		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors, debug );
 		final QueueRunner indexRunner = new QueueRunner( uploadTaskQueue ) {
 			public boolean handleMessage( Object m ) throws Exception {
 				if( m instanceof UploadTask ) {
@@ -976,6 +987,7 @@ public class FlowUploader
 	static FlowUploaderCommand fromArgs( Iterator<String> args, boolean requireServer, boolean alwaysShowUrns ) throws Exception {
 		ArrayList<UploadTask> tasks = new ArrayList<UploadTask>();
 		boolean verbose = false;
+		boolean debug = false;
 		boolean showProgress = false;
 		String cacheDir = null;
 		String dataDir = null;
@@ -995,17 +1007,24 @@ public class FlowUploader
 		ArrayList<UploadClientSpec> uploadClientSpecs = new ArrayList<UploadClientSpec>(); 
 		for( ; args.hasNext(); ) {
 			String a = args.next();
+			
+			// Verbosity options
 			if( "-v".equals(a) ) {
 				verbose = true;
 				showProgress = true;
+			} else if( "-show-progress".equals(a) ) {
+				showProgress = true;
+			} else if( "-debug".equals(a) ) {
+				debug =true;
+			
+			// Commit options
 			} else if( "-m".equals(a) ) {
 				commitMessage = args.next();
 			} else if( "-a".equals(a) ) {
 				commitAuthor = args.next();
 			} else if( "-n".equals(a) ) {
 				commitName = args.next();
-			} else if( "-show-progress".equals(a) ) {
-				showProgress = true;
+			
 			} else if( "-no-cache".equals(a) ) {
 				cacheDir = "DO-NOT-CACHE";
 			
@@ -1103,11 +1122,12 @@ public class FlowUploader
 		boolean showUrns = verbose || alwaysShowUrns;
 		
 		FlowUploader fu = new FlowUploader(tasks);
+		fu.debug = debug;
+		fu.showProgress = showProgress;
 		fu.cacheDir = cacheDirFile;
 		fu.dataDir = dataDirFile;
 		fu.headDir = headDirFile;
 		fu.storeSector = storeSector;
-		fu.showProgress = showProgress;
 		fu.showTransferSummary = verbose;
 		fu.reportPathUrnMapping = showUrns && tasks.size() != 1;
 		fu.reportUrn = showUrns && tasks.size() == 1;
