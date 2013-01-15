@@ -588,7 +588,7 @@ public class FlowUploader
 			} else {
 				throw new RuntimeException("Don't know how to index "+file);
 			}
-			if( debug ) System.err.println("Indexer: "+file+": done: "+cachedUrn);
+			if( debug ) System.err.println("Indexer: "+file+": done: "+fi.urn);
 			return new IndexResult( fi, true );
 		}
 		
