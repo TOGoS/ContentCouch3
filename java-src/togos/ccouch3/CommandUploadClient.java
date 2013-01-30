@@ -183,7 +183,7 @@ class CommandUploadClient implements UploadClient
 	public final String serverName;
 	public final String[] serverCommand;
 	public boolean debug = false;
-	public boolean dieWhenNothingToSend = true;
+	public boolean dieWhenNothingToSend = false;
 	protected final TransferTracker transferTracker;
 	protected final UploadCache uploadCache;
 	

@@ -110,6 +110,11 @@ public class FlowUploader
 		public QueueRunner( BlockingQueue<Object> inQueue ) {
 			this.inQueue = inQueue;
 		}
+		/**
+		 * Should return true if it expects to handle more messages.
+		 * False indicates that this QueueRunner should clean up and
+		 * quit, and handleMessage expects to never be called again.
+		 */
 		protected abstract boolean handleMessage( Object m ) throws Exception;
 		protected abstract void cleanUp() throws Exception;
 		public void run() {
@@ -601,9 +606,10 @@ public class FlowUploader
 	
 	Collection<UploadTask> tasks;
 	public int howToHandleFileReadErrors = Actions.THROW_AN_EXCEPTION;
-	public boolean debug;
-	public boolean showTransferSummary;
-	public boolean showProgress;
+	public boolean debug = false;
+	public boolean fastExitEnabled = false;
+	public boolean showTransferSummary = false;
+	public boolean showProgress = false;
 	public boolean reportPathUrnMapping = false;
 	public boolean reportUrn = false;
 	public StreamURNifier digestor = BITPRINT_STREAM_URNIFIER;
@@ -750,7 +756,7 @@ public class FlowUploader
 		final IndexedObjectSink[] indexedObjectSinks = new IndexedObjectSink[uploadClientSpecs.length];
 		for( int i=0; i<uploadClientSpecs.length; ++i ) {
 			final UploadCache uc = getUploadCache(uploadClientSpecs[i].getServerName());
-			uploadClients[i] = uploadClientSpecs[i].createClient( uc, tt );
+			uploadClients[i] = uploadClientSpecs[i].createClient( uc, tt, this );
 			indexedObjectSinks[i] = new IndexedObjectSink( uc, uploadClients[i] );
 		}
 		
@@ -821,6 +827,7 @@ public class FlowUploader
 			@Override
 			protected void cleanUp() throws Exception {
 				for( IndexedObjectSink d : indexedObjectSinks ) {
+					if( debug ) System.err.println("Indexer: Sending EndMessage to IndexedObjectSink.");
 					d.give( EndMessage.INSTANCE );
 				}
 			}
@@ -953,7 +960,13 @@ public class FlowUploader
 	
 	interface UploadClientSpec {
 		public String getServerName();
-		public UploadClient createClient( UploadCache uc, TransferTracker tt );
+		/**
+		 * fu should only be used to pull simple options from; don't
+		 * call any methods on it plz.  This should maybe be refactored
+		 * to a FlowUploadOptions object when I'm at a more comfy
+		 * computer.
+		 */
+		public UploadClient createClient( UploadCache uc, TransferTracker tt, FlowUploader fu );
 	}
 	
 	static class CommandUploadClientSpec implements UploadClientSpec {
@@ -967,8 +980,11 @@ public class FlowUploader
 		
 		public String getServerName() { return name; }
 		
-		public UploadClient createClient( UploadCache uc, TransferTracker tt ) {
-			return new CommandUploadClient( name, command, uc, tt );
+		public UploadClient createClient( UploadCache uc, TransferTracker tt, FlowUploader fu ) {
+			CommandUploadClient cuc = new CommandUploadClient( name, command, uc, tt );
+			cuc.debug = fu.debug;
+			cuc.dieWhenNothingToSend = fu.fastExitEnabled;
+			return cuc;
 		}
 	}
 	
@@ -988,6 +1004,7 @@ public class FlowUploader
 		ArrayList<UploadTask> tasks = new ArrayList<UploadTask>();
 		boolean verbose = false;
 		boolean debug = false;
+		boolean fastExitEnabled = false;
 		boolean showProgress = false;
 		String cacheDir = null;
 		String dataDir = null;
@@ -1015,8 +1032,9 @@ public class FlowUploader
 			} else if( "-show-progress".equals(a) ) {
 				showProgress = true;
 			} else if( "-debug".equals(a) ) {
-				debug =true;
-			
+				debug = true;
+			} else if( "-enable-fast-exit".equals(a) ) {
+				fastExitEnabled = true;
 			// Commit options
 			} else if( "-m".equals(a) ) {
 				commitMessage = args.next();
@@ -1123,6 +1141,7 @@ public class FlowUploader
 		
 		FlowUploader fu = new FlowUploader(tasks);
 		fu.debug = debug;
+		fu.fastExitEnabled = fastExitEnabled;
 		fu.showProgress = showProgress;
 		fu.cacheDir = cacheDirFile;
 		fu.dataDir = dataDirFile;
@@ -1143,19 +1162,22 @@ public class FlowUploader
 		"to another program (probably 'ssh somewhere \"ccouch3 cmd-server\"').\n" +
 		"\n" +
 		"Options:\n" +
-		"  -n <name>    ; Give a name for the next commit\n" +
-		"  -a <author>  ; Give an author name for the next commit\n" +
-		"  -m <message> ; Give a description for the next commit\n" +
+		"  -n <name>      ; Give a name for the next commit\n" +
+		"  -a <author>    ; Give an author name for the next commit\n" +
+		"  -m <message>   ; Give a description for the next commit\n" +
 		"  -local-repo <path> ; Path to local ccouch repository to store cache in.\n" +
 		"  -local-repo:<name> <path> ; Path to a named local repository; this is needed\n" +
-		"                 when creating a named commit with '-n'\n" +
-		"  -no-cache    ; Do not cache file hashes or upload records.\n" +
+		"                 ; when creating a named commit with '-n'\n" +
+		"  -no-cache      ; Do not cache file hashes or upload records.\n" +
 		"  -command-server:<name> <cmd> <arg> <arg> ... ';' ; Add a command to pipe\n" +
-		"                 cmd-server commands to\n" +
+		"                 ; cmd-server commands to\n" +
 		//"  -server-name <name> ; name of repository you are uploading to;\n" +
 		//"    this is used for tracking which files have already been uploaded where.\n" +
 		//"  -server-command <cmd> <arg> <arg> ... -- ; Command to pipe cmd-server\n" +
 		//"    commands to.\n" +
+		"  -debug         ; spew inner thoughts all over your terminal.\n" +
+		"  -enable-fast-exit ; enable fast exiting when no data needs to be sent\n" +
+		"                 ; (hangs on some systems).\n" +
 		"  -show-progress ; show progress information on stderr.\n" +
 		"\n" +
 		"Note that commit info (besides author) must be given separately for each file\n" +
