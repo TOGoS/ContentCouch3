@@ -461,9 +461,22 @@ public class FlowUploader
 		}
 		
 		public Collection<DirectoryEntry> indexDirectoryEntries( File file ) throws Exception {
+			assert file.isDirectory();
+			
 			ArrayList<DirectoryEntry> entries = new ArrayList<DirectoryEntry>();
 			
-			for( File c : file.listFiles() ) if( !shouldIgnore(c) ) {
+			File[] dirEntries = file.listFiles();
+			if( dirEntries == null ) {
+				switch( howToHandleFileReadErrors ) {
+				case Actions.SKIP_THE_FILE:
+					System.err.println("Skipping directory because couldn't list files within (.listFiles() returned null): "+file);
+					return entries;
+				case Actions.THROW_AN_EXCEPTION:
+					throw new Exception("Failed to read files from directory (.listFiles() returned null): "+file);
+				default: throw new Exception("Invalid file read error handling option: "+howToHandleFileReadErrors);
+				}
+			}
+			for( File c : dirEntries ) if( !shouldIgnore(c) ) {
 				IndexResult indexResult;
 				try {
 					indexResult = index(c);
