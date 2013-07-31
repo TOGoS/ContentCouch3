@@ -4,7 +4,7 @@ public class DirectoryEntry extends FileInfo implements Comparable<DirectoryEntr
 {
 	public final String name;
 	
-	public DirectoryEntry( String name, String urn, int fileType, long size, long mtime ) {
+	public DirectoryEntry( String name, String urn, FileType fileType, long size, long mtime ) {
 		super( name, urn, fileType, size, mtime );
 		this.name = name;
 	}

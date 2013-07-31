@@ -8,7 +8,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,8 +24,7 @@ import togos.blob.util.BlobUtil;
 import togos.ccouch3.FlowUploader.Indexer.IndexedObjectSink;
 import togos.ccouch3.FlowUploader.StandardTransferTracker.Counter;
 import togos.ccouch3.hash.BitprintDigest;
-import togos.ccouch3.hash.BitprintHashURNFormatter;
-import togos.ccouch3.hash.HashFormatter;
+import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.slf.RandomAccessFileBlob;
@@ -47,51 +45,6 @@ public class FlowUploader
 			this.file = file;
 		}
 	}
-	
-	//// Hash stuff ////
-	
-	interface MessageDigestFactory {
-		public MessageDigest createMessageDigest();
-	}
-	
-	interface StreamURNifier {
-		public String digest( InputStream is ) throws IOException;
-	}
-
-	static class MessageDigestor implements StreamURNifier {
-		final MessageDigestFactory messageDigestFactory;
-		final HashFormatter hform;
-		
-		public MessageDigestor( MessageDigestFactory fac, HashFormatter form ) {
-			this.messageDigestFactory = fac;
-			this.hform = form;
-		}
-		
-		@Override
-		public String digest(InputStream is) throws IOException {
-			MessageDigest d = messageDigestFactory.createMessageDigest();
-			
-			byte[] buffer = new byte[65536];
-			while( true ) {
-				int z = is.read( buffer );
-				if( z <= 0 ) break;
-				d.update( buffer, 0, z );
-					
-			}
-			
-			return hform.format( d.digest() );
-		}
-	}
-	
-	static class BitprintMessageDigestFactory implements MessageDigestFactory {
-		@Override
-		public MessageDigest createMessageDigest() {
-			return new BitprintDigest();
-		}
-	}
-	
-	public static final BitprintMessageDigestFactory BITPRINT_MESSAGE_DIGEST_FACTORY = new BitprintMessageDigestFactory(); 
-	public static final MessageDigestor BITPRINT_STREAM_URNIFIER = new MessageDigestor( BITPRINT_MESSAGE_DIGEST_FACTORY, BitprintHashURNFormatter.INSTANCE );
 	
 	//// Queue stuff ////
 	
@@ -512,7 +465,7 @@ public class FlowUploader
 					new FileInfo(
 						file.getCanonicalPath(),
 						cachedUrn,
-						file.isDirectory() ? FileInfo.FILETYPE_DIRECTORY : FileInfo.FILETYPE_BLOB,
+						file.isDirectory() ? FileInfo.FileType.DIRECTORY : FileInfo.FileType.BLOB,
 						file.length(),
 						file.lastModified()
 					), false
@@ -539,7 +492,7 @@ public class FlowUploader
 				fi = new FileInfo(
 					file.getCanonicalPath(),
 					fileUrn,
-					FileInfo.FILETYPE_BLOB,
+					FileInfo.FileType.BLOB,
 					file.length(),
 					file.lastModified()
 				);
@@ -559,7 +512,7 @@ public class FlowUploader
 				/*
 				boolean includesSubDirs = false;
 				for( DirectoryEntry e : entries ) {
-					if( e.fileType == DirectoryEntry.FILETYPE_DIRECTORY ) {
+					if( e.fileType == DirectoryEntry.FileType.DIRECTORY ) {
 						includesSubDirs = true;
 					}
 				}
@@ -580,7 +533,7 @@ public class FlowUploader
 				fi = new FileInfo(
 					file.getCanonicalPath(),
 					treeUrn,
-					FileInfo.FILETYPE_DIRECTORY,
+					FileInfo.FileType.DIRECTORY,
 					file.length(),
 					file.lastModified()
 				);
@@ -625,7 +578,7 @@ public class FlowUploader
 	public boolean showProgress = false;
 	public boolean reportPathUrnMapping = false;
 	public boolean reportUrn = false;
-	public StreamURNifier digestor = BITPRINT_STREAM_URNIFIER;
+	public StreamURNifier digestor = BitprintDigest.STREAM_URNIFIER;
 	public DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
 	public File cacheDir;
 	
@@ -788,7 +741,7 @@ public class FlowUploader
 						// If any new data was uploaded, send the name -> URN mapping to the server
 						// to be logged.  We want to NOT do this if we are only indexing and not
 						// sending!  In this case anyNewData will also be false.
-						String objectTypeName = indexResult.fileInfo.fileType == FileInfo.FILETYPE_BLOB ? "File" : "Directory";
+						String objectTypeName = indexResult.fileInfo.fileType == FileInfo.FileType.BLOB ? "File" : "Directory";
 						String message =
 							"[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
 							objectTypeName + " '" + ut.name + "' = " + indexResult.fileInfo.urn;
@@ -1207,7 +1160,7 @@ public class FlowUploader
 		"Example usage:\n" +
 		"  ccouch3 upload \\\n" +
 		"    -command-server:example.org ssh tom@example.org \"ccouch3 cmd-server\" ';' \\\n" +
-		"    -local-repo:/home/tom/ccouch \\\n" +
+		"    -local-repo:tom /home/tom/ccouch \\\n" +
 		"    -a Tom -n archives/tom/pictures -m \"Tom's pictures\" /home/tom/pics/ \\\n" +
 		"    -a Tom -n archives/tom/docs -m \"Tom's documents\" /home/tom/docs/";
 	

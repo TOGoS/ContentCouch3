@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 
+import togos.ccouch3.FileInfo.FileType;
 import togos.ccouch3.util.DateUtil;
 import togos.ccouch3.util.XMLUtil;
 
@@ -20,7 +21,7 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 
 		boolean needBzNamespace = false, needDcNamespace = false;
 		for( FileInfo f : sortedEntries ) {
-			if( f.fileType == FileInfo.FILETYPE_BLOB ) {
+			if( f.fileType == FileType.BLOB ) {
 				if( f.mtime != -1 ) needDcNamespace = true;
 				if( f.size != -1 ) needBzNamespace = true;
 			}
@@ -37,12 +38,12 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 			String tag;
 			boolean showSize, showMtime;
 			switch( f.fileType ) {
-			case( FileInfo.FILETYPE_BLOB ):
+			case BLOB:
 				tag = "Blob";
 				showSize = f.size != -1;
 				showMtime = f.mtime != -1;
 				break;
-			case( FileInfo.FILETYPE_DIRECTORY ):
+			case DIRECTORY:
 				tag = "Directory";
 				showSize = false;
 				showMtime = false;

@@ -13,7 +13,7 @@ import togos.blob.ByteChunk;
 import togos.blob.SimpleByteChunk;
 import togos.blob.util.BlobUtil;
 import togos.ccouch3.FlowUploader.CommitConfig;
-import togos.ccouch3.FlowUploader.StreamURNifier;
+import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.StoreException;
 import togos.ccouch3.util.FileUtil;

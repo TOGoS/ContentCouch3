@@ -2,16 +2,18 @@ package togos.ccouch3;
 
 public class FileInfo
 {
-	static final int FILETYPE_BLOB = 1;
-	static final int FILETYPE_DIRECTORY = 2;
+	public enum FileType {
+		BLOB,
+		DIRECTORY
+	};
 	
 	public final String path;
 	public final String urn;
-	public final int fileType;
+	public final FileType fileType;
 	public final long size;
 	public final long mtime;
 	
-	public FileInfo( String path, String urn, int fileType, long size, long mtime ) {
+	public FileInfo( String path, String urn, FileType fileType, long size, long mtime ) {
 		this.path     = path;
 		this.urn      = urn;
 		this.fileType = fileType;

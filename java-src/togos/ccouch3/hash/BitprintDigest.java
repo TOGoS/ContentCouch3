@@ -8,6 +8,22 @@ import org.bitpedia.util.TigerTree;
 
 public class BitprintDigest extends MessageDigest
 {
+	public static final MessageDigestFactory FACTORY = new MessageDigestFactory() {
+		@Override public MessageDigest createMessageDigest() {
+			return new BitprintDigest();
+		}
+	};
+	
+	public static final HashFormatter FORMATTER = new HashFormatter() {
+		@Override public String format(byte[] hash) {
+			return "urn:bitprint:" + BitprintDigest.format(hash);
+		}
+	};
+	
+	public static final StreamURNifier STREAM_URNIFIER =
+			new MessageDigestStreamURNifier(FACTORY, FORMATTER);
+		
+	
 	public static String format( byte[] hash ) {
 		byte[] sha1Hash = new byte[20];
 		System.arraycopy( hash, 0, sha1Hash, 0, 20);
