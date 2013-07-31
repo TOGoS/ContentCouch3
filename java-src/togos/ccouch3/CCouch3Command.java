@@ -6,14 +6,16 @@ import java.util.Iterator;
 public class CCouch3Command
 {
 	public static boolean isHelpArgument( String arg ) {
-		return "-?".equals(arg) || "-h".equals(arg) || "--help".equals(arg);
+		return "-?".equals(arg) || "-h".equals(arg) ||
+				"--help".equals(arg) || "-help".equals(arg) || "-halp".equals(arg);
 	}
 	
 	public static String USAGE =
 		"Usage: ccouch3 <subcommand> <subcommand-arguments>\n" +
 		"Subcommands:\n" +
 		"  identify          ; identify files/directories\n" +
-		"  upload            ; upload files to a repository\n" +
+		"  upload            ; upload files to a remote repository\n" +
+		"  backup            ; back up files locally\n" +
 		"  command-server    ; run a command server\n" +
 		"  <subcommand> -?   ; get help on a specific command";
 	
@@ -26,6 +28,8 @@ public class CCouch3Command
 		String cmd = argi.next();
 		if( "upload".equals(cmd) ) {
 			return FlowUploader.uploadMain(argi);
+		} else if( "backup".equals(cmd) ) {
+			return UpBacker.backupMain(argi);
 		} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
 			return FlowUploader.identifyMain(argi);
 		} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {

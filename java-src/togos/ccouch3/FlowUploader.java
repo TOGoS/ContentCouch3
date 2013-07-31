@@ -29,6 +29,8 @@ import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.slf.RandomAccessFileBlob;
 import togos.ccouch3.slf.SimpleListFile2;
+import togos.ccouch3.util.FileUtil;
+import togos.ccouch3.util.LogUtil;
 
 public class FlowUploader
 {
@@ -264,10 +266,6 @@ public class FlowUploader
 			throw new RuntimeException(e);
 		}
 	}
-		
-	static final String[] IGNORE_FILENAMES = {
-		"thumbs.db", "desktop.ini"
-	};
 	
 	// TODO: split into URN cache and upload cache; they are sometimes needed independently
 	
@@ -405,14 +403,7 @@ public class FlowUploader
 			this.howToHandleFileReadErrors = howToHandleFileReadErrors;
 			this.debug = debug;
 		}
-		
-		protected boolean shouldIgnore( File f ) {
-			if( f.isHidden() || f.getName().startsWith(".") ) return true;
-			String name = f.getName().toLowerCase();
-			for( String ifn : IGNORE_FILENAMES ) if( ifn.equals(name) ) return true;
-			return false;
-		}
-		
+				
 		public Collection<DirectoryEntry> indexDirectoryEntries( File file ) throws Exception {
 			assert file.isDirectory();
 			
@@ -429,7 +420,9 @@ public class FlowUploader
 				default: throw new Exception("Invalid file read error handling option: "+howToHandleFileReadErrors);
 				}
 			}
-			for( File c : dirEntries ) if( !shouldIgnore(c) ) {
+			for( File c : dirEntries ) {
+				if( FileUtil.shouldIgnore(c) ) continue;
+				
 				IndexResult indexResult;
 				try {
 					indexResult = index(c);
@@ -741,10 +734,7 @@ public class FlowUploader
 						// If any new data was uploaded, send the name -> URN mapping to the server
 						// to be logged.  We want to NOT do this if we are only indexing and not
 						// sending!  In this case anyNewData will also be false.
-						String objectTypeName = indexResult.fileInfo.fileType == FileInfo.FileType.BLOB ? "File" : "Directory";
-						String message =
-							"[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
-							objectTypeName + " '" + ut.name + "' = " + indexResult.fileInfo.urn;
+						String message = LogUtil.formatStorageLogEntry(new Date(), indexResult.fileInfo.fileType, ut.name, indexResult.fileInfo.urn);
 						LogMessage lm = new LogMessage(BlobUtil.bytes(message));
 						for( IndexedObjectSink d : indexedObjectSinks ) d.give( lm );
 					}

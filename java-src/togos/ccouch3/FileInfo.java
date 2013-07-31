@@ -3,8 +3,13 @@ package togos.ccouch3;
 public class FileInfo
 {
 	public enum FileType {
-		BLOB,
-		DIRECTORY
+		BLOB("Blob"),
+		DIRECTORY("Directory");
+
+		public final String niceName;
+		FileType( String niceName ) {
+			this.niceName = niceName;
+		}
 	};
 	
 	public final String path;

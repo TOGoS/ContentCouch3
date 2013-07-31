@@ -11,6 +11,19 @@ import togos.blob.SimpleByteChunk;
 
 public class FileUtil
 {
+	private FileUtil() { }
+	
+	static final String[] IGNORE_FILENAMES = {
+		"thumbs.db", "desktop.ini"
+	};
+	
+	public static boolean shouldIgnore( File f ) {
+		if( f.isHidden() || f.getName().startsWith(".") ) return true;
+		String name = f.getName().toLowerCase();
+		for( String ifn : IGNORE_FILENAMES ) if( ifn.equals(name) ) return true;
+		return false;
+	}
+	
 	public static void mkParentDirs( File f ) {
 		File p = f.getParentFile();
 		if( p == null ) return;
