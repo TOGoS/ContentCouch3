@@ -1,0 +1,26 @@
+digraph G {
+	edge [fontsize=10];
+	node [shape=box overlap=false fontsize=10];
+	overlap = false;	
+
+	main [label="Main Thread"]
+	cache_job_creator [label="Cache Job Creator\n\nTurns URNs into cache jobs\nand forwards to cache job processor"]
+	cache_job_processor [label="Cache Job Processor\n\nNecessity-checks cache jobs and\nforwards to to download job creator"]
+	download_job_creator [label="Download Job Processor\n\nTranslates cache jobs to download jobs"]
+	download_job_processor [label="Download Job Processor\n\nHands out download jobs to download threads"]
+	download_threads [label="Download Threads\n\nDo actual downloading.\nCompleted/failed jobs go back to download job processor"]
+	job_completion_processor [label="Job Completion Processor\n\nReports on finished/failed jobs.\nCalls Cache Job Creator to spawn new jobs for recursive cases"]
+	job_counter [rank=min label="Job Counter\n\nKeeps track of outstanding jobs\nso Main Thread can know when to quit"]
+
+	main -> cache_job_creator [label="addUrn"];
+	cache_job_creator -> job_counter [color=red weight=100];
+	cache_job_creator -> cache_job_processor [penwidth=4];
+	cache_job_processor -> download_job_creator [penwidth=4];
+	download_job_creator -> download_job_processor [penwidth=4];
+	download_job_processor -> download_threads [label="accept(job)" penwidth=2];
+	download_job_processor -> job_completion_processor [penwidth=4];
+	download_threads -> download_job_processor [penwidth=4];
+	job_completion_processor -> job_counter [color=red weight=100];
+	job_completion_processor -> cache_job_creator [label="addUrn"];
+	job_counter -> main [color=red weight=100];
+}
