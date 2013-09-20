@@ -40,7 +40,11 @@ public class SHA1FileRepository implements Repository
 		String sha1Base32 = m.group(1);
 		
 		String postSectorPath = sha1Base32.substring(0,2) + "/" + sha1Base32;
-		for( File sector : dataDir.listFiles() ) {
+		
+		File[] sectorFileList = dataDir.listFiles();
+		if( sectorFileList == null ) return null;
+		
+		for( File sector : sectorFileList ) {
 			File blobFile = new File(sector.getPath() + "/" + postSectorPath); 
 			if( blobFile.exists() ) return blobFile;
 		}
