@@ -2,6 +2,7 @@ package togos.ccouch3.repo;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,7 +17,6 @@ import org.bitpedia.util.Base32;
 import togos.blob.ByteChunk;
 import togos.blob.SimpleByteChunk;
 import togos.ccouch3.util.FileUtil;
-
 
 public class SHA1FileRepository implements Repository
 {
@@ -68,6 +68,13 @@ public class SHA1FileRepository implements Repository
 		} catch( IOException e ) {
 			return null;
 		}
+	}
+	
+	@Override
+	public InputStream getInputStream( String urn ) throws FileNotFoundException {
+		File f = getFile( urn );
+		if( f == null ) return null;
+		return new FileInputStream(f);
 	}
 	
 	public void put(String urn, InputStream is) throws StoreException {

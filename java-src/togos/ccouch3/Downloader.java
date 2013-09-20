@@ -10,6 +10,10 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CodingErrorAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -19,6 +23,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import togos.ccouch3.Downloader.RepositorySet.RemoteRepository;
 import togos.ccouch3.repo.Repository;
@@ -111,8 +117,12 @@ public class Downloader
 		}
 	}
 	
+	static final Charset UTF8 = Charset.forName("UTF-8");
+	static final Pattern SHA1_OR_BITPRINT_PATTERN = Pattern.compile(
+		"urn:(sha1:[A-Z0-9]{32}|bitprint:[A-Z0-9]{32}\\.[A-Z0-9]{39})",
+		Pattern.CASE_INSENSITIVE);
+	
 	final ActiveJobSet<String> enqueuedUrns = new ActiveJobSet<String>();
-	//final ActiveJobSet<String> downloadingUrns = new ActiveJobSet<String>();  
 	
 	private final BQ<String> urnQueue = new BQ<String>(10);
 	
@@ -133,6 +143,14 @@ public class Downloader
 	 * When starting a download
 	 */
 	public boolean reportDownloads = false;
+	public boolean reportUnrecursableBlobs = false;
+	
+	static enum RecursionMode { NEVER, TEXT }
+	
+	public RecursionMode recursionMode;
+	public int recursionSizeLimit;
+	// AS7Q5NVWLNDPLRL3A7RYHPXY3QSMPQVI.3LPFRNN2WLY3WMKEHJ2Y3VYKEYMREOGZARVS4YY
+	public Pattern urnPattern = SHA1_OR_BITPRINT_PATTERN;
 	
 	public Downloader( RepositorySet repoSet, Repository localRepo ) {
 		this.remoteRepoSet = repoSet;
@@ -156,6 +174,9 @@ public class Downloader
 					System.err.println("Downloading "+fullUrl+" ("+urlC.getContentLength()+" bytes)");
 				}
 				localRepo.put(urn, is);
+				if( reportDownloads ) {
+					System.err.println("Completed download of "+fullUrl);
+				}
 				return true;
 			} catch( FileNotFoundException e ) {
 				// 404d!
@@ -192,24 +213,54 @@ public class Downloader
 			return false;
 		}
 		
-		protected void dealWith( String urn ) {
-			/*
-			if( !downloadingUrns.add(urn) ) {
-				// Someone's already dealing with it!
-				return;
-			}
-			*/
+		protected void recurse( String urn ) {
+			if( recursionMode == RecursionMode.NEVER ) return;
 			
+			try {
+				InputStream is = localRepo.getInputStream(urn);
+				if( is == null ) {
+					if( reportUnrecursableBlobs ) {
+						System.err.println("Blob not found in local repo; can't recurse: "+urn);
+					}
+					return;
+				}
+				
+				CharsetDecoder utf8decoder = UTF8.newDecoder();
+				// Have it throw CharacterCodingException on non-UTF-8 input! 
+				utf8decoder.onMalformedInput(CodingErrorAction.REPORT);
+				
+				BufferedReader br = new BufferedReader(new InputStreamReader(is, utf8decoder));
+				String line;
+				Matcher matcher = urnPattern.matcher("");
+				while( (line = br.readLine()) != null ) {
+					matcher.reset(line);
+					while( matcher.find() ) {
+						enqueueImmediately(matcher.group());
+					}
+				}
+			} catch( CharacterCodingException e ) {
+				if( reportUnrecursableBlobs ) {
+					System.err.println("Not valid UTF-8; can't recurse: "+urn);
+				}
+			} catch( IOException e ) {
+				if( reportErrors ) {
+					System.err.println("Could not recurse on "+urn+" due to an "+e.getClass().getName());
+					e.printStackTrace();
+				}
+			}
+		}
+		
+		protected void dealWith( String urn ) {
 			boolean success = false;
 			try {
 				success = download(urn);
-				// TODO: if recursing, recurse
+				
+				if( success ) recurse(urn);
 			} catch( MalformedURLException e ) {
 				e.printStackTrace();
 			} catch( InterruptedException e ) {
 				Thread.currentThread().interrupt();
 			} finally {
-				//downloadingUrns.remove(urn);
 				enqueuedUrns.remove(urn);
 				if( !success ) {
 					failCount.incrementAndGet();
@@ -250,6 +301,14 @@ public class Downloader
 		
 		if( enqueuedUrns.add(urn) ) {
 			urnQueue.put(urn);
+		}
+	}
+	
+	public void enqueueImmediately( String urn ) {
+		assert !stopped;
+		
+		if( enqueuedUrns.add(urn) ) {
+			urnQueue.add(urn);
 		}
 	}
 	
@@ -302,15 +361,29 @@ public class Downloader
 		String localRepoPath = "~/.ccouch";
 		String cacheSector = "remote";
 		int connectionsPerRemote = 2;
+		RecursionMode recursionMode = RecursionMode.NEVER;
 		List<String> urnArgs = new ArrayList<String>();
 		List<String> remoteRepoUrls = new ArrayList<String>();
-		
+		boolean reportDownloads = false;
+		boolean reportUnrecursableBlobs = false;
+		boolean reportErrors = true;
+		boolean reportFailures = true;
 		boolean summarizeWhenCompletedWithFailures = true;
 		
 		while( args.hasNext() ) {
 			String arg = args.next();
 			if( !arg.startsWith("-") ) {
 				urnArgs.add(arg);
+			} else if( "-recurse".equals(arg) ) {
+				recursionMode = RecursionMode.TEXT;
+			} else if( "-debug".equals(arg) ) {
+				reportDownloads = true;
+				reportUnrecursableBlobs = true;
+			} else if( "-silent".equals(arg) ) {
+				reportDownloads = false;
+				reportErrors = false;
+				reportFailures = false;
+				summarizeWhenCompletedWithFailures = false;
 			} else if( "-repo".equals(arg) ) {
 				localRepoPath = args.next();
 			} else if( "-remote-repo".equals(arg) ) {
@@ -340,6 +413,12 @@ public class Downloader
 		final SHA1FileRepository localRepo = new SHA1FileRepository(new File(localRepoDir, "data"), cacheSector);
 		
 		Downloader downloader = new Downloader( new RepositorySet(remoteRepoUrls, connectionsPerRemote), localRepo );
+		downloader.recursionMode = recursionMode;
+		downloader.reportDownloads = reportDownloads;
+		downloader.reportUnrecursableBlobs = reportUnrecursableBlobs;
+		downloader.reportErrors = reportErrors;
+		downloader.reportFailures = reportFailures;
+		
 		downloader.start();
 		for( String urnArg : urnArgs ) downloader.enqueueArg( urnArg, System.in );
 		downloader.join();

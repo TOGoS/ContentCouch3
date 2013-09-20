@@ -2,7 +2,6 @@ package togos.blob.util;
 
 import java.io.UnsupportedEncodingException;
 
-// import togos.blob.ByteBlob;
 import togos.blob.ByteChunk;
 import togos.blob.SimpleByteChunk;
 

@@ -1,5 +1,6 @@
 package togos.ccouch3.repo;
 
+import java.io.IOException;
 import java.io.InputStream;
 
 import togos.blob.ByteChunk;
@@ -16,4 +17,6 @@ public interface Repository
 	public void put( String urn, InputStream is ) throws StoreException;
 	
 	public ByteChunk getChunk( String urn, int maxSize );
+	
+	public InputStream getInputStream( String urn ) throws IOException;
 }
