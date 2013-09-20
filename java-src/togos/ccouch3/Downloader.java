@@ -157,11 +157,15 @@ public class Downloader
 		this.localRepo = localRepo;
 		this.downloadThreads = new ArrayList<DownloadThread>(remoteRepoSet.size());
 		for( int i=repoSet.size()-1; i>=0; --i ) {
-			downloadThreads.add(new DownloadThread());
+			downloadThreads.add(new DownloadThread("Download thread "+i));
 		}
 	}
 	
 	class DownloadThread extends Thread {
+		public DownloadThread(String name) {
+			super(name);
+		}
+		
 		protected boolean downloadFrom( String repoUrl, String urn )
 			throws MalformedURLException
 		{
