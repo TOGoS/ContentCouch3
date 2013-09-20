@@ -220,8 +220,9 @@ public class Downloader
 		protected void recurse( String urn ) {
 			if( recursionMode == RecursionMode.NEVER ) return;
 			
+			InputStream is = null;
 			try {
-				InputStream is = localRepo.getInputStream(urn);
+				is = localRepo.getInputStream(urn);
 				if( is == null ) {
 					if( reportUnrecursableBlobs ) {
 						System.err.println("Blob not found in local repo; can't recurse: "+urn);
@@ -250,6 +251,14 @@ public class Downloader
 				if( reportErrors ) {
 					System.err.println("Could not recurse on "+urn+" due to an "+e.getClass().getName());
 					e.printStackTrace();
+				}
+			} finally {
+				if( is != null ) try {
+					is.close();
+				} catch( IOException e ) {
+					if( reportErrors ) {
+						System.err.println("Failed to close InputStream of "+urn+" after scanning for URNs");
+					}
 				}
 			}
 		}
