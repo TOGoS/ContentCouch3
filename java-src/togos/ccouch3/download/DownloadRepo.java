@@ -8,36 +8,41 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.concurrent.ArrayBlockingQueue;
 
+import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.StoreException;
 
-public class DownloadRepo
+class DownloadRepo
 {
 	static class DownloadThread extends Thread {
-		DownloadRepo repo;
-		public DownloadThread( DownloadRepo repo ) {
-			this.repo = repo;
+		final DownloadRepo sourceRepository;
+		final Repository destRepository;
+		
+		public DownloadThread( DownloadRepo src, Repository dest ) {
+			super(src.urlPrefix + " download thread");
+			this.sourceRepository = src;
+			this.destRepository = dest;
 		}
 		
 		public void _run()
 			throws InterruptedException, MalformedURLException, IOException, StoreException
 		{
 			while(true) {
-				DownloadJob job = repo.inputQueue.take();
+				DownloadJob job = sourceRepository.inputQueue.take();
 				
 				InputStream is;
 				try {
-					URLConnection urlConn = new URL(repo.urlPrefix + job.urn).openConnection();
+					URLConnection urlConn = new URL(sourceRepository.urlPrefix + job.urn).openConnection();
 					is = urlConn.getInputStream();
 				} catch( FileNotFoundException e ) {
 					is = null;
 				}
 				
 				if( is != null ) {
-					job.localRepo.put(job.urn, is);
-					job.downloadCompleted = true;
+					destRepository.put(job.urn, is);
+					job.completedSuccessfully = true;
 				}
 				
-				repo.returnQueue.put(job);
+				sourceRepository.returnQueue.put(job);
 			}
 		}
 		
@@ -63,14 +68,14 @@ public class DownloadRepo
 	 * @param urlPrefix  e.g. "http://131.172.168.104/uri-res/"
 	 * @param capacity number of requests to allow at once; usually 2
 	 */
-	public DownloadRepo( String urlPrefix, int capacity, ArrayBlockingQueue<DownloadJob> returnQueue ) {
+	public DownloadRepo( String urlPrefix, int capacity, Repository localRepo, ArrayBlockingQueue<DownloadJob> returnQueue ) {
 		this.urlPrefix = urlPrefix;
 		this.capacity = capacity;
 		this.inputQueue = new ArrayBlockingQueue<DownloadJob>(capacity);
 		this.returnQueue = returnQueue;
 		this.downloadThreads = new DownloadThread[capacity];
 		for( int i=0; i<capacity; ++i ) {
-			downloadThreads[i] = new DownloadThread(this);
+			downloadThreads[i] = new DownloadThread(this, localRepo);
 		}
 	}
 	

@@ -1,19 +1,16 @@
 package togos.ccouch3.download;
 
+import java.util.Collection;
 import java.util.HashSet;
-
-import togos.ccouch3.repo.Repository;
 
 public class DownloadJob
 {
 	public final String urn;
-	public final Repository localRepo;
-	public boolean downloadCompleted;
+	public boolean completedSuccessfully = false;
+	public final HashSet<DownloadRepo> reposToTry;
 	
-	public DownloadJob( String urn, Repository localRepo ) {
+	public DownloadJob( String urn, Collection<DownloadRepo> reposToTry ) {
 		this.urn = urn;
-		this.localRepo = localRepo;
+		this.reposToTry = new HashSet<DownloadRepo>(reposToTry);
 	}
-	
-	public HashSet<DownloadRepo> reposToTry = new HashSet<DownloadRepo>();
 }
