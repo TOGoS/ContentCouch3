@@ -124,15 +124,15 @@ public class Downloader
 	/**
 	 * Errors other than 404s
 	 */
-	public boolean reportErrors;
+	public boolean reportErrors = true;
 	/**
 	 * When a blob cannot be found anywhere
 	 */
-	public boolean reportFailures;
+	public boolean reportFailures = true;
 	/**
 	 * When starting a download
 	 */
-	public boolean reportDownloads;
+	public boolean reportDownloads = false;
 	
 	public Downloader( RepositorySet repoSet, Repository localRepo ) {
 		this.remoteRepoSet = repoSet;
@@ -152,15 +152,21 @@ public class Downloader
 				URLConnection urlC = fullUrl.openConnection();
 				urlC.connect();
 				InputStream is = urlC.getInputStream();
-				System.err.println("Downloading "+fullUrl+" ("+urlC.getContentLength()+" bytes)");
+				if( reportDownloads ) {
+					System.err.println("Downloading "+fullUrl+" ("+urlC.getContentLength()+" bytes)");
+				}
 				localRepo.put(urn, is);
 				return true;
 			} catch( FileNotFoundException e ) {
 				// 404d!
 			} catch( IOException e ) {
-				System.err.println(e.getClass().getName()+" when downloading "+fullUrl+": "+e.getMessage());
+				if( reportErrors ) {
+					System.err.println(e.getClass().getName()+" when downloading "+fullUrl+": "+e.getMessage());
+				}
 			} catch( StoreException e ) {
-				System.err.println(e.getClass().getName()+" when downloading "+fullUrl+": "+e.getMessage());
+				if( reportErrors ) {
+					System.err.println(e.getClass().getName()+" when downloading "+fullUrl+": "+e.getMessage());
+				}
 			}
 			return false;
 		}
@@ -169,7 +175,7 @@ public class Downloader
 			throws InterruptedException, MalformedURLException
 		{
 			if( localRepo.contains(urn) ) {
-				System.err.println(urn + " already exists locally");
+				// System.err.println(urn + " already exists locally");
 				return true;
 			}
 			
@@ -207,7 +213,9 @@ public class Downloader
 				enqueuedUrns.remove(urn);
 				if( !success ) {
 					failCount.incrementAndGet();
-					System.err.println("Couldn't find "+urn);
+					if( reportFailures ) {
+						System.err.println("Couldn't find "+urn);
+					}
 				}
 			}
 		}
@@ -297,6 +305,8 @@ public class Downloader
 		List<String> urnArgs = new ArrayList<String>();
 		List<String> remoteRepoUrls = new ArrayList<String>();
 		
+		boolean summarizeWhenCompletedWithFailures = true;
+		
 		while( args.hasNext() ) {
 			String arg = args.next();
 			if( !arg.startsWith("-") ) {
@@ -336,8 +346,10 @@ public class Downloader
 		
 		int failures = downloader.failCount.intValue();
 		if( failures > 0 ) {
-			String noun = failures > 1 ? "resources" : "resource";
-			System.err.println(failures + " " + noun + " could not be cached.");
+			if( summarizeWhenCompletedWithFailures ) {
+				String noun = failures > 1 ? "resources" : "resource";
+				System.err.println(failures + " " + noun + " could not be cached.");
+			}
 			return 2;
 		} else {
 			return 0;
