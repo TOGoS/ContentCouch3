@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -27,10 +26,12 @@ import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
-import togos.ccouch3.slf.RandomAccessFileBlob;
 import togos.ccouch3.slf.SimpleListFile2;
+import togos.ccouch3.util.AddableSet;
+import togos.ccouch3.util.EmptyAddableSet;
 import togos.ccouch3.util.FileUtil;
 import togos.ccouch3.util.LogUtil;
+import togos.ccouch3.util.SLFStringSet;
 
 public class FlowUploader
 {
@@ -250,23 +251,6 @@ public class FlowUploader
 	
 	////
 	
-	static final ByteChunk YES_MARKER = BlobUtil.byteChunk("Y");
-	
-	protected static void mkParentDirs( File f ) {
-		File p = f.getParentFile();
-		if( p != null && !p.exists() ) p.mkdirs();
-	}
-	
-	protected static SimpleListFile2 mkSlf( File f ) {
-		mkParentDirs(f);
-		try {
-			return new SimpleListFile2( new RandomAccessFileBlob(f, "rw"), 16, true );
-		} catch( FileNotFoundException e ) {
-			// This should not happen!
-			throw new RuntimeException(e);
-		}
-	}
-	
 	// TODO: split into URN cache and upload cache; they are sometimes needed independently
 	
 	interface HashCache {
@@ -287,14 +271,14 @@ public class FlowUploader
 		
 		protected synchronized SimpleListFile2 getFileUrnCache() {
 			if( fileUrnCache == null ) {
-				fileUrnCache = mkSlf(fileUrnCacheFile);
+				fileUrnCache = SimpleListFile2.mkSlf(fileUrnCacheFile);
 			}
 			return fileUrnCache;
 		}
 		
 		protected synchronized SimpleListFile2 getDirUrnCache() {
 			if( dirUrnCache == null ) {
-				dirUrnCache = mkSlf(dirUrnCacheFile);
+				dirUrnCache = SimpleListFile2.mkSlf(dirUrnCacheFile);
 			}
 			return dirUrnCache;
 		}
@@ -326,57 +310,19 @@ public class FlowUploader
 		}
 	}
 	
-	interface UploadCache {
-		public boolean isFullyUploaded( String urn ) throws Exception;
-		public void markFullyUploaded( String urn ) throws Exception;
-	}
-	
-	class SLFUploadCache implements UploadCache {
-		final File uploadedCacheFile;
-		
-		SimpleListFile2 uploadedCache;
-		
-		public SLFUploadCache( File cacheDir, String serverName ) {
-			this.uploadedCacheFile = new File(cacheDir + "/uploaded-to-"+serverName+".slf2");
-		}
-		
-		protected synchronized SimpleListFile2 getUploadedCache() {
-			if( uploadedCache == null ) {
-				uploadedCache = mkSlf(uploadedCacheFile);
-			}
-			return uploadedCache;
-		}
-		
-		@Override
-		public void markFullyUploaded(String urn) throws Exception {
-			SimpleListFile2 c = getUploadedCache();
-			ByteChunk urnChunk = BlobUtil.byteChunk(urn);
-			synchronized( c ) { c.put(urnChunk, YES_MARKER); }
-		}
-		
-		@Override
-		public boolean isFullyUploaded(String urn) throws Exception {
-			SimpleListFile2 c = getUploadedCache();
-			ByteChunk urnChunk = BlobUtil.byteChunk(urn);
-			ByteChunk storedMarker;
-			synchronized( c ) { storedMarker = c.get(urnChunk); }
-			return YES_MARKER.equals(storedMarker);
-		}
-	}
-	
 	static class Indexer
 	{
 		public static class IndexedObjectSink implements Sink<Object> {
 			public final Sink<Object> indexResultSink;
-			public final UploadCache uploadCache;
+			public final AddableSet<String> uploadCache;
 			
-			public IndexedObjectSink( UploadCache uc, Sink<Object> sink ) {
+			public IndexedObjectSink( AddableSet<String> uc, Sink<Object> sink ) {
 				this.uploadCache = uc;
 				this.indexResultSink = sink;
 			}
 			
-			public boolean isFullyUploaded( String urn ) throws Exception {
-				return uploadCache.isFullyUploaded(urn);
+			public boolean contains( String urn ) {
+				return uploadCache.contains(urn);
 			}
 			
 			public void give( Object thing ) throws Exception {
@@ -443,7 +389,7 @@ public class FlowUploader
 		
 		protected boolean isFullyUploadedEverywhere(String urn) throws Exception {
 			for( IndexedObjectSink d : destinations ) {
-				if( !d.isFullyUploaded(urn) ) return false;
+				if( !d.contains(urn) ) return false;
 			}
 			return true;
 		}
@@ -493,7 +439,7 @@ public class FlowUploader
 				hashCache.cacheFileUrn( file, fileUrn );
 				
 				for( IndexedObjectSink d : destinations ) {
-					if( !d.isFullyUploaded(fi.urn) ) d.give(fi);
+					if( !d.contains(fi.urn) ) d.give(fi);
 				}
 			} else if( file.isDirectory() ) {
 				// Even if we already know the URN, we still need to walk the entire
@@ -542,7 +488,7 @@ public class FlowUploader
 				BlobInfo blobInfo = new BlobInfo( rdfBlobUrn, baos.toByteArray() );
 				
 				for( IndexedObjectSink d : destinations ) {
-					if( !d.isFullyUploaded(fi.urn) ) {
+					if( !d.contains(fi.urn) ) {
 						d.give( blobInfo );
 						d.give( new FullyStoredMarker(treeUrn) );
 					}
@@ -601,17 +547,12 @@ public class FlowUploader
 		return hashCache;
 	}
 	
-	protected Map<String,UploadCache> uploadCaches = new HashMap<String,UploadCache>();
-	protected synchronized UploadCache getUploadCache( String serverName ) {
-		if( cacheDir == null ) {
-			return new UploadCache() {
-				@Override public void markFullyUploaded(String urn) throws Exception {}
-				@Override public boolean isFullyUploaded(String urn) throws Exception { return false; }
-			};
-		}
-		UploadCache uc = uploadCaches.get(serverName);
+	protected Map<String,AddableSet<String>> uploadCaches = new HashMap<String,AddableSet<String>>();
+	protected synchronized AddableSet<String> getUploadCache( String serverName ) {
+		if( cacheDir == null ) return EmptyAddableSet.getInstance();
+		AddableSet<String> uc = uploadCaches.get(serverName);
 		if( uc == null ) {
-			uploadCaches.put( serverName, uc = new SLFUploadCache(cacheDir, serverName) );
+			uploadCaches.put( serverName, uc = new SLFStringSet(cacheDir, serverName) );
 		}
 		return uc;
 	}
@@ -714,7 +655,7 @@ public class FlowUploader
 		final UploadClient[] uploadClients = new UploadClient[uploadClientSpecs.length];
 		final IndexedObjectSink[] indexedObjectSinks = new IndexedObjectSink[uploadClientSpecs.length];
 		for( int i=0; i<uploadClientSpecs.length; ++i ) {
-			final UploadCache uc = getUploadCache(uploadClientSpecs[i].getServerName());
+			final AddableSet<String> uc = getUploadCache(uploadClientSpecs[i].getServerName());
 			uploadClients[i] = uploadClientSpecs[i].createClient( uc, tt, this );
 			indexedObjectSinks[i] = new IndexedObjectSink( uc, uploadClients[i] );
 		}
@@ -746,7 +687,7 @@ public class FlowUploader
 						BlobInfo commitBlobInfo = new BlobInfo( csr.latestCommitDataUrn, csr.latestCommitData );
 						for( IndexedObjectSink d : indexedObjectSinks ) {
 							// Log the commit and send the data to any server that doesn't have it
-							if( !d.isFullyUploaded(csr.latestCommitDataUrn) ) {
+							if( !d.contains(csr.latestCommitDataUrn) ) {
 								String message =
 										"[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
 										"Commit '" + ut.name + "' = " + csr.latestCommitUrn;
@@ -764,7 +705,7 @@ public class FlowUploader
 							String headNameUrn = "ccouch-head:"+ut.commitConfig.headName+"/"+headNum;
 							for( IndexedObjectSink d : indexedObjectSinks ) {
 								// Send the head to any server that doesn't have it
-								if( !d.isFullyUploaded(headNameUrn) ) {
+								if( !d.contains(headNameUrn) ) {
 									d.give( ph );
 									d.give( new FullyStoredMarker(headNameUrn) );
 								}
@@ -922,7 +863,7 @@ public class FlowUploader
 		 * to a FlowUploadOptions object when I'm at a more comfy
 		 * computer.
 		 */
-		public UploadClient createClient( UploadCache uc, TransferTracker tt, FlowUploader fu );
+		public UploadClient createClient( AddableSet<String> uc, TransferTracker tt, FlowUploader fu );
 	}
 	
 	static class CommandUploadClientSpec implements UploadClientSpec {
@@ -936,7 +877,7 @@ public class FlowUploader
 		
 		public String getServerName() { return name; }
 		
-		public UploadClient createClient( UploadCache uc, TransferTracker tt, FlowUploader fu ) {
+		public UploadClient createClient( AddableSet<String> uc, TransferTracker tt, FlowUploader fu ) {
 			CommandUploadClient cuc = new CommandUploadClient( name, command, uc, tt );
 			cuc.debug = fu.debug;
 			cuc.dieWhenNothingToSend = fu.fastExitEnabled;

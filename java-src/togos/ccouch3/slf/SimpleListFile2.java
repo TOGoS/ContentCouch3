@@ -1,6 +1,8 @@
 package togos.ccouch3.slf;
 
 import java.io.Closeable;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.Flushable;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -44,6 +46,21 @@ import togos.blob.SimpleByteChunk;
  */
 public class SimpleListFile2 implements Flushable, Closeable, SimpleMap<ByteChunk,ByteChunk>
 {
+	protected static void mkParentDirs( File f ) {
+		File p = f.getParentFile();
+		if( p != null && !p.exists() ) p.mkdirs();
+	}
+	
+	public static SimpleListFile2 mkSlf( File f ) {
+		mkParentDirs(f);
+		try {
+			return new SimpleListFile2( new RandomAccessFileBlob(f, "rw"), 16, true );
+		} catch( FileNotFoundException e ) {
+			// This should not happen!
+			throw new RuntimeException(e);
+		}
+	}
+	
 	static final byte[] slf2 = {'S','L','F','2'};
 	static final byte[] indx = {'I','N','D','X'};
 	static final byte[] recl = {'R','E','C','L'};

@@ -14,9 +14,9 @@ import togos.ccouch3.FlowUploader.Piper;
 import togos.ccouch3.FlowUploader.PutHead;
 import togos.ccouch3.FlowUploader.Sink;
 import togos.ccouch3.FlowUploader.TransferTracker;
-import togos.ccouch3.FlowUploader.UploadCache;
 import togos.ccouch3.cmdstream.CmdReader;
 import togos.ccouch3.cmdstream.CmdWriter;
+import togos.ccouch3.util.AddableSet;
 
 class CommandUploadClient implements UploadClient
 {
@@ -185,7 +185,7 @@ class CommandUploadClient implements UploadClient
 	public boolean debug = false;
 	public boolean dieWhenNothingToSend = false;
 	protected final TransferTracker transferTracker;
-	protected final UploadCache uploadCache;
+	protected final AddableSet<String> uploadCache;
 	
 	protected boolean started;
 	protected boolean anythingSent;
@@ -202,7 +202,7 @@ class CommandUploadClient implements UploadClient
 	public int headProcExitCode = 0;
 	public int uploadProcExitCode = 0;
 	
-	public CommandUploadClient( String serverName, String[] serverCommand, UploadCache uc, TransferTracker tt ) {
+	public CommandUploadClient( String serverName, String[] serverCommand, AddableSet<String> uc, TransferTracker tt ) {
 		this.serverName = serverName;
 		this.serverCommand = serverCommand;
 		this.transferTracker = tt;
@@ -252,7 +252,7 @@ class CommandUploadClient implements UploadClient
 			new Sink<Object>() { public void give(Object value) throws Exception {
 				if( value instanceof FullyStoredMarker ) {
 					FullyStoredMarker fsm = (FullyStoredMarker)value;
-					uploadCache.markFullyUploaded( fsm.urn );
+					uploadCache.add( fsm.urn );
 				}
 			} }
 		);
