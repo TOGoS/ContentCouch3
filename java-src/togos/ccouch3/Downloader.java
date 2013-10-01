@@ -451,14 +451,19 @@ public class Downloader
 		"  -connections-per-remote <n>\n" +
 		"\n" +
 		"URLs of remote repositories will be used as follows:\n" +
+		"         hostname      -> http://hostname/uri-res/N2R?<qs-escaped-urn>\n" +
 		"  http://hostname      -> http://hostname/uri-res/N2R?<qs-escaped-urn>\n" +
 		"  http://hostname/...  -> http://hostname/...?<qs-escaped-urn>\n" +
 		"  http://hostname/...? -> http://hostname/...?<qs-escaped-urn>\n" +
 		"  http://hostname/.../ -> http://hostname/.../<pathseg-escaped-urn>";
 	
-	protected static Pattern BARE_HOST_REPO_URL_PATTERN = Pattern.compile("^https?://[^/]+$");
+	protected static final Pattern BARE_HOSTNAME_REPO_PATTERN = Pattern.compile("^[^/]+$");
+	protected static final Pattern BARE_HTTP_HOSTNAME_REPO_PATTERN = Pattern.compile("^https?://[^/]+$");
 	protected static String defuzzRemoteRepoPrefix( String url ) {
-		if( BARE_HOST_REPO_URL_PATTERN.matcher(url).matches() ) {
+		if( BARE_HOSTNAME_REPO_PATTERN.matcher(url).matches() ) {
+			url = "http://" + url;
+		}
+		if( BARE_HTTP_HOSTNAME_REPO_PATTERN.matcher(url).matches() ) {
 			url += "/uri-res/N2R?";
 		}
 		if( !url.endsWith("/") && !url.endsWith("?") ) {
