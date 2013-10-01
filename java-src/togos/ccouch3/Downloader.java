@@ -169,6 +169,117 @@ public class Downloader
 		}
 	}
 	
+	protected boolean isObviouslyFullyCached( String urn ) {
+		return
+			recursionMode == RecursionMode.NEVER ? localRepo.contains(urn) :
+			fullyCachedUrns.contains(urn);
+	}
+	
+	/**
+	 * Scan the blob identified by 'urn' for URNs, calling forEach for each one found.
+	 * It will return true only if the blob identified by 'urn' is successfully found
+	 * and scanned and forEach returns true for all embedded URNs.
+	 * If shortCircuit is true, this will return as soon as forEach returns false.
+	 */
+	protected boolean scanForUrns( String urn, ScanCallback forEach, boolean shortCircuit ) {
+		boolean success = true;
+		InputStream is = null;
+		try {
+			is = localRepo.getInputStream(urn);
+			if( is == null ) {
+				if( reportUnrecursableBlobs ) {
+					System.err.println("Blob not found in local repo; can't scan: "+urn);
+				}
+				return false;
+			}
+			
+			CharsetDecoder utf8decoder = UTF8.newDecoder();
+			// Have it throw CharacterCodingException on non-UTF-8 input!
+			utf8decoder.onMalformedInput(CodingErrorAction.REPORT);
+			
+			BufferedReader br = new BufferedReader(new InputStreamReader(is, utf8decoder));
+			String line;
+			Matcher matcher = urnPattern.matcher("");
+			while( (line = br.readLine()) != null ) {
+				matcher.reset(line);
+				while( matcher.find() ) {
+					if( !forEach.handle(matcher.group()) ) {
+						success = false;
+						if( shortCircuit ) return false;
+					}
+				}
+			}
+		} catch( CharacterCodingException e ) {
+			// This is normal and counts as success!
+			if( reportUnrecursableBlobs ) {
+				System.err.println("Not valid UTF-8; can't scan: "+urn);
+			}
+		} catch( IOException e ) {
+			// This is not, and doesn't.
+			success = false;
+			if( reportErrors ) {
+				System.err.println("Error while scanning for URNs in "+urn+" due to an "+e.getClass().getName());
+				e.printStackTrace();
+			}
+		} finally {
+			if( is != null ) try {
+				is.close();
+			} catch( IOException e ) {
+				if( reportErrors ) {
+					System.err.println("Failed to close InputStream of "+urn+" after scanning for URNs");
+				}
+			}
+		}
+		return success;
+	}
+	
+	protected void cacheRecurse( String urn ) {
+		if( recursionMode == RecursionMode.NEVER ) return;
+		
+		boolean fullyCached = scanForUrns(urn, new ScanCallback() {
+			@Override public boolean handle(String urn) {
+				if( isObviouslyFullyCached(urn) ) return true;
+				
+				enqueueImmediately(urn);
+				return false;
+			}
+		}, false);
+		
+		if( fullyCached ) fullyCachedUrns.add(urn);
+	}
+	
+	/**
+	 * Depth-first, short-circuiting, memoizing check.
+	 * Using this on a completely cached tree will ensure that
+	 * the tree is marked as fully cached.
+	 * 
+	 * First invocation:
+	 *   isFullyCached() - check fully-cached-<scan method>.slf2;
+	 *     it's not marked, and some blobs missing.
+	 *   recurse()       - recursively download all blobs; leaves are marked fully cached
+	 * Second invocation:
+	 *   isFullyCached() - check fully-cached-<scan method>.slf2;
+	 *     it's not marked, but all blobs are now present, so we mark it.
+	 * Third invocation:
+	 *   isFullyCached() - check fully-cached-<scan method>.slf2;
+	 *     it is already marked, so we're done.
+	 */
+	protected boolean isFullyCached( String urn ) {
+		if( isObviouslyFullyCached(urn) ) return true;
+		
+		if( localRepo.contains(urn) ) {
+			boolean fullyCached = scanForUrns(urn, new ScanCallback() {
+				@Override public boolean handle(String v) {
+					return isFullyCached(v);
+				}
+			}, true);
+			if( fullyCached ) fullyCachedUrns.add(urn);
+			return fullyCached;
+		} else {
+			return false;
+		}
+	}
+	
 	class DownloadThread extends Thread {
 		public DownloadThread(String name) {
 			super(name);
@@ -207,10 +318,7 @@ public class Downloader
 		protected boolean cache( String urn )
 			throws InterruptedException, MalformedURLException
 		{
-			if( localRepo.contains(urn) ) {
-				// System.err.println(urn + " already exists locally");
-				return true;
-			}
+			if( localRepo.contains(urn) ) return true;
 			
 			HashSet<String> failedRepos = new HashSet<String>();
 			RemoteRepository repo;
@@ -224,107 +332,11 @@ public class Downloader
 			}
 			return false;
 		}
-		
-		protected int scanForUrns( String urn, ScanCallback forEach ) {
-			int findings = 0;
-			InputStream is = null;
-			try {
-				is = localRepo.getInputStream(urn);
-				if( is == null ) {
-					if( reportUnrecursableBlobs ) {
-						System.err.println("Blob not found in local repo; can't scan: "+urn);
-					}
-					return -1;
-				}
 				
-				CharsetDecoder utf8decoder = UTF8.newDecoder();
-				// Have it throw CharacterCodingException on non-UTF-8 input! 
-				utf8decoder.onMalformedInput(CodingErrorAction.REPORT);
-				
-				BufferedReader br = new BufferedReader(new InputStreamReader(is, utf8decoder));
-				String line;
-				Matcher matcher = urnPattern.matcher("");
-				while( (line = br.readLine()) != null ) {
-					matcher.reset(line);
-					while( matcher.find() ) {
-						++findings;
-						if( !forEach.handle(matcher.group()) ) return findings; 
-					}
-				}
-			} catch( CharacterCodingException e ) {
-				if( reportUnrecursableBlobs ) {
-					System.err.println("Not valid UTF-8; can't scan: "+urn);
-				}
-			} catch( IOException e ) {
-				if( reportErrors ) {
-					System.err.println("Error while scanning for URNs in "+urn+" due to an "+e.getClass().getName());
-					e.printStackTrace();
-				}
-			} finally {
-				if( is != null ) try {
-					is.close();
-				} catch( IOException e ) {
-					if( reportErrors ) {
-						System.err.println("Failed to close InputStream of "+urn+" after scanning for URNs");
-					}
-				}
-			}
-			return findings;
-		}
-		
-		protected void recurse( String urn ) {
-			if( recursionMode == RecursionMode.NEVER ) return;
-			
-			final boolean[] fullyCached = new boolean[]{true};
-			
-			scanForUrns(urn, new ScanCallback() {
-				@Override public boolean handle(String v) {
-					if( !fullyCachedUrns.contains(v) ) {
-						enqueueImmediately(v);
-						fullyCached[0] = false;
-					}
-					return true;
-				}
-			});
-			
-			if( fullyCached[0] ) {
-				fullyCachedUrns.add(urn);
-			}
-		}
-		
-		/*
-		protected boolean isFullyCached( String urn ) {
-			if( fullyCachedUrns.contains(urn) ) return true;
-			
-			final boolean[] allThere = new boolean[]{true};
-			
-			if( localRepo.contains(urn) ) {
-				scanForUrns(urn, new ScanCallback() {
-					@Override public boolean handle(String v) {
-						if( isFullyCached(v) ) return true;
-						
-						allThere[0] = false;
-						return false;
-					}
-				});
-			}
-			
-			if( allThere[0] ) {
-				// Soon we'll never have to look it up again yaaay
-				fullyCachedUrns.add(urn);
-			}
-			return allThere[0];
-		}
-		*/
-		
 		protected void dealWith( String urn ) {
 			boolean success = false;
 			try {
-				// if( isFullyCached(urn) ) return;
-				
-				success = cache(urn);
-				
-				if( success ) recurse(urn);
+				if( (success = cache(urn)) ) cacheRecurse(urn);
 			} catch( MalformedURLException e ) {
 				e.printStackTrace();
 			} catch( InterruptedException e ) {
@@ -368,7 +380,7 @@ public class Downloader
 	public void enqueue( String urn ) throws InterruptedException {
 		assert !stopped;
 		
-		if( fullyCachedUrns.contains(urn) ) return;
+		if( isFullyCached(urn) ) return;
 		
 		if( enqueuedUrns.add(urn) ) {
 			urnQueue.put(urn);
@@ -377,8 +389,6 @@ public class Downloader
 	
 	public void enqueueImmediately( String urn ) {
 		assert !stopped;
-		
-		if( fullyCachedUrns.contains(urn) ) return;
 		
 		if( enqueuedUrns.add(urn) ) {
 			urnQueue.add(urn);
@@ -520,7 +530,7 @@ public class Downloader
 		
 		final AddableSet<String> fullyCachedTreeUrns =
 			recursionMode == RecursionMode.NEVER ? EmptyAddableSet.<String>getInstance() :
-			new SLFStringSet(new File(localRepoDir, "cache/ccouch3-downloader/fully-cached-"+recursionMode.name()+".slf2"));
+			new SLFStringSet(new File(localRepoDir, "cache/ccouch3-downloader/fully-cached-"+recursionMode.name().toLowerCase()+".slf2"));
 		
 		Downloader downloader = new Downloader( new RepositorySet(remoteRepoUrls, connectionsPerRemote), localRepo, fullyCachedTreeUrns );
 		downloader.recursionMode = recursionMode;
