@@ -552,7 +552,7 @@ public class FlowUploader
 		if( cacheDir == null ) return EmptyAddableSet.getInstance();
 		AddableSet<String> uc = uploadCaches.get(serverName);
 		if( uc == null ) {
-			uploadCaches.put( serverName, uc = new SLFStringSet(cacheDir, serverName) );
+			uploadCaches.put( serverName, uc = new SLFStringSet(new File(cacheDir, "uploaded-to-"+serverName+".slf2")) );
 		}
 		return uc;
 	}

@@ -30,6 +30,9 @@ import togos.ccouch3.Downloader.RepositorySet.RemoteRepository;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.repo.StoreException;
+import togos.ccouch3.util.AddableSet;
+import togos.ccouch3.util.EmptyAddableSet;
+import togos.ccouch3.util.SLFStringSet;
 
 public class Downloader
 {
@@ -90,6 +93,10 @@ public class Downloader
 		}
 	}
 	
+	interface ScanCallback {
+		public boolean handle(String t);
+	}
+	
 	static class BQ<Item> {
 		private final LinkedList<Item> items = new LinkedList<Item>();
 		private final int capacity;
@@ -128,6 +135,7 @@ public class Downloader
 	
 	final RepositorySet remoteRepoSet;
 	final Repository localRepo;
+	final AddableSet<String> fullyCachedUrns;
 	final ArrayList<DownloadThread> downloadThreads;
 	final AtomicInteger failCount = new AtomicInteger();
 	
@@ -148,13 +156,13 @@ public class Downloader
 	static enum RecursionMode { NEVER, TEXT }
 	
 	public RecursionMode recursionMode;
-	public int recursionSizeLimit;
 	// AS7Q5NVWLNDPLRL3A7RYHPXY3QSMPQVI.3LPFRNN2WLY3WMKEHJ2Y3VYKEYMREOGZARVS4YY
 	public Pattern urnPattern = SHA1_OR_BITPRINT_PATTERN;
 	
-	public Downloader( RepositorySet repoSet, Repository localRepo ) {
+	public Downloader( RepositorySet repoSet, Repository localRepo, AddableSet<String> fullyCachedUrns ) {
 		this.remoteRepoSet = repoSet;
 		this.localRepo = localRepo;
+		this.fullyCachedUrns = fullyCachedUrns;
 		this.downloadThreads = new ArrayList<DownloadThread>(remoteRepoSet.size());
 		for( int i=repoSet.size()-1; i>=0; --i ) {
 			downloadThreads.add(new DownloadThread("Download thread "+i));
@@ -196,7 +204,7 @@ public class Downloader
 			return false;
 		}
 		
-		protected boolean download( String urn )
+		protected boolean cache( String urn )
 			throws InterruptedException, MalformedURLException
 		{
 			if( localRepo.contains(urn) ) {
@@ -217,17 +225,16 @@ public class Downloader
 			return false;
 		}
 		
-		protected void recurse( String urn ) {
-			if( recursionMode == RecursionMode.NEVER ) return;
-			
+		protected int scanForUrns( String urn, ScanCallback forEach ) {
+			int findings = 0;
 			InputStream is = null;
 			try {
 				is = localRepo.getInputStream(urn);
 				if( is == null ) {
 					if( reportUnrecursableBlobs ) {
-						System.err.println("Blob not found in local repo; can't recurse: "+urn);
+						System.err.println("Blob not found in local repo; can't scan: "+urn);
 					}
-					return;
+					return -1;
 				}
 				
 				CharsetDecoder utf8decoder = UTF8.newDecoder();
@@ -240,16 +247,17 @@ public class Downloader
 				while( (line = br.readLine()) != null ) {
 					matcher.reset(line);
 					while( matcher.find() ) {
-						enqueueImmediately(matcher.group());
+						++findings;
+						if( !forEach.handle(matcher.group()) ) return findings; 
 					}
 				}
 			} catch( CharacterCodingException e ) {
 				if( reportUnrecursableBlobs ) {
-					System.err.println("Not valid UTF-8; can't recurse: "+urn);
+					System.err.println("Not valid UTF-8; can't scan: "+urn);
 				}
 			} catch( IOException e ) {
 				if( reportErrors ) {
-					System.err.println("Could not recurse on "+urn+" due to an "+e.getClass().getName());
+					System.err.println("Error while scanning for URNs in "+urn+" due to an "+e.getClass().getName());
 					e.printStackTrace();
 				}
 			} finally {
@@ -261,12 +269,60 @@ public class Downloader
 					}
 				}
 			}
+			return findings;
 		}
+		
+		protected void recurse( String urn ) {
+			if( recursionMode == RecursionMode.NEVER ) return;
+			
+			final boolean[] fullyCached = new boolean[]{true};
+			
+			scanForUrns(urn, new ScanCallback() {
+				@Override public boolean handle(String v) {
+					if( !fullyCachedUrns.contains(v) ) {
+						enqueueImmediately(v);
+						fullyCached[0] = false;
+					}
+					return true;
+				}
+			});
+			
+			if( fullyCached[0] ) {
+				fullyCachedUrns.add(urn);
+			}
+		}
+		
+		/*
+		protected boolean isFullyCached( String urn ) {
+			if( fullyCachedUrns.contains(urn) ) return true;
+			
+			final boolean[] allThere = new boolean[]{true};
+			
+			if( localRepo.contains(urn) ) {
+				scanForUrns(urn, new ScanCallback() {
+					@Override public boolean handle(String v) {
+						if( isFullyCached(v) ) return true;
+						
+						allThere[0] = false;
+						return false;
+					}
+				});
+			}
+			
+			if( allThere[0] ) {
+				// Soon we'll never have to look it up again yaaay
+				fullyCachedUrns.add(urn);
+			}
+			return allThere[0];
+		}
+		*/
 		
 		protected void dealWith( String urn ) {
 			boolean success = false;
 			try {
-				success = download(urn);
+				// if( isFullyCached(urn) ) return;
+				
+				success = cache(urn);
 				
 				if( success ) recurse(urn);
 			} catch( MalformedURLException e ) {
@@ -312,6 +368,8 @@ public class Downloader
 	public void enqueue( String urn ) throws InterruptedException {
 		assert !stopped;
 		
+		if( fullyCachedUrns.contains(urn) ) return;
+		
 		if( enqueuedUrns.add(urn) ) {
 			urnQueue.put(urn);
 		}
@@ -319,6 +377,8 @@ public class Downloader
 	
 	public void enqueueImmediately( String urn ) {
 		assert !stopped;
+		
+		if( fullyCachedUrns.contains(urn) ) return;
 		
 		if( enqueuedUrns.add(urn) ) {
 			urnQueue.add(urn);
@@ -458,7 +518,11 @@ public class Downloader
 		
 		final SHA1FileRepository localRepo = new SHA1FileRepository(new File(localRepoDir, "data"), cacheSector);
 		
-		Downloader downloader = new Downloader( new RepositorySet(remoteRepoUrls, connectionsPerRemote), localRepo );
+		final AddableSet<String> fullyCachedTreeUrns =
+			recursionMode == RecursionMode.NEVER ? EmptyAddableSet.<String>getInstance() :
+			new SLFStringSet(new File(localRepoDir, "cache/ccouch3-downloader/fully-cached-"+recursionMode.name()+".slf2"));
+		
+		Downloader downloader = new Downloader( new RepositorySet(remoteRepoUrls, connectionsPerRemote), localRepo, fullyCachedTreeUrns );
 		downloader.recursionMode = recursionMode;
 		downloader.reportDownloads = reportDownloads;
 		downloader.reportUnrecursableBlobs = reportUnrecursableBlobs;
