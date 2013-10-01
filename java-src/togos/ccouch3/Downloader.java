@@ -367,6 +367,35 @@ public class Downloader
 		
 		stopped = true;
 	}
+
+	protected static final String USAGE =
+		"Usage: ccouch3 cache [<options>] {<urn>|@<urn-list-file>} ...\n" +
+		"\n" +
+		"Options:\n" +
+		"  -repo <path>       ; path to local repository\n" +
+		"  -remote-repo <url> ; URL of remote repository (slightly fuzzy; see notes)\n" +
+		"  -recurse           ; recursively scan cached blobs for new URNs to cache\n" +
+		"  -debug             ; be very noisy\n" +
+		"  -silent            ; say nothing, ever\n" +
+		"  -sector <name>     ; sector within local repo to store data in\n" +
+		"  -connections-per-remote <n>\n" +
+		"\n" +
+		"URLs of remote repositories will be used as follows:\n" +
+		"  http://hostname      -> http://hostname/uri-res/N2R?<qs-escaped-urn>\n" +
+		"  http://hostname/...  -> http://hostname/...?<qs-escaped-urn>\n" +
+		"  http://hostname/...? -> http://hostname/...?<qs-escaped-urn>\n" +
+		"  http://hostname/.../ -> http://hostname/.../<pathseg-escaped-urn>";
+	
+	protected static Pattern BARE_HOST_REPO_URL_PATTERN = Pattern.compile("^https?://[^/]+$");
+	protected static String defuzzRemoteRepoPrefix( String url ) {
+		if( BARE_HOST_REPO_URL_PATTERN.matcher(url).matches() ) {
+			url += "/uri-res/N2R?";
+		}
+		if( !url.endsWith("/") && !url.endsWith("?") ) {
+			url += "?";
+		}
+		return url;
+	}
 	
 	public static int main( Iterator<String> args )
 		throws IOException, InterruptedException
@@ -400,13 +429,17 @@ public class Downloader
 			} else if( "-repo".equals(arg) ) {
 				localRepoPath = args.next();
 			} else if( "-remote-repo".equals(arg) ) {
-				remoteRepoUrls.add(args.next());
+				remoteRepoUrls.add(defuzzRemoteRepoPrefix(args.next()));
 			} else if( "-connections-per-remote".equals(arg) ) {
 				connectionsPerRemote = Integer.parseInt(args.next());
 			} else if( "-sector".equals(arg) ) {
 				cacheSector = args.next();
+			} else if( CCouch3Command.isHelpArgument(arg) ) {
+				System.out.println(USAGE);
+				return 0;
 			} else {
 				System.err.println("Error: unrecognized option: '"+arg+"'");
+				System.err.println(USAGE);
 				return 1;
 			}
 		}
