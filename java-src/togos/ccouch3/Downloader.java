@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
+import java.net.NoRouteToHostException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.CharacterCodingException;
@@ -303,6 +304,8 @@ public class Downloader
 				return true;
 			} catch( FileNotFoundException e ) {
 				// 404d!
+			} catch( NoRouteToHostException e ) {
+				// This happens sometimes!
 			} catch( IOException e ) {
 				if( reportErrors ) {
 					System.err.println(e.getClass().getName()+" when downloading "+fullUrl+": "+e.getMessage());
