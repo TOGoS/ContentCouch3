@@ -11,6 +11,7 @@ import java.net.MalformedURLException;
 import java.net.NoRouteToHostException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.UnknownHostException;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
@@ -305,6 +306,8 @@ public class Downloader
 			} catch( FileNotFoundException e ) {
 				// 404d!
 			} catch( NoRouteToHostException e ) {
+				// This happens sometimes!
+			} catch( UnknownHostException e ) {
 				// This happens sometimes!
 			} catch( IOException e ) {
 				if( reportErrors ) {
