@@ -7,6 +7,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.ConnectException;
 import java.net.MalformedURLException;
 import java.net.NoRouteToHostException;
 import java.net.URL;
@@ -150,6 +151,10 @@ public class Downloader
 	 */
 	public boolean reportFailures = true;
 	/**
+	 * Any connection error or error status other than a 404
+	 */
+	public boolean reportDownloadFailures = false;
+	/**
 	 * When starting a download
 	 */
 	public boolean reportDownloads = false;
@@ -290,6 +295,7 @@ public class Downloader
 		protected boolean downloadFrom( String repoUrl, String urn )
 			throws MalformedURLException
 		{
+			Exception connectionError = null;
 			URL fullUrl = new URL(repoUrl+urn);
 			try {
 				URLConnection urlC = fullUrl.openConnection();
@@ -306,9 +312,11 @@ public class Downloader
 			} catch( FileNotFoundException e ) {
 				// 404d!
 			} catch( NoRouteToHostException e ) {
-				// This happens sometimes!
+				connectionError = e;
 			} catch( UnknownHostException e ) {
-				// This happens sometimes!
+				connectionError = e;
+			} catch( ConnectException e ) {
+				connectionError = e;
 			} catch( IOException e ) {
 				if( reportErrors ) {
 					System.err.println(e.getClass().getName()+" when downloading "+fullUrl+": "+e.getMessage());
@@ -318,6 +326,11 @@ public class Downloader
 					System.err.println(e.getClass().getName()+" when downloading "+fullUrl+": "+e.getMessage());
 				}
 			}
+			
+			if( connectionError != null && reportDownloadFailures ) {
+				System.err.println(connectionError.getClass().getName()+" when downloading "+fullUrl+": "+connectionError.getMessage());
+			}
+			
 			return false;
 		}
 		
@@ -489,6 +502,7 @@ public class Downloader
 		List<String> remoteRepoUrls = new ArrayList<String>();
 		boolean reportDownloads = false;
 		boolean reportUnrecursableBlobs = false;
+		boolean reportDownloadFailures = false;
 		boolean reportErrors = true;
 		boolean reportFailures = true;
 		boolean summarizeWhenCompletedWithFailures = true;
@@ -502,6 +516,7 @@ public class Downloader
 			} else if( "-debug".equals(arg) ) {
 				reportDownloads = true;
 				reportUnrecursableBlobs = true;
+				reportDownloadFailures = true;
 			} else if( "-silent".equals(arg) ) {
 				reportDownloads = false;
 				reportErrors = false;
@@ -547,6 +562,7 @@ public class Downloader
 		downloader.recursionMode = recursionMode;
 		downloader.reportDownloads = reportDownloads;
 		downloader.reportUnrecursableBlobs = reportUnrecursableBlobs;
+		downloader.reportDownloadFailures = reportDownloadFailures;
 		downloader.reportErrors = reportErrors;
 		downloader.reportFailures = reportFailures;
 		
