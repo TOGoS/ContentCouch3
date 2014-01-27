@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.net.ConnectException;
 import java.net.MalformedURLException;
 import java.net.NoRouteToHostException;
+import java.net.SocketException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
@@ -316,6 +317,8 @@ public class Downloader
 			} catch( UnknownHostException e ) {
 				connectionError = e;
 			} catch( ConnectException e ) {
+				connectionError = e;
+			} catch( SocketException e ) {
 				connectionError = e;
 			} catch( IOException e ) {
 				if( reportErrors ) {
