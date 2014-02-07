@@ -23,8 +23,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -102,8 +102,9 @@ public class Downloader
 	}
 	
 	static class BQ<Item> {
-		private final LinkedList<Item> items = new LinkedList<Item>();
+		private final ArrayList<Item> items = new ArrayList<Item>();
 		private final int capacity;
+		private final Random rand = new Random();
 		
 		public BQ( int capacity ) {
 			this.capacity = capacity;
@@ -120,9 +121,9 @@ public class Downloader
 			items.add(item);
 			notifyAll();
 		}
-		public synchronized Item take() throws InterruptedException {
+		public synchronized Item takeRandom() throws InterruptedException {
 			while( items.size() == 0 ) wait();
-			Item i = items.remove(0);
+			Item i = items.remove( rand.nextInt(items.size()) );
 			notifyAll();
 			return i;
 		}
@@ -135,7 +136,7 @@ public class Downloader
 	
 	final ActiveJobSet<String> enqueuedUrns = new ActiveJobSet<String>();
 	
-	private final BQ<String> urnQueue = new BQ<String>(10);
+	private final BQ<String> urnQueue = new BQ<String>(32);
 	
 	final RepositorySet remoteRepoSet;
 	final Repository localRepo;
@@ -378,7 +379,7 @@ public class Downloader
 			while(!interrupted()) {
 				String urn;
 				try {
-					urn = urnQueue.take();
+					urn = urnQueue.takeRandom();
 				} catch( InterruptedException e ) {
 					Thread.currentThread().interrupt();
 					continue;
