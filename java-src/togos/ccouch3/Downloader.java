@@ -289,17 +289,19 @@ public class Downloader
 		}
 	}
 	
-	protected HashSet<String> missing = null;
-	public void setRememberMissing(boolean nf) {
-		missing = nf ? new HashSet<String>() : null;
+	// At the expense of memory,
+	// we can avoid enqueuing things more than once.
+	protected HashSet<String> pushed = null;
+	public void setRememberAttempts(boolean nf) {
+		pushed = nf ? new HashSet<String>() : null;
 	}
-	protected boolean alreadyNotedAsMissing(String urn) {
-		if( missing == null ) return false;
-		synchronized(missing) { return missing.contains(urn); } 
+	protected boolean alreadyPushed(String urn) {
+		if( pushed == null ) return false;
+		synchronized(pushed) { return pushed.contains(urn); } 
 	}
-	protected void noteAsMissing(String urn) {
-		if( missing == null ) return;
-		synchronized(missing) { missing.add(urn); } 
+	protected void notePushed(String urn) {
+		if( pushed == null ) return;
+		synchronized(pushed) { pushed.add(urn); } 
 	}
 	
 	class DownloadThread extends Thread {
@@ -355,7 +357,7 @@ public class Downloader
 			throws InterruptedException, MalformedURLException
 		{
 			if( localRepo.contains(urn) ) return true;
-			if( alreadyNotedAsMissing(urn) ) return false;
+			if( alreadyPushed(urn) ) return false;
 			
 			HashSet<String> failedRepos = new HashSet<String>();
 			RemoteRepository repo;
@@ -367,7 +369,7 @@ public class Downloader
 				}
 				failedRepos.add(repo.url);
 			}
-			noteAsMissing(urn);
+			notePushed(urn);
 			return false;
 		}
 				
@@ -415,22 +417,21 @@ public class Downloader
 		started = true;
 	}
 	
-	public void enqueue( String urn ) throws InterruptedException {
+	protected boolean prequeue( String urn ) {
 		assert !stopped;
 		
-		if( isFullyCached(urn) ) return;
+		if( isFullyCached(urn) ) return false;
+		if( alreadyPushed(urn) ) return false;
 		
-		if( enqueuedUrns.add(urn) ) {
-			urnQueue.put(urn);
-		}
+		return enqueuedUrns.add(urn);
+	}
+	
+	public void enqueue( String urn ) throws InterruptedException {
+		if( prequeue(urn) ) urnQueue.put(urn);
 	}
 	
 	public void enqueueImmediately( String urn ) {
-		assert !stopped;
-		
-		if( enqueuedUrns.add(urn) ) {
-			urnQueue.add(urn);
-		}
+		if( prequeue(urn) ) urnQueue.add(urn);
 	}
 	
 	public void enqueueArg( String arg, InputStream stdin )
@@ -528,7 +529,7 @@ public class Downloader
 		boolean summarizeWhenCompletedWithFailures = true;
 		// This is a very reasonable thing to do, but is
 		// false by default because the set may take up a lot of memory.
-		boolean rememberMissing = false;
+		boolean rememberAttempts = false;
 		
 		while( args.hasNext() ) {
 			String arg = args.next();
@@ -553,8 +554,8 @@ public class Downloader
 				connectionsPerRemote = Integer.parseInt(args.next());
 			} else if( "-sector".equals(arg) ) {
 				cacheSector = args.next();
-			} else if( "-remember-missing".equals(arg) ) {
-				rememberMissing = true;
+			} else if( "-remember-missing".equals(arg) || "-remember-attempts".equals(arg) ) {
+				rememberAttempts = true;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println(USAGE);
 				return 0;
@@ -590,7 +591,7 @@ public class Downloader
 		downloader.reportDownloadFailures = reportDownloadFailures;
 		downloader.reportErrors = reportErrors;
 		downloader.reportFailures = reportFailures;
-		downloader.setRememberMissing(rememberMissing);
+		downloader.setRememberAttempts(rememberAttempts);
 		
 		downloader.start();
 		for( String urnArg : urnArgs ) downloader.enqueueArg( urnArg, System.in );
