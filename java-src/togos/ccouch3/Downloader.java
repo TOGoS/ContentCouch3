@@ -289,6 +289,19 @@ public class Downloader
 		}
 	}
 	
+	protected HashSet<String> missing = null;
+	public void setRememberMissing(boolean nf) {
+		missing = nf ? new HashSet<String>() : null;
+	}
+	protected boolean alreadyNotedAsMissing(String urn) {
+		if( missing == null ) return false;
+		synchronized(missing) { return missing.contains(urn); } 
+	}
+	protected void noteAsMissing(String urn) {
+		if( missing == null ) return;
+		synchronized(missing) { missing.add(urn); } 
+	}
+	
 	class DownloadThread extends Thread {
 		public DownloadThread(String name) {
 			super(name);
@@ -342,6 +355,7 @@ public class Downloader
 			throws InterruptedException, MalformedURLException
 		{
 			if( localRepo.contains(urn) ) return true;
+			if( alreadyNotedAsMissing(urn) ) return false;
 			
 			HashSet<String> failedRepos = new HashSet<String>();
 			RemoteRepository repo;
@@ -353,6 +367,7 @@ public class Downloader
 				}
 				failedRepos.add(repo.url);
 			}
+			noteAsMissing(urn);
 			return false;
 		}
 				
@@ -471,6 +486,7 @@ public class Downloader
 		"  -debug             ; be very noisy\n" +
 		"  -silent            ; say nothing, ever\n" +
 		"  -sector <name>     ; sector within local repo to store data in\n" +
+		"  -remember-missing  ; avoid re-attempting failed fetches\n"+
 		"  -connections-per-remote <n>\n" +
 		"\n" +
 		"URLs of remote repositories will be used as follows:\n" +
@@ -510,6 +526,9 @@ public class Downloader
 		boolean reportErrors = true;
 		boolean reportFailures = true;
 		boolean summarizeWhenCompletedWithFailures = true;
+		// This is a very reasonable thing to do, but is
+		// false by default because the set may take up a lot of memory.
+		boolean rememberMissing = false;
 		
 		while( args.hasNext() ) {
 			String arg = args.next();
@@ -534,6 +553,8 @@ public class Downloader
 				connectionsPerRemote = Integer.parseInt(args.next());
 			} else if( "-sector".equals(arg) ) {
 				cacheSector = args.next();
+			} else if( "-remember-missing".equals(arg) ) {
+				rememberMissing = true;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println(USAGE);
 				return 0;
@@ -569,6 +590,7 @@ public class Downloader
 		downloader.reportDownloadFailures = reportDownloadFailures;
 		downloader.reportErrors = reportErrors;
 		downloader.reportFailures = reportFailures;
+		downloader.setRememberMissing(rememberMissing);
 		
 		downloader.start();
 		for( String urnArg : urnArgs ) downloader.enqueueArg( urnArg, System.in );
