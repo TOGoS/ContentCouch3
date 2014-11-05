@@ -509,5 +509,6 @@ public class SimpleListFile2 implements Flushable, Closeable, SimpleMap<ByteChun
 	
 	public void close() throws IOException {
 		if( this.fileChannel != null ) this.fileChannel.close();
+		if( this.blob instanceof Closeable ) { ((Closeable)blob).close(); }
 	}
 }

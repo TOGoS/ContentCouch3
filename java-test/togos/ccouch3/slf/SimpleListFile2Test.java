@@ -57,31 +57,38 @@ public class SimpleListFile2Test extends TestCase
 	protected void _testReadWrite( boolean lock ) throws IOException {
 		if( f.exists() ) f.delete();
 		
+		HashMap kv = new HashMap();
 		RandomAccessFileBlob blob = new RandomAccessFileBlob(f, "rw");
 		SimpleListFile2 slf = new SimpleListFile2(blob, 16, lock);
-		
-		HashMap kv = new HashMap();
-		
-		for( int i=0; i<1024; ++i ) {
-			ByteChunk k = rand( 128 );
-			ByteChunk v = rand( 512 );
-			kv.put( k, v );
-			slf.put( k, v );
-			assertEquals( v, slf.get(k) );
+		try {
+			for( int i=0; i<1024; ++i ) {
+				ByteChunk k = rand( 128 );
+				ByteChunk v = rand( 512 );
+				kv.put( k, v );
+				slf.put( k, v );
+				assertEquals( v, slf.get(k) );
+			}
+			
+			for( Iterator i=kv.entrySet().iterator(); i.hasNext(); ) {
+				Map.Entry e = (Map.Entry)i.next();
+				assertEquals( e.getValue(), slf.get((ByteChunk)e.getKey()) );
+			}
+			
+			blob.close();
+			blob = new RandomAccessFileBlob(f, "rw");
+		} finally {
+			slf.close();
 		}
 		
-		for( Iterator i=kv.entrySet().iterator(); i.hasNext(); ) {
-			Map.Entry e = (Map.Entry)i.next();
-			assertEquals( e.getValue(), slf.get((ByteChunk)e.getKey()) );
-		}
-		
-		blob.close();
-		blob = new RandomAccessFileBlob(f, "rw");
-		slf = new SimpleListFile2(blob, 8, lock);
-		
-		for( Iterator i=kv.entrySet().iterator(); i.hasNext(); ) {
-			Map.Entry e = (Map.Entry)i.next();
-			assertEquals( e.getValue(), slf.get((ByteChunk)e.getKey()) );
+		try {
+			slf = new SimpleListFile2(blob, 8, lock);
+			
+			for( Iterator i=kv.entrySet().iterator(); i.hasNext(); ) {
+				Map.Entry e = (Map.Entry)i.next();
+				assertEquals( e.getValue(), slf.get((ByteChunk)e.getKey()) );
+			}
+		} finally {
+			slf.close();
 		}
 	}
 	
@@ -110,26 +117,29 @@ public class SimpleListFile2Test extends TestCase
 		
 		final RandomAccessFileBlob blob = new RandomAccessFileBlob(f, "rw");
 		final SimpleListFile2 slf = new SimpleListFile2(blob, 16, true);
-		
-		Thread[] threads = new Thread[numThreads];
-		for( int i=0; i<numThreads; ++i ) {
-			final int offset = i*insertsPerThread;
-			threads[i] = new Thread() {
-				public void run() {
-					for( int j=0; j<insertsPerThread; ++j ) {
-						slf.put( keys[j+offset], values[j+offset] );
-					}
+		try {
+			Thread[] threads = new Thread[numThreads];
+			for( int i=0; i<numThreads; ++i ) {
+				final int offset = i*insertsPerThread;
+				threads[i] = new Thread() {
+					public void run() {
+						for( int j=0; j<insertsPerThread; ++j ) {
+							slf.put( keys[j+offset], values[j+offset] );
+						}
+					};
 				};
-			};
-			threads[i].start();
-		}
-		
-		for( int i=0; i<numThreads; ++i ) {
-			threads[i].join();
-		}
-		
-		for( int j=0; j<numEntries; ++j ) {
-			assertEquals( values[j], slf.get(keys[j]) );
+				threads[i].start();
+			}
+			
+			for( int i=0; i<numThreads; ++i ) {
+				threads[i].join();
+			}
+			
+			for( int j=0; j<numEntries; ++j ) {
+				assertEquals( values[j], slf.get(keys[j]) );
+			}
+		} finally {
+			slf.close();
 		}
 	}
 	
@@ -152,24 +162,27 @@ public class SimpleListFile2Test extends TestCase
 		// 7 is chosen to ensure that some indexes must be reused
 		// within a chunk.
 		final SimpleListFile2 slf = new SimpleListFile2(blob, 7, true);
-		
-		Thread[] threads = new Thread[numThreads];
-		for( int i=0; i<numThreads; ++i ) {
-			final int offset = i*insertsPerThread;
-			threads[i] = new Thread() {
-				public void run() {
-					slf.multiPut( keys, values, offset, insertsPerThread );
+		try {
+			Thread[] threads = new Thread[numThreads];
+			for( int i=0; i<numThreads; ++i ) {
+				final int offset = i*insertsPerThread;
+				threads[i] = new Thread() {
+					public void run() {
+						slf.multiPut( keys, values, offset, insertsPerThread );
+					};
 				};
-			};
-			threads[i].start();
-		}
-		
-		for( int i=0; i<numThreads; ++i ) {
-			threads[i].join();
-		}
-		
-		for( int j=0; j<numEntries; ++j ) {
-			assertEquals( values[j], slf.get(keys[j]) );
+				threads[i].start();
+			}
+			
+			for( int i=0; i<numThreads; ++i ) {
+				threads[i].join();
+			}
+			
+			for( int j=0; j<numEntries; ++j ) {
+				assertEquals( values[j], slf.get(keys[j]) );
+			}
+		} finally {
+			slf.close();
 		}
 	}
 }

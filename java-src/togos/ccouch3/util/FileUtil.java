@@ -77,6 +77,7 @@ public class FileUtil
 			}
 		} finally {
 			if( tempFile.exists() ) tempFile.delete();
+			fos.close();
 		}
 	}
 }

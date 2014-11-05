@@ -65,10 +65,14 @@ public class SHA1FileRepository implements Repository
 			int size = (int)f.length();
 			byte[] data = new byte[size];
 			FileInputStream fis = new FileInputStream( f );
-			int r=0;
-			for( int z; r < size && (z=fis.read(data, r, size-r)) > 0; r += z);
-			if( r < size ) return null;
-			return new SimpleByteChunk(data);
+			try {
+				int r=0;
+				for( int z; r < size && (z=fis.read(data, r, size-r)) > 0; r += z);
+				if( r < size ) return null;
+				return new SimpleByteChunk(data);
+			} finally {
+				fis.close();
+			}
 		} catch( IOException e ) {
 			return null;
 		}

@@ -86,7 +86,7 @@ public class RDFCommitSerializerTest extends TestCase
 	
 	protected void assertCommitSerializesTo( String expected, Commit c ) throws Exception {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		new RDFCommitSerializer().serializeCommit( c, baos );
+		RDFCommitSerializer.serializeCommit( c, baos );
 		String serialized = baos.toString("UTF-8");
 		assertEquals( expected, serialized );
 	}
