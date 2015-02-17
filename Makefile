@@ -1,17 +1,17 @@
-.PHONY: clean all java-src
+.PHONY: clean default
+.DELETE_ON_ERROR:
 
-all: CCouch3.jar
+default: CCouch3.jar.urn
 
-java-src:
+CCouch3.jar: $(shell find src/main)
+	rm -rf "target"
+	find src/main -name *.java >java-src.lst
+	mkdir -p "target"
+	javac -source 1.6 -target 1.6 -sourcepath src/main/java -d target @java-src.lst
+	jar -ce togos.ccouch3.CCouch3Command -C target . >CCouch3.jar
 
-java-bin: java-src
-	rm -rf java-bin
-	find java-src -name *.java >java-src.lst
-	mkdir -p java-bin
-	javac -source 1.6 -target 1.6 -sourcepath java-src -d java-bin @java-src.lst
-
-CCouch3.jar: java-bin
-	jar -ce togos.ccouch3.CCouch3Command -C java-bin . >CCouch3.jar
+%.urn: % CCouch3.jar
+	java -jar CCouch3.jar id "$<" >"$@"
 
 clean:
-	rm -rf java-bin CCouch3.jar ccouch3.jar
+	rm -rf target CCouch3.jar ccouch3.jar CCouch3.jar.urn java-bin

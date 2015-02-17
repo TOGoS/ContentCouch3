@@ -1,0 +1,7 @@
+.classpath
+.project
+.settings
+CCouch3.jar
+java-src.lst
+target
+temp
