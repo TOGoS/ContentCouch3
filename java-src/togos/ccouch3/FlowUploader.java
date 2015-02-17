@@ -33,7 +33,12 @@ import togos.ccouch3.util.FileUtil;
 import togos.ccouch3.util.LogUtil;
 import togos.ccouch3.util.SLFStringSet;
 
-public class FlowUploader
+interface FlowUploaderSettings {
+	public boolean isDebugging();
+	public boolean isFastExitEnabled();
+}
+
+public class FlowUploader implements FlowUploaderSettings
 {
 	static class Actions {
 		public static final int SKIP_THE_FILE = 2;
@@ -507,30 +512,69 @@ public class FlowUploader
 		}
 	}
 	
+	static class FlowUploaderConfig {
+		public Collection<UploadTask> tasks = new ArrayList<UploadTask>();
+		public int howToHandleFileReadErrors = Actions.THROW_AN_EXCEPTION;
+		public boolean debug = false;
+		public boolean fastExitEnabled = false;
+		public boolean showTransferSummary = false;
+		public boolean showProgress = false;
+		public boolean reportPathUrnMapping = false;
+		public boolean reportUrn = false;
+		public StreamURNifier digestor = BitprintDigest.STREAM_URNIFIER;
+		public DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
+		public File cacheDir;
+		public File dataDir;
+		public File headDir;
+		public String storeSector = "user";
+		public Collection<UploadClientSpec> uploadClientSpecs = new ArrayList<UploadClientSpec>();
+	}
+	
 	//// Put it all together ////
 	
-	Collection<UploadTask> tasks;
-	public int howToHandleFileReadErrors = Actions.THROW_AN_EXCEPTION;
-	public boolean debug = false;
-	public boolean fastExitEnabled = false;
-	public boolean showTransferSummary = false;
-	public boolean showProgress = false;
-	public boolean reportPathUrnMapping = false;
-	public boolean reportUrn = false;
-	public StreamURNifier digestor = BitprintDigest.STREAM_URNIFIER;
-	public DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
-	public File cacheDir;
+	protected final Collection<UploadTask> tasks;
+	protected final int howToHandleFileReadErrors;
+	protected final boolean debug;
+	protected final boolean fastExitEnabled;
+	protected final boolean showTransferSummary;
+	protected final boolean showProgress;
+	protected final boolean reportPathUrnMapping;
+	protected final boolean reportUrn;
+	protected final StreamURNifier digestor;
+	protected final DirectorySerializer dirSer;
+	protected final File cacheDir;
 	
 	// Used when creating commits:
-	public File dataDir;
-	public File headDir;
-	public String storeSector;
+	protected final File dataDir;
+	protected final File headDir;
+	protected final String storeSector;
 	
 	// Used when uploading:
-	public UploadClientSpec[] uploadClientSpecs;
+	protected final UploadClientSpec[] uploadClientSpecs;
 	
-	public FlowUploader( Collection<UploadTask> tasks ) {
-		this.tasks = tasks;
+	public FlowUploader( FlowUploaderConfig config ) {
+		this.tasks = config.tasks;
+		this.howToHandleFileReadErrors = config.howToHandleFileReadErrors;
+		this.debug = config.debug;
+		this.fastExitEnabled = config.fastExitEnabled;
+		this.showTransferSummary = config.showTransferSummary;
+		this.showProgress = config.showProgress;
+		this.reportPathUrnMapping = config.reportPathUrnMapping;
+		this.reportUrn = config.reportUrn;
+		this.digestor = config.digestor;
+		this.dirSer = config.dirSer;
+		this.cacheDir = config.cacheDir;
+		this.dataDir = config.dataDir;
+		this.headDir = config.headDir;
+		this.storeSector = config.storeSector;
+		this.uploadClientSpecs = config.uploadClientSpecs.toArray(new UploadClientSpec[config.uploadClientSpecs.size()]);
+	}
+	
+	public boolean isDebugging() {
+		return debug;
+	}
+	public boolean isFastExitEnabled() {
+		return fastExitEnabled;
 	}
 	
 	protected HashCache hashCache;
@@ -828,42 +872,36 @@ public class FlowUploader
 	}
 	
 	static class FlowUploaderCommand {
-		public static final int MODE_RUN   = 0;
-		public static final int MODE_ERROR = 1;
-		public static final int MODE_HELP  = 2;
+		enum Mode {
+			RUN, ERROR, HELP
+		};
 		
 		public static FlowUploaderCommand error( String errorMessage ) {
-			return new FlowUploaderCommand( MODE_ERROR, errorMessage, null );
+			return new FlowUploaderCommand( Mode.ERROR, errorMessage, null );
 		}
 		
-		public static FlowUploaderCommand normal( FlowUploader up ) {
-			return new FlowUploaderCommand( MODE_RUN, null, up );
+		public static FlowUploaderCommand normal( FlowUploaderConfig config ) {
+			return new FlowUploaderCommand( Mode.RUN, null, config );
 		}
 
 		public static FlowUploaderCommand help() {
-			return new FlowUploaderCommand( MODE_HELP, null, null );
+			return new FlowUploaderCommand( Mode.HELP, null, null );
 		}
 		
-		public final int mode;
+		public final Mode mode;
 		public final String errorMessage;
-		public final FlowUploader flowUploader;
+		public final FlowUploaderConfig config;
 		
-		public FlowUploaderCommand( int mode, String errorMessage, FlowUploader fu ) {
+		public FlowUploaderCommand( Mode mode, String errorMessage, FlowUploaderConfig config ) {
 			this.mode = mode;
 			this.errorMessage = errorMessage;
-			this.flowUploader = fu;
+			this.config = config;
 		}
 	}
 	
 	interface UploadClientSpec {
 		public String getServerName();
-		/**
-		 * fu should only be used to pull simple options from; don't
-		 * call any methods on it plz.  This should maybe be refactored
-		 * to a FlowUploadOptions object when I'm at a more comfy
-		 * computer.
-		 */
-		public UploadClient createClient( AddableSet<String> uc, TransferTracker tt, FlowUploader fu );
+		public UploadClient createClient( AddableSet<String> uc, TransferTracker tt, FlowUploaderSettings fus );
 	}
 	
 	static class CommandUploadClientSpec implements UploadClientSpec {
@@ -877,10 +915,10 @@ public class FlowUploader
 		
 		public String getServerName() { return name; }
 		
-		public UploadClient createClient( AddableSet<String> uc, TransferTracker tt, FlowUploader fu ) {
+		public UploadClient createClient( AddableSet<String> uc, TransferTracker tt, FlowUploaderSettings fus ) {
 			CommandUploadClient cuc = new CommandUploadClient( name, command, uc, tt );
-			cuc.debug = fu.debug;
-			cuc.dieWhenNothingToSend = fu.fastExitEnabled;
+			cuc.debug = fus.isDebugging();
+			cuc.dieWhenNothingToSend = fus.isFastExitEnabled();
 			return cuc;
 		}
 	}
@@ -898,40 +936,36 @@ public class FlowUploader
 	}
 	
 	static FlowUploaderCommand fromArgs( Iterator<String> args, boolean requireServer, boolean alwaysShowUrns ) throws Exception {
-		ArrayList<UploadTask> tasks = new ArrayList<UploadTask>();
+		FlowUploaderConfig config = new FlowUploaderConfig();
+		
 		boolean verbose = false;
-		boolean debug = false;
-		boolean fastExitEnabled = false;
-		boolean showProgress = false;
+		boolean cacheEnabled = true;
 		String cacheDir = null;
 		String dataDir = null;
 		String headDir = null;
-		String storeSector = "user";
 		String serverName = null;
 		String[] serverCommand = null;
 		
 		String repoName = null;
-		int howToHandleReadErrors = Actions.THROW_AN_EXCEPTION;
 		
 		// Optional commit info
 		String commitName = null;
 		String commitAuthor = null;
 		String commitMessage = null;
 		
-		ArrayList<UploadClientSpec> uploadClientSpecs = new ArrayList<UploadClientSpec>(); 
 		for( ; args.hasNext(); ) {
 			String a = args.next();
 			
 			// Verbosity options
 			if( "-v".equals(a) ) {
 				verbose = true;
-				showProgress = true;
+				config.showProgress = true;
 			} else if( "-show-progress".equals(a) ) {
-				showProgress = true;
+				config.showProgress = true;
 			} else if( "-debug".equals(a) ) {
-				debug = true;
+				config.debug = true;
 			} else if( "-enable-fast-exit".equals(a) ) {
-				fastExitEnabled = true;
+				config.fastExitEnabled = true;
 			// Commit options
 			} else if( "-m".equals(a) ) {
 				commitMessage = args.next();
@@ -941,7 +975,7 @@ public class FlowUploader
 				commitName = args.next();
 			
 			} else if( "-no-cache".equals(a) ) {
-				cacheDir = "DO-NOT-CACHE";
+				cacheEnabled = false;
 			
 			} else if( "-repo".equals(a) || a.startsWith("-local-repo:") ) {
 				if( a.startsWith("-local-repo:") ) {
@@ -959,16 +993,16 @@ public class FlowUploader
 				dataDir = args.next();
 				
 			} else if( "-sector".equals(a) ) {
-				storeSector = args.next();
+				config.storeSector = args.next();
 			} else if( "-server-name".equals(a) ) {
 				serverName = args.next();
 			} else if( a.startsWith("-command-server:") ) {
 				final String sn = a.substring(16);
-				uploadClientSpecs.add( new CommandUploadClientSpec(sn, readSubCommandArguments(args)) );
+				config.uploadClientSpecs.add( new CommandUploadClientSpec(sn, readSubCommandArguments(args)) );
 			} else if( "-server-command".equals(a) ) {
 				serverCommand = readSubCommandArguments(args);
 			} else if( "-skip-files-with-read-errors".equals(a) ) {
-				howToHandleReadErrors = Actions.SKIP_THE_FILE;
+				config.howToHandleFileReadErrors = Actions.SKIP_THE_FILE;
 			} else if( CCouch3Command.isHelpArgument(a) ) {
 				return FlowUploaderCommand.help();
 			} else if( !a.startsWith("-") ) {
@@ -985,39 +1019,36 @@ public class FlowUploader
 					commitName = null;
 				}
 				
-				tasks.add( new UploadTask(a, a, commitConfig) );
+				config.tasks.add( new UploadTask(a, a, commitConfig) );
 			} else {
 				return FlowUploaderCommand.error("Unrecognised argument: "+a);
 			}
 		}
 		
-		File cacheDirFile;
-		if( "DO-NOT-CACHE".equals(cacheDir) ) {
-			cacheDirFile = null;
+		if( !cacheEnabled ) {
+			config.cacheDir = null;
 		} else if( cacheDir == null ) {
 			String homeDir = System.getProperty("user.home");
 			if( homeDir == null ) homeDir = ".";
-			cacheDirFile = new File(repoCacheDir(homeDir + "/.ccouch"));
+			config.cacheDir = new File(repoCacheDir(homeDir + "/.ccouch"));
 		} else {
-			cacheDirFile = new File(cacheDir);
+			config.cacheDir = new File(cacheDir);
 		}
 		
-		File dataDirFile;
 		if( dataDir == null ) {
 			String homeDir = System.getProperty("user.home");
 			if( homeDir == null ) homeDir = ".";
-			dataDirFile = new File(repoDataDir(homeDir + "/.ccouch"));
+			config.dataDir = new File(repoDataDir(homeDir + "/.ccouch"));
 		} else {
-			dataDirFile = new File(dataDir);
+			config.dataDir = new File(dataDir);
 		}
 		
-		File headDirFile;
 		if( headDir == null ) {
 			String homeDir = System.getProperty("user.home");
 			if( homeDir == null ) homeDir = ".";
-			headDirFile = new File(repoHeadDir(homeDir + "/.ccouch"));
+			config.headDir = new File(repoHeadDir(homeDir + "/.ccouch"));
 		} else {
-			headDirFile = new File(headDir);
+			config.headDir = new File(headDir);
 		}
 		
 		// Set up upload clients //
@@ -1026,30 +1057,21 @@ public class FlowUploader
 			return FlowUploaderCommand.error("-server-name and -server-command must both be specified if either are.");
 		}
 		if( serverName != null && serverCommand != null ) {
-			uploadClientSpecs.add( new CommandUploadClientSpec(serverName, serverCommand) );
+			config.uploadClientSpecs.add( new CommandUploadClientSpec(serverName, serverCommand) );
 		}
 		if( requireServer ) {
-			if( uploadClientSpecs.size() == 0 ) {
+			if( config.uploadClientSpecs.size() == 0 ) {
 				return FlowUploaderCommand.error("No servers specified.");
 			}
 		}
 		
 		boolean showUrns = verbose || alwaysShowUrns;
 		
-		FlowUploader fu = new FlowUploader(tasks);
-		fu.debug = debug;
-		fu.fastExitEnabled = fastExitEnabled;
-		fu.showProgress = showProgress;
-		fu.cacheDir = cacheDirFile;
-		fu.dataDir = dataDirFile;
-		fu.headDir = headDirFile;
-		fu.storeSector = storeSector;
-		fu.showTransferSummary = verbose;
-		fu.reportPathUrnMapping = showUrns && tasks.size() != 1;
-		fu.reportUrn = showUrns && tasks.size() == 1;
-		fu.uploadClientSpecs = uploadClientSpecs.toArray(new UploadClientSpec[uploadClientSpecs.size()]);
-		fu.howToHandleFileReadErrors = howToHandleReadErrors;
-		return FlowUploaderCommand.normal( fu );
+		config.showTransferSummary = verbose;
+		config.reportPathUrnMapping = showUrns && config.tasks.size() != 1;
+		config.reportUrn = showUrns && config.tasks.size() == 1;
+		
+		return FlowUploaderCommand.normal( config );
 	}
 	
 	static final String UPLOAD_USAGE =
@@ -1098,15 +1120,15 @@ public class FlowUploader
 	public static int uploadMain( Iterator<String> args ) throws Exception {
 		FlowUploaderCommand fuc = fromArgs(args, true, false);
 		switch( fuc.mode ) {
-		case( FlowUploaderCommand.MODE_ERROR ):
+		case ERROR:
 			System.err.println( "Error: " + fuc.errorMessage + "\n" );
 			System.err.println( UPLOAD_USAGE );
 			return 1;
-		case( FlowUploaderCommand.MODE_HELP ):
+		case HELP:
 			System.out.println( UPLOAD_USAGE );
 			return 0;
 		default:
-			return fuc.flowUploader.runUpload();
+			return new FlowUploader(fuc.config).runUpload();
 		}
 	}
 	
@@ -1125,15 +1147,15 @@ public class FlowUploader
 	public static int identifyMain( Iterator<String> args ) throws Exception {
 		FlowUploaderCommand fuc = fromArgs(args, false, true);
 		switch( fuc.mode ) {
-		case( FlowUploaderCommand.MODE_ERROR ):
+		case ERROR:
 			System.err.println( "Error: " + fuc.errorMessage + "\n" );
 			System.err.println( IDENTIFY_USAGE );
 			return 1;
-		case( FlowUploaderCommand.MODE_HELP ):
+		case HELP:
 			System.out.println( IDENTIFY_USAGE );
 			return 0;
 		default:
-			fuc.flowUploader.runIdentify();
+			new FlowUploader(fuc.config).runIdentify();
 			return 0;
 		}
 	}
