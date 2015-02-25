@@ -1,6 +1,6 @@
 package togos.ccouch3;
 
-public class FileInfo
+public class FileInfo implements BlobInfo
 {
 	public enum FileType {
 		BLOB("Blob"),
@@ -29,4 +29,7 @@ public class FileInfo
 	public FileInfo( FileInfo fileInfo ) {
 		this( fileInfo.path, fileInfo.urn, fileInfo.fileType, fileInfo.size, fileInfo.mtime );
 	}
+
+	@Override public String getUrn() { return urn; }
+	@Override public long getSize() { return size; }
 }

@@ -5,7 +5,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import togos.ccouch3.FlowUploader.BlobInfo;
+import togos.ccouch3.FlowUploader.SmallBlobInfo;
 import togos.ccouch3.FlowUploader.EndMessage;
 import togos.ccouch3.FlowUploader.FileMissing;
 import togos.ccouch3.FlowUploader.FullyStoredMarker;
@@ -35,8 +35,8 @@ class CommandUploadClient implements UploadClient
 				if( m instanceof FileInfo ) {
 					FileInfo fi = (FileInfo)m;
 					w.writeCmd( new String[]{ "head", fi.path, fi.urn } );
-				} else if( m instanceof BlobInfo ) {
-					BlobInfo bi = (BlobInfo)m;
+				} else if( m instanceof SmallBlobInfo ) {
+					SmallBlobInfo bi = (SmallBlobInfo)m;
 					w.writeCmd( new String[]{ "put", bi.urn, bi.urn, "chunk", String.valueOf(bi.length) } );
 					w.writeChunk( bi.blob, bi.offset, bi.length );
 					w.endChunks();
@@ -63,7 +63,7 @@ class CommandUploadClient implements UploadClient
 			}
 		}
 	}
-		
+	
 	static class Uploader implements Sink<Object> {
 		protected final CmdWriter w;
 		protected final TransferTracker tt;

@@ -31,6 +31,7 @@ import togos.ccouch3.util.AddableSet;
 import togos.ccouch3.util.EmptyAddableSet;
 import togos.ccouch3.util.FileUtil;
 import togos.ccouch3.util.LogUtil;
+import togos.ccouch3.util.RepoURLDefuzzer;
 import togos.ccouch3.util.SLFStringSet;
 
 interface FlowUploaderSettings {
@@ -183,12 +184,13 @@ public class FlowUploader implements FlowUploaderSettings
 		public String toString() { return "EndMessage"; }
 	}
 	
-	static class BlobInfo {
+	/** These get sent through for small blobs, like encoded tree nodes. */
+	static class SmallBlobInfo implements BlobInfo {
 		public final String urn;
 		public final byte[] blob;
 		public final int offset, length;
 		
-		public BlobInfo( String urn, byte[] blob, int offset, int length ) {
+		public SmallBlobInfo( String urn, byte[] blob, int offset, int length ) {
 			assert offset >= 0;
 			assert offset <= blob.length;
 			assert offset + length <= blob.length;
@@ -198,13 +200,16 @@ public class FlowUploader implements FlowUploaderSettings
 			this.length = length;
 		}
 		
-		public BlobInfo( String urn, ByteChunk c ) {
+		public SmallBlobInfo( String urn, ByteChunk c ) {
 			this( urn, c.getBuffer(), c.getOffset(), c.getSize() );
 		}
 		
-		public BlobInfo( String urn, byte[] blob ) {
+		public SmallBlobInfo( String urn, byte[] blob ) {
 			this( urn, blob, 0, blob.length );
 		}
+		
+		@Override public long getSize() { return length; }
+		@Override public String getUrn() { return urn; }
 	}
 	
 	static class FullyStoredMarker {
@@ -490,7 +495,7 @@ public class FlowUploader implements FlowUploaderSettings
 					return new IndexResult( fi, false );
 				}
 				
-				BlobInfo blobInfo = new BlobInfo( rdfBlobUrn, baos.toByteArray() );
+				SmallBlobInfo blobInfo = new SmallBlobInfo( rdfBlobUrn, baos.toByteArray() );
 				
 				for( IndexedObjectSink d : destinations ) {
 					if( !d.contains(fi.urn) ) {
@@ -692,7 +697,7 @@ public class FlowUploader implements FlowUploaderSettings
 	 *                                \-> head error piper                 \-> upload error piper
 	 *                                
 	 * if indexer finishes without sending anything on to the next process, the other threads
-	 * are aborted.
+	 * can be aborted.
 	 */
 	public int runUpload() {
 		final StandardTransferTracker tt = new StandardTransferTracker();
@@ -728,7 +733,7 @@ public class FlowUploader implements FlowUploaderSettings
 						CommitManager.CommitSaveResult csr = getCommitManager().saveCommit(
 							new File(ut.path), indexResult.fileInfo.urn, timestamp, ut.commitConfig );
 						
-						BlobInfo commitBlobInfo = new BlobInfo( csr.latestCommitDataUrn, csr.latestCommitData );
+						SmallBlobInfo commitBlobInfo = new SmallBlobInfo( csr.latestCommitDataUrn, csr.latestCommitData );
 						for( IndexedObjectSink d : indexedObjectSinks ) {
 							// Log the commit and send the data to any server that doesn't have it
 							if( !d.contains(csr.latestCommitDataUrn) ) {
@@ -899,8 +904,17 @@ public class FlowUploader implements FlowUploaderSettings
 		}
 	}
 	
-	interface UploadClientSpec {
+	interface UploadClientSpec
+	{
 		public String getServerName();
+		
+		/**
+		 * 
+		 * @param uc
+		 * @param tt
+		 * @param fus
+		 * @return
+		 */
 		public UploadClient createClient( AddableSet<String> uc, TransferTracker tt, FlowUploaderSettings fus );
 	}
 	
@@ -920,6 +934,25 @@ public class FlowUploader implements FlowUploaderSettings
 			cuc.debug = fus.isDebugging();
 			cuc.dieWhenNothingToSend = fus.isFastExitEnabled();
 			return cuc;
+		}
+	}
+	
+	static class HTTPUploadClientSpec implements UploadClientSpec {
+		public final String name;
+		public final String url;
+		
+		public HTTPUploadClientSpec( String name, String url ) {
+			this.name = name;
+			this.url = url;
+		}
+		
+		public String getServerName() { return name; }
+		
+		public UploadClient createClient( AddableSet<String> uc, TransferTracker tt, FlowUploaderSettings fus ) {
+			HTTPUploadClient huc = new HTTPUploadClient( name, url, uc, tt );
+			//huc.debug = fus.isDebugging();
+			//huc.dieWhenNothingToSend = fus.isFastExitEnabled();
+			return huc;
 		}
 	}
 	
@@ -996,6 +1029,9 @@ public class FlowUploader implements FlowUploaderSettings
 				config.storeSector = args.next();
 			} else if( "-server-name".equals(a) ) {
 				serverName = args.next();
+			} else if( a.startsWith("-http-server:") ) {
+				final String sn = a.substring(16);
+				config.uploadClientSpecs.add( new HTTPUploadClientSpec(sn, RepoURLDefuzzer.defuzzRemoteRepoPrefix(args.next())) );
 			} else if( a.startsWith("-command-server:") ) {
 				final String sn = a.substring(16);
 				config.uploadClientSpecs.add( new CommandUploadClientSpec(sn, readSubCommandArguments(args)) );

@@ -36,6 +36,7 @@ import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.repo.StoreException;
 import togos.ccouch3.util.AddableSet;
 import togos.ccouch3.util.EmptyAddableSet;
+import togos.ccouch3.util.RepoURLDefuzzer;
 import togos.ccouch3.util.SLFStringSet;
 
 public class Downloader
@@ -497,21 +498,6 @@ public class Downloader
 		"  http://hostname/...? -> http://hostname/...?<qs-escaped-urn>\n" +
 		"  http://hostname/.../ -> http://hostname/.../<pathseg-escaped-urn>";
 	
-	protected static final Pattern BARE_HOSTNAME_REPO_PATTERN = Pattern.compile("^[^/]+$");
-	protected static final Pattern BARE_HTTP_HOSTNAME_REPO_PATTERN = Pattern.compile("^https?://[^/]+$");
-	protected static String defuzzRemoteRepoPrefix( String url ) {
-		if( BARE_HOSTNAME_REPO_PATTERN.matcher(url).matches() ) {
-			url = "http://" + url;
-		}
-		if( BARE_HTTP_HOSTNAME_REPO_PATTERN.matcher(url).matches() ) {
-			url += "/uri-res/N2R?";
-		}
-		if( !url.endsWith("/") && !url.endsWith("?") ) {
-			url += "?";
-		}
-		return url;
-	}
-	
 	public static int main( Iterator<String> args )
 		throws IOException, InterruptedException
 	{
@@ -549,7 +535,7 @@ public class Downloader
 			} else if( "-repo".equals(arg) ) {
 				localRepoPath = args.next();
 			} else if( "-remote-repo".equals(arg) ) {
-				remoteRepoUrls.add(defuzzRemoteRepoPrefix(args.next()));
+				remoteRepoUrls.add(RepoURLDefuzzer.defuzzRemoteRepoPrefix(args.next()));
 			} else if( "-connections-per-remote".equals(arg) ) {
 				connectionsPerRemote = Integer.parseInt(args.next());
 			} else if( "-sector".equals(arg) ) {
