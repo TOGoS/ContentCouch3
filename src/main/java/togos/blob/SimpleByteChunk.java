@@ -20,6 +20,11 @@ public class SimpleByteChunk implements ByteChunk
 	public final int length;
 	
 	public SimpleByteChunk( byte[] buf, int offset, int length ) {
+		assert buf != null || length == 0;
+		assert offset >= 0;
+		assert offset <= buf.length;
+		assert offset + length <= buf.length;
+
 		this.data = buf;
 		this.offset = offset;
 		this.length = length;

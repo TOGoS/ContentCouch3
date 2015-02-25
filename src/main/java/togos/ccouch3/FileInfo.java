@@ -1,5 +1,9 @@
 package togos.ccouch3;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+
 public class FileInfo implements BlobInfo
 {
 	public enum FileType {
@@ -32,4 +36,8 @@ public class FileInfo implements BlobInfo
 
 	@Override public String getUrn() { return urn; }
 	@Override public long getSize() { return size; }
+	
+	public InputStream openInputStream() throws FileNotFoundException {
+		return new FileInputStream(path);
+	}
 }

@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import togos.ccouch3.FlowUploader.SmallBlobInfo;
 import togos.ccouch3.FlowUploader.EndMessage;
 import togos.ccouch3.FlowUploader.FileMissing;
 import togos.ccouch3.FlowUploader.FullyStoredMarker;

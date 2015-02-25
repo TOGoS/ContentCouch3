@@ -184,34 +184,6 @@ public class FlowUploader implements FlowUploaderSettings
 		public String toString() { return "EndMessage"; }
 	}
 	
-	/** These get sent through for small blobs, like encoded tree nodes. */
-	static class SmallBlobInfo implements BlobInfo {
-		public final String urn;
-		public final byte[] blob;
-		public final int offset, length;
-		
-		public SmallBlobInfo( String urn, byte[] blob, int offset, int length ) {
-			assert offset >= 0;
-			assert offset <= blob.length;
-			assert offset + length <= blob.length;
-			this.urn = urn;
-			this.blob = blob;
-			this.offset = offset;
-			this.length = length;
-		}
-		
-		public SmallBlobInfo( String urn, ByteChunk c ) {
-			this( urn, c.getBuffer(), c.getOffset(), c.getSize() );
-		}
-		
-		public SmallBlobInfo( String urn, byte[] blob ) {
-			this( urn, blob, 0, blob.length );
-		}
-		
-		@Override public long getSize() { return length; }
-		@Override public String getUrn() { return urn; }
-	}
-	
 	static class FullyStoredMarker {
 		public final String urn;
 		public FullyStoredMarker( String urn ) { this.urn = urn; }
@@ -950,7 +922,7 @@ public class FlowUploader implements FlowUploaderSettings
 		
 		public UploadClient createClient( AddableSet<String> uc, TransferTracker tt, FlowUploaderSettings fus ) {
 			HTTPUploadClient huc = new HTTPUploadClient( name, url, uc, tt );
-			//huc.debug = fus.isDebugging();
+			huc.debug = fus.isDebugging();
 			//huc.dieWhenNothingToSend = fus.isFastExitEnabled();
 			return huc;
 		}

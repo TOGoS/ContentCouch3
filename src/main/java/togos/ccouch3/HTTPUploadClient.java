@@ -1,6 +1,8 @@
 package togos.ccouch3;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -23,6 +25,8 @@ class HTTPUploadClient implements UploadClient
 	protected final ArrayBlockingQueue<Object> headTasks = new ArrayBlockingQueue<Object>(1024);
 	protected final ArrayBlockingQueue<Object> putTasks = new ArrayBlockingQueue<Object>(1024);
 	
+	public boolean debug = false;
+	
 	protected URL urlFor(String urn) throws MalformedURLException {
 		return new URL(repoUrl + urn);
 	}
@@ -38,21 +42,43 @@ class HTTPUploadClient implements UploadClient
 		} else if( status == 404 ) {
 			return false;
 		} else {
-			throw new RuntimeException("HEAD received unexpectd response code "+status);
+			throw new RuntimeException("HEAD received unexpectd response code "+status+"; "+urlCon.getResponseMessage());
 		}
 	}
 	
-	protected void upload( BlobInfo bi ) {
-		throw new UnsupportedOperationException();
+	protected void upload( BlobInfo bi ) throws IOException {
+		InputStream is = bi.openInputStream();
+		try {
+			URL url = urlFor(bi.getUrn());
+			HttpURLConnection urlCon = (HttpURLConnection)url.openConnection();
+			urlCon.setRequestMethod("PUT");
+			OutputStream os = urlCon.getOutputStream();
+			try {
+				byte[] buf = new byte[1024*1024];
+				int r;
+				while( (r = is.read(buf)) > 0 ) {
+					os.write(buf, 0, r);
+				}
+			} finally {
+				os.close();
+			}
+			int status = urlCon.getResponseCode();
+			if( status < 200 || status >= 300 ) {
+				throw new RuntimeException("PUT received unexpected response code "+status+"; "+urlCon.getResponseMessage());
+			}
+		} finally {
+			is.close();
+		}
 	}
 	
 	final int SMALL_BLOB_SIZE = 8192;
 	
-	Thread headThread = new Thread() {
+	protected final Thread headThread = new Thread() {
 		protected boolean keepGoing = true;
 		
 		/** Returns true to indicate that the message should be forwarded */
 		protected boolean handle(Object m) throws Exception {
+			if( debug ) System.err.println("headThread received "+m.getClass());
 			if( m instanceof BlobInfo ) {
 				// Is it small?  Then just upload it.
 				BlobInfo bi = (BlobInfo)m;
@@ -105,11 +131,12 @@ class HTTPUploadClient implements UploadClient
 		}
 	};
 	
-	Thread putThread = new Thread() {
+	protected final Thread putThread = new Thread() {
 		boolean keepGoing = true;
 		
 		/** Returns true to indicate that the message should be forwarded */
 		protected void handle(Object m) throws Exception {
+			if( debug ) System.err.println("putThread received "+m.getClass());
 			if( m instanceof BlobInfo ) {
 				upload((BlobInfo)m);
 			} else if( m instanceof FullyStoredMarker ) {
@@ -156,9 +183,11 @@ class HTTPUploadClient implements UploadClient
 	@Override public void start() {
 		headThread.start();
 		putThread.start();
+		System.err.println("HTTP HEAD and PUT threads started");
 	}
 	
 	@Override public void halt() {
+		System.err.println("Halting HEAD and PUT threads...");
 		headThread.interrupt();
 		putThread.interrupt();
 	}
@@ -166,5 +195,6 @@ class HTTPUploadClient implements UploadClient
 	@Override public void join() throws InterruptedException {
 		headThread.join();
 		putThread.join();
+		System.err.println("HTTP HEAD and PUT threads completed");
 	}
 }
