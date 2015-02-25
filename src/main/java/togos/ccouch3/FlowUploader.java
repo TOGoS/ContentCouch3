@@ -24,6 +24,7 @@ import togos.ccouch3.FlowUploader.Indexer.IndexedObjectSink;
 import togos.ccouch3.FlowUploader.StandardTransferTracker.Counter;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.StreamURNifier;
+import togos.ccouch3.repo.FileResolver;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.slf.SimpleListFile2;
@@ -315,6 +316,7 @@ public class FlowUploader implements FlowUploaderSettings
 			}
 		}
 		
+		protected final FileResolver localFileResolver;
 		protected final DirectorySerializer dirSer;
 		protected final StreamURNifier digestor;
 		protected final HashCache hashCache;
@@ -323,10 +325,12 @@ public class FlowUploader implements FlowUploaderSettings
 		protected final boolean debug;
 
 		public Indexer(
+			FileResolver localFileResolver,
 			DirectorySerializer dirSer, StreamURNifier digestor,
 			HashCache hashCache, IndexedObjectSink[] destinations,
 			int howToHandleFileReadErrors, boolean debug
 		) {
+			this.localFileResolver = localFileResolver;
 			this.dirSer = dirSer;
 			this.digestor = digestor;
 			this.destinations = destinations;
@@ -488,7 +492,7 @@ public class FlowUploader implements FlowUploaderSettings
 		}
 		
 		protected IndexResult index( String path ) throws Exception {
-			return index( new File(path) );
+			return index( localFileResolver.getFile(path) );
 		}
 	}
 	
@@ -591,6 +595,25 @@ public class FlowUploader implements FlowUploaderSettings
 		return localRepository;
 	}
 	
+	protected FileResolver localFileResolver;
+	protected synchronized FileResolver getLocalFileResolver() {
+		if( localFileResolver == null ) {
+			final Repository localRepo = getLocalRepository();
+			
+			localFileResolver = new FileResolver() {
+				@Override
+				public File getFile(String name) {
+					if( name.startsWith("urn:") ) {
+						File g = localRepo.getFile(name);
+						if( g != null ) return g;
+					}
+					return new File(name);
+				}
+			};
+		}
+		return localFileResolver;
+	}
+	
 	protected CommitManager cman;
 	protected synchronized CommitManager getCommitManager() {
 		if( cman == null ) {
@@ -618,7 +641,7 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	public void runIdentify() throws Exception {
-		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), new IndexedObjectSink[0], howToHandleFileReadErrors, debug );
+		final Indexer indexer = new Indexer( getLocalFileResolver(), dirSer, digestor, getHashCache(), new IndexedObjectSink[0], howToHandleFileReadErrors, debug );
 		for( UploadTask ut : tasks ) {
 			IndexResult indexResult = indexer.index(ut.path);
 			report( indexResult.fileInfo );
@@ -687,7 +710,7 @@ public class FlowUploader implements FlowUploaderSettings
 		final LinkedBlockingQueue<Object> uploadTaskQueue = new LinkedBlockingQueue<Object>(tasks);
 		uploadTaskQueue.add( EndMessage.INSTANCE );
 		
-		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors, debug );
+		final Indexer indexer = new Indexer( getLocalFileResolver(), dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors, debug );
 		final QueueRunner indexRunner = new QueueRunner( uploadTaskQueue ) {
 			public boolean handleMessage( Object m ) throws Exception {
 				if( m instanceof UploadTask ) {

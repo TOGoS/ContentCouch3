@@ -32,7 +32,8 @@ public class SHA1FileRepository implements Repository
 	
 	Pattern SHA1EXTRACTOR = Pattern.compile("^urn:(?:sha1|bitprint):([A-Z0-9]{32})");
 	
-	protected File getFile( String urn ) {
+	@Override
+	public File getFile( String urn ) {
 		Matcher m = SHA1EXTRACTOR.matcher(urn);
 		if( !m.find() ) return null;
 		if( !dataDir.exists() ) return null;

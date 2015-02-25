@@ -5,8 +5,11 @@ import java.io.InputStream;
 
 import togos.blob.ByteChunk;
 
-
-public interface Repository
+/**
+ * Note that getFile may return null without implying that the named blob does not exist in the repository.
+ * It might just not be backed by a File.
+ */
+public interface Repository extends FileResolver
 {
 	public boolean contains( String urn );
 	/**
