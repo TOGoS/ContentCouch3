@@ -1124,6 +1124,7 @@ public class FlowUploader implements FlowUploaderSettings
 		"  -local-repo:<name> <path> ; Path to a named local repository; this is needed\n" +
 		"                 ; when creating a named commit with '-n'\n" +
 		"  -no-cache      ; Do not cache file hashes or upload records.\n" +
+		"  -http-server:<name> <url> ; PUT files to a N2R server.\n" +
 		"  -command-server:<name> <cmd> <arg> <arg> ... ';' ; Add a command to pipe\n" +
 		"                 ; cmd-server commands to\n" +
 		//"  -server-name <name> ; name of repository you are uploading to;\n" +
