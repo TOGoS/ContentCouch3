@@ -46,12 +46,17 @@ class HTTPUploadClient implements UploadClient
 		}
 	}
 	
-	protected void upload( BlobInfo bi ) throws IOException {
+	protected void upload( BlobInfo bi, String tag ) throws IOException {
+		if( bi instanceof FileInfo ) {
+			transferTracker.sendingFile( ((FileInfo)bi).path );
+		}
+		
 		InputStream is = bi.openInputStream();
 		try {
 			URL url = urlFor(bi.getUrn());
 			HttpURLConnection urlCon = (HttpURLConnection)url.openConnection();
 			urlCon.setRequestMethod("PUT");
+			urlCon.setDoOutput(true);
 			OutputStream os = urlCon.getOutputStream();
 			try {
 				byte[] buf = new byte[1024*1024];
@@ -69,6 +74,11 @@ class HTTPUploadClient implements UploadClient
 		} finally {
 			is.close();
 		}
+		transferTracker.transferred(bi.getSize(), 1, tag);
+	}
+	
+	protected void upload( BlobInfo bi ) throws IOException {
+		upload( bi, bi instanceof FileInfo ? TransferTracker.TAG_FILE : TransferTracker.TAG_TREENODE );
 	}
 	
 	final int SMALL_BLOB_SIZE = 8192;

@@ -39,7 +39,7 @@ class CommandUploadClient implements UploadClient
 					w.writeCmd( new String[]{ "put", bi.urn, bi.urn, "chunk", String.valueOf(bi.length) } );
 					w.writeChunk( bi.blob, bi.offset, bi.length );
 					w.endChunks();
-					tt.transferred( bi.blob.length, 1, "treenode" );
+					tt.transferred( bi.blob.length, 1, TransferTracker.TAG_TREENODE );
 				} else if( m instanceof FullyStoredMarker ) {
 					FullyStoredMarker fsm = (FullyStoredMarker)m;
 					w.writeCmd( new String[]{ "echo", "fully-stored", fsm.urn} );
@@ -84,7 +84,7 @@ class CommandUploadClient implements UploadClient
 				try {
 					for( int z = fis.read(buffer); z >= 0; z = fis.read(buffer) ) {
 						w.writeChunk( buffer, 0, z );
-						tt.transferred( z, 0, "file" );
+						tt.transferred( z, 0, TransferTracker.TAG_FILE );
 					}
 				} finally {
 					fis.close();

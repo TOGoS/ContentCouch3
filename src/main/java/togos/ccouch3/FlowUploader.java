@@ -99,6 +99,9 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	interface TransferTracker {
+		public static final String TAG_TREENODE = "treenode";
+		public static final String TAG_FILE = "file";
+		
 		// Units = e.g. files, or whatever you want to track.
 		public void transferred( long byteCount, int unitCount, String tag );
 		public void sendingFile( String filename );
