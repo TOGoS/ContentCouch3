@@ -684,7 +684,8 @@ public class FlowUploader implements FlowUploaderSettings
 			indexedObjectSinks[i] = new IndexedObjectSink( uc, uploadClients[i] );
 		}
 		
-		final LinkedBlockingQueue<Object> uploadTaskQueue     = new LinkedBlockingQueue<Object>(tasks);
+		final LinkedBlockingQueue<Object> uploadTaskQueue = new LinkedBlockingQueue<Object>(tasks);
+		uploadTaskQueue.add( EndMessage.INSTANCE );
 		
 		final Indexer indexer = new Indexer( dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors, debug );
 		final QueueRunner indexRunner = new QueueRunner( uploadTaskQueue ) {
@@ -777,13 +778,15 @@ public class FlowUploader implements FlowUploaderSettings
 		indexThread.start();
 		if( showProgress ) progressThread.start();
 		
-		uploadTaskQueue.add( EndMessage.INSTANCE );
-		
 		boolean error = false;
 		try {
+			if( debug ) System.err.println("Waiting for index thread to finish...");
 			indexThread.join();
+			if( debug ) System.err.println("Index thread completed.");
 			
+			if( debug ) System.err.println("Waiting for upload clients to finish...");
 			for( UploadClient uc : uploadClients ) uc.join();
+			if( debug ) System.err.println("Upload clients all completed.");
 			
 			progressThread.interrupt();
 			

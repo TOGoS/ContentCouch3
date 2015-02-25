@@ -112,7 +112,7 @@ class HTTPUploadClient implements UploadClient
 				keepGoing = false;
 				// Caller will send an EndMessage onward
 				// as part of its shutdown sequence.
-				return true;
+				return false;
 			} else {
 				throw new RuntimeException("Unrecognized message: "+m.getClass());
 			}
@@ -138,6 +138,7 @@ class HTTPUploadClient implements UploadClient
 					this.interrupt();
 				}
 			}
+			if( debug ) System.err.println("headThread completing naturally.");
 		}
 	};
 	
@@ -165,7 +166,7 @@ class HTTPUploadClient implements UploadClient
 		public void run() {
 			while(keepGoing) {
 				try {
-					Object m = headTasks.take();
+					Object m = putTasks.take();
 					handle(m);
 				} catch( InterruptedException e ) {
 					keepGoing = false;
@@ -174,6 +175,7 @@ class HTTPUploadClient implements UploadClient
 					throw new RuntimeException(e);
 				}
 			}
+			if( debug ) System.err.println("putThread completing naturally.");
 		};
 	};
 	
@@ -193,11 +195,11 @@ class HTTPUploadClient implements UploadClient
 	@Override public void start() {
 		headThread.start();
 		putThread.start();
-		System.err.println("HTTP HEAD and PUT threads started");
+		if(debug) System.err.println(getClass().getSimpleName()+": HTTP HEAD and PUT threads started");
 	}
 	
 	@Override public void halt() {
-		System.err.println("Halting HEAD and PUT threads...");
+		if(debug) System.err.println(getClass().getSimpleName()+": Halting HEAD and PUT threads...");
 		headThread.interrupt();
 		putThread.interrupt();
 	}
@@ -205,6 +207,6 @@ class HTTPUploadClient implements UploadClient
 	@Override public void join() throws InterruptedException {
 		headThread.join();
 		putThread.join();
-		System.err.println("HTTP HEAD and PUT threads completed");
+		if(debug) System.err.println(getClass().getSimpleName()+": HTTP HEAD and PUT threads completed");
 	}
 }
