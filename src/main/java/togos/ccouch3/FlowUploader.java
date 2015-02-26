@@ -317,6 +317,7 @@ public class FlowUploader implements FlowUploaderSettings
 		}
 		
 		protected final FileResolver localFileResolver;
+		protected final BlobReferenceScanMode scanMode;
 		protected final DirectorySerializer dirSer;
 		protected final StreamURNifier digestor;
 		protected final HashCache hashCache;
@@ -326,11 +327,13 @@ public class FlowUploader implements FlowUploaderSettings
 
 		public Indexer(
 			FileResolver localFileResolver,
+			BlobReferenceScanMode scanMode,
 			DirectorySerializer dirSer, StreamURNifier digestor,
 			HashCache hashCache, IndexedObjectSink[] destinations,
 			int howToHandleFileReadErrors, boolean debug
 		) {
 			this.localFileResolver = localFileResolver;
+			this.scanMode = scanMode;
 			this.dirSer = dirSer;
 			this.digestor = digestor;
 			this.destinations = destinations;
@@ -402,6 +405,10 @@ public class FlowUploader implements FlowUploaderSettings
 			
 			FileInfo fi;
 			if( file.isFile() ) {
+				if( scanMode != BlobReferenceScanMode.NEVER ) {
+					throw new RuntimeException(scanMode+" scan mode not supported yet!");
+				}
+				
 				String fileUrn;
 				if( cachedUrn != null ) {
 					fileUrn = cachedUrn;
@@ -512,6 +519,7 @@ public class FlowUploader implements FlowUploaderSettings
 		public File headDir;
 		public String storeSector = "user";
 		public Collection<UploadClientSpec> uploadClientSpecs = new ArrayList<UploadClientSpec>();
+		public BlobReferenceScanMode scanMode = BlobReferenceScanMode.NEVER; 
 	}
 	
 	//// Put it all together ////
@@ -527,6 +535,7 @@ public class FlowUploader implements FlowUploaderSettings
 	protected final StreamURNifier digestor;
 	protected final DirectorySerializer dirSer;
 	protected final File cacheDir;
+	protected final BlobReferenceScanMode scanMode;
 	
 	// Used when creating commits:
 	protected final File dataDir;
@@ -552,6 +561,7 @@ public class FlowUploader implements FlowUploaderSettings
 		this.headDir = config.headDir;
 		this.storeSector = config.storeSector;
 		this.uploadClientSpecs = config.uploadClientSpecs.toArray(new UploadClientSpec[config.uploadClientSpecs.size()]);
+		this.scanMode = config.scanMode;
 	}
 	
 	public boolean isDebugging() {
@@ -576,11 +586,13 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	protected Map<String,AddableSet<String>> uploadCaches = new HashMap<String,AddableSet<String>>();
-	protected synchronized AddableSet<String> getUploadCache( String serverName ) {
+	protected synchronized AddableSet<String> getUploadCache( String serverName, BlobReferenceScanMode scanMode ) {
 		if( cacheDir == null ) return EmptyAddableSet.getInstance();
 		AddableSet<String> uc = uploadCaches.get(serverName);
 		if( uc == null ) {
-			uploadCaches.put( serverName, uc = new SLFStringSet(new File(cacheDir, "uploaded-to-"+serverName+".slf2")) );
+			uploadCaches.put( serverName, uc = new SLFStringSet(new File(cacheDir,
+				"uploaded-to-"+serverName+(scanMode == BlobReferenceScanMode.NEVER ? "" : "-rs-"+scanMode.name().toLowerCase())+".slf2")) );
+			// 'rs' = 'recursively scanned'
 		}
 		return uc;
 	}
@@ -641,7 +653,7 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	public void runIdentify() throws Exception {
-		final Indexer indexer = new Indexer( getLocalFileResolver(), dirSer, digestor, getHashCache(), new IndexedObjectSink[0], howToHandleFileReadErrors, debug );
+		final Indexer indexer = new Indexer( getLocalFileResolver(), BlobReferenceScanMode.NEVER, dirSer, digestor, getHashCache(), new IndexedObjectSink[0], howToHandleFileReadErrors, debug );
 		for( UploadTask ut : tasks ) {
 			IndexResult indexResult = indexer.index(ut.path);
 			report( indexResult.fileInfo );
@@ -702,7 +714,7 @@ public class FlowUploader implements FlowUploaderSettings
 		final UploadClient[] uploadClients = new UploadClient[uploadClientSpecs.length];
 		final IndexedObjectSink[] indexedObjectSinks = new IndexedObjectSink[uploadClientSpecs.length];
 		for( int i=0; i<uploadClientSpecs.length; ++i ) {
-			final AddableSet<String> uc = getUploadCache(uploadClientSpecs[i].getServerName());
+			final AddableSet<String> uc = getUploadCache(uploadClientSpecs[i].getServerName(), scanMode);
 			uploadClients[i] = uploadClientSpecs[i].createClient( uc, tt, this );
 			indexedObjectSinks[i] = new IndexedObjectSink( uc, uploadClients[i] );
 		}
@@ -710,7 +722,7 @@ public class FlowUploader implements FlowUploaderSettings
 		final LinkedBlockingQueue<Object> uploadTaskQueue = new LinkedBlockingQueue<Object>(tasks);
 		uploadTaskQueue.add( EndMessage.INSTANCE );
 		
-		final Indexer indexer = new Indexer( getLocalFileResolver(), dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors, debug );
+		final Indexer indexer = new Indexer( getLocalFileResolver(), scanMode, dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors, debug );
 		final QueueRunner indexRunner = new QueueRunner( uploadTaskQueue ) {
 			public boolean handleMessage( Object m ) throws Exception {
 				if( m instanceof UploadTask ) {
@@ -1000,6 +1012,7 @@ public class FlowUploader implements FlowUploaderSettings
 				config.debug = true;
 			} else if( "-enable-fast-exit".equals(a) ) {
 				config.fastExitEnabled = true;
+			
 			// Commit options
 			} else if( "-m".equals(a) ) {
 				commitMessage = args.next();
@@ -1011,6 +1024,7 @@ public class FlowUploader implements FlowUploaderSettings
 			} else if( "-no-cache".equals(a) ) {
 				cacheEnabled = false;
 			
+			// Local repository options
 			} else if( "-repo".equals(a) || a.startsWith("-local-repo:") ) {
 				if( a.startsWith("-local-repo:") ) {
 					repoName = a.substring(12);
@@ -1038,10 +1052,13 @@ public class FlowUploader implements FlowUploaderSettings
 				config.uploadClientSpecs.add( new CommandUploadClientSpec(sn, readSubCommandArguments(args)) );
 			} else if( "-server-command".equals(a) ) {
 				serverCommand = readSubCommandArguments(args);
+			
+			// Options about what to upload
+			} else if( "-recurse".equals(a) ) {
+				// A bit of a misnomer...
+				config.scanMode = BlobReferenceScanMode.TEXT;
 			} else if( "-skip-files-with-read-errors".equals(a) ) {
 				config.howToHandleFileReadErrors = Actions.SKIP_THE_FILE;
-			} else if( CCouch3Command.isHelpArgument(a) ) {
-				return FlowUploaderCommand.help();
 			} else if( !a.startsWith("-") ) {
 				CommitConfig commitConfig;
 				if( commitAuthor == null && commitMessage == null && commitName == null ) {
@@ -1057,6 +1074,10 @@ public class FlowUploader implements FlowUploaderSettings
 				}
 				
 				config.tasks.add( new UploadTask(a, a, commitConfig) );
+				
+			// Help
+			} else if( CCouch3Command.isHelpArgument(a) ) {
+				return FlowUploaderCommand.help();
 			} else {
 				return FlowUploaderCommand.error("Unrecognised argument: "+a);
 			}
@@ -1121,6 +1142,9 @@ public class FlowUploader implements FlowUploaderSettings
 		"  -n <name>      ; Give a name for the next commit\n" +
 		"  -a <author>    ; Give an author name for the next commit\n" +
 		"  -m <message>   ; Give a description for the next commit\n" +
+		"  -recurse       ; Recursively scan blobs for URN references and upload\n" +
+		"                 ; their targets, too (this is a bit of a misnomer, since\n" +
+		"                 ; directories are always recursively uploaded)\n" +
 		"  -local-repo <path> ; Path to local ccouch repository to store cache in.\n" +
 		"  -local-repo:<name> <path> ; Path to a named local repository; this is needed\n" +
 		"                 ; when creating a named commit with '-n'\n" +

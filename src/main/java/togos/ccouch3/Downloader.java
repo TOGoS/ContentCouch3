@@ -163,9 +163,7 @@ public class Downloader
 	public boolean reportDownloads = false;
 	public boolean reportUnrecursableBlobs = false;
 	
-	static enum RecursionMode { NEVER, TEXT }
-	
-	public RecursionMode recursionMode;
+	public BlobReferenceScanMode scanMode;
 	// AS7Q5NVWLNDPLRL3A7RYHPXY3QSMPQVI.3LPFRNN2WLY3WMKEHJ2Y3VYKEYMREOGZARVS4YY
 	public Pattern urnPattern = SHA1_OR_BITPRINT_PATTERN;
 	
@@ -181,7 +179,7 @@ public class Downloader
 	
 	protected boolean isObviouslyFullyCached( String urn ) {
 		return
-			recursionMode == RecursionMode.NEVER ? localRepo.contains(urn) :
+			scanMode == BlobReferenceScanMode.NEVER ? localRepo.contains(urn) :
 			fullyCachedUrns.contains(urn);
 	}
 	
@@ -244,7 +242,7 @@ public class Downloader
 	}
 	
 	protected void cacheRecurse( String urn ) {
-		if( recursionMode == RecursionMode.NEVER ) return;
+		if( scanMode == BlobReferenceScanMode.NEVER ) return;
 		
 		boolean fullyCached = scanForUrns(urn, new ScanCallback() {
 			@Override public boolean handle(String urn) {
@@ -504,7 +502,7 @@ public class Downloader
 		String localRepoPath = "~/.ccouch";
 		String cacheSector = "remote";
 		int connectionsPerRemote = 2;
-		RecursionMode recursionMode = RecursionMode.NEVER;
+		BlobReferenceScanMode scanMode = BlobReferenceScanMode.NEVER;
 		List<String> urnArgs = new ArrayList<String>();
 		List<String> remoteRepoUrls = new ArrayList<String>();
 		boolean reportDownloads = false;
@@ -522,7 +520,7 @@ public class Downloader
 			if( !arg.startsWith("-") ) {
 				urnArgs.add(arg);
 			} else if( "-recurse".equals(arg) ) {
-				recursionMode = RecursionMode.TEXT;
+				scanMode = BlobReferenceScanMode.TEXT;
 			} else if( "-debug".equals(arg) ) {
 				reportDownloads = true;
 				reportUnrecursableBlobs = true;
@@ -567,11 +565,11 @@ public class Downloader
 		final SHA1FileRepository localRepo = new SHA1FileRepository(new File(localRepoDir, "data"), cacheSector);
 		
 		final AddableSet<String> fullyCachedTreeUrns =
-			recursionMode == RecursionMode.NEVER ? EmptyAddableSet.<String>getInstance() :
-			new SLFStringSet(new File(localRepoDir, "cache/ccouch3-downloader/fully-cached-"+recursionMode.name().toLowerCase()+".slf2"));
+			scanMode == BlobReferenceScanMode.NEVER ? EmptyAddableSet.<String>getInstance() :
+			new SLFStringSet(new File(localRepoDir, "cache/ccouch3-downloader/fully-cached-"+scanMode.name().toLowerCase()+".slf2"));
 		
 		Downloader downloader = new Downloader( new RepositorySet(remoteRepoUrls, connectionsPerRemote), localRepo, fullyCachedTreeUrns );
-		downloader.recursionMode = recursionMode;
+		downloader.scanMode = scanMode;
 		downloader.reportDownloads = reportDownloads;
 		downloader.reportUnrecursableBlobs = reportUnrecursableBlobs;
 		downloader.reportDownloadFailures = reportDownloadFailures;
