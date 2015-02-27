@@ -222,7 +222,7 @@ class CommandUploadClient implements UploadClient
 			halt();
 		} else {
 			if( headRequestSender == null ) {
-				throw new RuntimeException("This CmdResponseReader has not been started; cannot write to it!");
+				throw new RuntimeException(serverName+" CmdResponseReader has not been started; cannot write to it!");
 			}
 			
 			headRequestSender.give(m);
@@ -263,10 +263,10 @@ class CommandUploadClient implements UploadClient
 		);
 		
 		if( debug ) {
-			uploader.w.debugPrefix = "Send upload command: ";
-			headRequestSender.w.debugPrefix = "Send head command: ";
-			headResponseReader.r.debugPrefix = "Read head response: ";
-			uploadResponseReader.r.debugPrefix = "Read upload response: ";
+			uploader.w.debugPrefix = "Send upload command to "+serverName+": ";
+			headRequestSender.w.debugPrefix = "Send head command to "+serverName+": ";
+			headResponseReader.r.debugPrefix = "Read head response from "+serverName+": ";
+			uploadResponseReader.r.debugPrefix = "Read upload response from "+serverName+": ";
 		}
 		
 		headResponseReaderThread = new Thread( headResponseReader, "Head Response Reader" );
