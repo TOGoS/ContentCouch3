@@ -17,4 +17,6 @@ import togos.service.Service;
  * preceding uploads are done.  An EndMessage should not kill
  * the service until everything else it was doing is done. 
  */
-public interface UploadClient extends Service, Sink<Object> { }
+public interface UploadClient extends Service, Sink<Object> {
+	public String getServerName();
+}

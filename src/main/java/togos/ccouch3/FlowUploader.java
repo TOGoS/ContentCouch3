@@ -969,11 +969,11 @@ public class FlowUploader implements FlowUploaderSettings
 					CommandUploadClient cuc = (CommandUploadClient)uc; 
 					if( cuc.anythingSent ) {
 						if( cuc.headProcExitCode != 0 ) {
-							System.err.println("Error: Head process exited with code "+cuc.headProcExitCode);
+							System.err.println("Error: "+uc.getServerName()+" head process exited with code "+cuc.headProcExitCode);
 							error = true;
 						}
 						if( cuc.uploadProcExitCode != 0 ) {
-							System.err.println("Error: Upload process exited with code "+cuc.uploadProcExitCode);
+							System.err.println("Error: "+uc.getServerName()+" upload process exited with code "+cuc.uploadProcExitCode);
 							error = true;
 						}
 					}

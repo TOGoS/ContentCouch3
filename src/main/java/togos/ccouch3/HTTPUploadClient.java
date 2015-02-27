@@ -17,8 +17,8 @@ import togos.ccouch3.util.AddableSet;
 
 class HTTPUploadClient implements UploadClient
 {
-	protected final String name;
-	protected final String repoUrl;
+	protected final String serverName;
+	protected final String serverUrl;
 	protected final AddableSet<String> fullyCachedUrnSet;
 	protected final TransferTracker transferTracker;
 	
@@ -27,8 +27,19 @@ class HTTPUploadClient implements UploadClient
 	
 	public boolean debug = false;
 	
+	public HTTPUploadClient(
+		String serverName, String serverUrl, AddableSet<String> uc, TransferTracker tt
+	) {
+		this.serverName = serverName;
+		this.serverUrl = serverUrl;
+		this.fullyCachedUrnSet = uc;
+		this.transferTracker = tt;
+	}
+	
+	@Override public String getServerName() { return serverName; }
+	
 	protected URL urlFor(String urn) throws MalformedURLException {
-		return new URL(repoUrl + urn);
+		return new URL(serverUrl + urn);
 	}
 	
 	protected boolean existsOnServer( String urn ) throws IOException {
@@ -182,16 +193,7 @@ class HTTPUploadClient implements UploadClient
 			if( debug ) System.err.println("putThread completing naturally.");
 		};
 	};
-	
-	public HTTPUploadClient(
-		String name, String url, AddableSet<String> uc, TransferTracker tt
-	) {
-		this.name = name;
-		this.repoUrl = url;
-		this.fullyCachedUrnSet = uc;
-		this.transferTracker = tt;
-	}
-	
+		
 	@Override public void give(Object value) throws Exception {
 		headTasks.put(value);
 	}

@@ -212,6 +212,8 @@ class CommandUploadClient implements UploadClient
 		this.uploadCache = uc;
 	}
 	
+	@Override public String getServerName() { return serverName; }
+	
 	public void give( Object m ) throws Exception {
 		if( !anythingSent && m instanceof EndMessage && dieWhenNothingToSend ) {
 			// Then we can quit without waiting for the server to
