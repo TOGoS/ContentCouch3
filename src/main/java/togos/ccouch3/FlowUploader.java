@@ -443,6 +443,14 @@ public class FlowUploader implements FlowUploaderSettings
 			return true;
 		}
 		
+		// TODO: Probably want to refactor
+		// so that index(blob file) calls index(URN),
+		// not the other way around.
+		//
+		// Right now, URNs must be backed by files to be uploaded, and
+		// once the file is found, the original URN gets ignored and
+		// the URN has to be re-calculated!
+		
 		protected IndexResult index( File file ) throws Exception {
 			if( debug ) System.err.println("Indexer: "+file+"...");
 			String cachedUrn = hashCache.getFileUrn( file );
@@ -722,6 +730,11 @@ public class FlowUploader implements FlowUploaderSettings
 				public File getFile(String name) {
 					if( name.startsWith("urn:") ) {
 						File g = localRepo.getFile(name);
+						// TODO: Maybe want to iven if it is null.
+						// Do we really want urn:... to resolve if
+						// a file by the same name happens to be in the current directory?
+						// that could cause a lot of confusion if it wasn't actually
+						// the file named by the URN!
 						if( g != null ) return g;
 					}
 					return new File(name);
