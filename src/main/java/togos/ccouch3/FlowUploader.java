@@ -12,7 +12,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -422,26 +421,9 @@ public class FlowUploader implements FlowUploaderSettings
 			case TEXT:
 				try {
 					return getBlobReferenceScanner().scanTextForUrns(blob.getUrn(), blob.openInputStream(), new ScanCallback() {
-						HashSet<String> urnsAlreadyProcessed = new HashSet<String>();
-						
 						@Override public boolean handle(String urn) {
-							if( urnsAlreadyProcessed.contains(urn) ) return true;
 							if( debug ) System.err.println("Found "+urn+" referenced by "+blob.getUrn());
-							boolean success = indexBlobByUrn(urn);
-							if( urnsAlreadyProcessed.size() >= 1024 ) {
-								// Chop it down a bit so we don't consume all the memory.
-								boolean rem = true;
-								for( Iterator<String> i = urnsAlreadyProcessed.iterator(); i.hasNext(); ) {
-									i.next();
-									if(rem) i.remove();
-									rem ^= true;
-								}
-								if(debug) System.err.println(
-									"Chopped already-processed URN set for "+blob.getUrn()+" down to "+
-									urnsAlreadyProcessed.size()+"; that blob must be really big!");
-							}
-							urnsAlreadyProcessed.add(urn);
-							return success;
+							return indexBlobByUrn(urn);
 						}
 					}, false);
 				} catch( IOException e ) {
@@ -565,6 +547,32 @@ public class FlowUploader implements FlowUploaderSettings
 			return new IndexResult( fi, true, fullyUploaded );
 		}
 		
+		// This is to prevent tight loops where the same blob is
+		// processed again and again and again due to being referenced
+		// a lot.
+		// 
+		// The 'fully uploaded' markers might not come back for a while,
+		// so we can't rely on them to catch cases where e.g.
+		// one blob references one other blob 1000 times.
+		
+		protected HashMap<String,Boolean> urnsAlreadyIndexed = new HashMap<String,Boolean>();
+		
+		protected void indexedBlobByUrn( String urn, boolean result ) {
+			if( urnsAlreadyIndexed.size() >= 1024 ) {
+				// Chop it down a bit so we don't consume all the memory.
+				boolean rem = true;
+				for( Iterator<Map.Entry<String,Boolean>> i = urnsAlreadyIndexed.entrySet().iterator(); i.hasNext(); ) {
+					i.next();
+					if(rem) i.remove();
+					rem ^= true;
+				}
+				if(debug) System.err.println(
+					"Chopped already-indexed URN set down to "+
+					urnsAlreadyIndexed.size()+" entries.");
+			}
+			urnsAlreadyIndexed.put(urn, Boolean.valueOf(result));
+		}
+		
 		/**
 		 * Used by callers who already know the URN of the thing,
 		 * and that it's a blob.
@@ -574,15 +582,21 @@ public class FlowUploader implements FlowUploaderSettings
 		 * or already fully stored everywhere.
 		 */
 		protected boolean indexBlobByUrn( String urn ) {
+			Boolean b = urnsAlreadyIndexed.get(urn);
+			if( b != null ) return b.booleanValue();
+			
 			// Note: There's no reason this needs to be a file.
 			// Could go all indexBlob(), here.
 			File f = localUrnBlobResolver.getFile(urn);
 			if( f == null ) {
 				System.err.println("Couldn't find "+urn);
+				indexedBlobByUrn(urn, false);
 				return false;
 			}
 			try {
-				return index(f).fullyStored;
+				boolean success = index(f).fullyStored;
+				indexedBlobByUrn(urn, success);
+				return success;
 			} catch( Exception e ) {
 				System.err.println("Error while processing "+f+": "+e.getMessage());
 				return false;
