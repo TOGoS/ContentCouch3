@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -421,9 +422,26 @@ public class FlowUploader implements FlowUploaderSettings
 			case TEXT:
 				try {
 					return getBlobReferenceScanner().scanTextForUrns(blob.getUrn(), blob.openInputStream(), new ScanCallback() {
+						HashSet<String> urnsAlreadyProcessed = new HashSet<String>();
+						
 						@Override public boolean handle(String urn) {
+							if( urnsAlreadyProcessed.contains(urn) ) return true;
 							if( debug ) System.err.println("Found "+urn+" referenced by "+blob.getUrn());
-							return indexBlobByUrn(urn);
+							boolean success = indexBlobByUrn(urn);
+							if( urnsAlreadyProcessed.size() >= 1024 ) {
+								// Chop it down a bit so we don't consume all the memory.
+								boolean rem = true;
+								for( Iterator<String> i = urnsAlreadyProcessed.iterator(); i.hasNext(); ) {
+									i.next();
+									if(rem) i.remove();
+									rem ^= true;
+								}
+								if(debug) System.err.println(
+									"Chopped already-processed URN set for "+blob.getUrn()+" down to "+
+									urnsAlreadyProcessed.size()+"; that blob must be really big!");
+							}
+							urnsAlreadyProcessed.add(urn);
+							return success;
 						}
 					}, false);
 				} catch( IOException e ) {
