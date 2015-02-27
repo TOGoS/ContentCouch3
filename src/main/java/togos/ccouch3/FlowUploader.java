@@ -442,22 +442,6 @@ public class FlowUploader implements FlowUploaderSettings
 				// directory to push all non-fully-uploaded subfiles/directories to the uploader.
 				Collection<DirectoryEntry> entries = indexDirectoryEntries( file );
 				
-				// Will become true if it has subdirectories *that we want to index*.
-				// If so, we *cannot* rely on the hash cache, and will not store it.
-				/*
-				boolean includesSubDirs = false;
-				for( DirectoryEntry e : entries ) {
-					if( e.fileType == DirectoryEntry.FileType.DIRECTORY ) {
-						includesSubDirs = true;
-					}
-				}
-				*/
-				
-				// On harold (Ubunty, some encfs or something) munging files
-				// does not alter the mtime of the directory containing the files!
-				// Therefore we can never cache directory hashes.
-				boolean canCacheDirectoryHash = false; //!includesSubDirs;
-				
 				ByteArrayOutputStream baos = new ByteArrayOutputStream();
 				dirSer.serialize(entries, baos);
 				baos.close();
@@ -473,9 +457,6 @@ public class FlowUploader implements FlowUploaderSettings
 					file.lastModified()
 				);
 				
-				if( canCacheDirectoryHash && treeUrn != cachedUrn ) {
-					hashCache.cacheFileUrn( file, treeUrn );
-				}
 				if( isFullyUploadedEverywhere(treeUrn) ) {
 					if( debug ) System.err.println("Indexer: "+file+": already uploaded: "+treeUrn); 
 					return new IndexResult( fi, false );
