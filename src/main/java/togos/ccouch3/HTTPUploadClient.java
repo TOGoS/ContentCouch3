@@ -37,6 +37,7 @@ class HTTPUploadClient implements UploadClient
 		urlCon.setRequestMethod("HEAD");
 		urlCon.connect();
 		int status = urlCon.getResponseCode();
+		if( debug ) System.err.println("HEAD "+url+" -> "+status);
 		if( status == 200 ) {
 			return true;
 		} else if( status == 404 ) {
@@ -68,6 +69,7 @@ class HTTPUploadClient implements UploadClient
 				os.close();
 			}
 			int status = urlCon.getResponseCode();
+			if( debug ) System.err.println("PUT "+url+" -> "+status);
 			if( status < 200 || status >= 300 ) {
 				throw new RuntimeException("PUT received unexpected response code "+status+"; "+urlCon.getResponseMessage());
 			}
