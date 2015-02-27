@@ -1236,6 +1236,8 @@ public class FlowUploader implements FlowUploaderSettings
 			config.cacheDir = new File(cacheDir);
 		}
 		
+		// TODO: Allow multiple data directories for reading
+		
 		if( dataDir == null ) {
 			String homeDir = System.getProperty("user.home");
 			if( homeDir == null ) homeDir = ".";
