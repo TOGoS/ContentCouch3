@@ -59,17 +59,19 @@ class HTTPUploadClient implements UploadClient
 			urlCon.setRequestMethod("PUT");
 			urlCon.setDoOutput(true);
 			OutputStream os = urlCon.getOutputStream();
+			int totalSize = 0;
 			try {
 				byte[] buf = new byte[1024*1024];
 				int r;
 				while( (r = is.read(buf)) > 0 ) {
+					totalSize += r;
 					os.write(buf, 0, r);
 				}
 			} finally {
 				os.close();
 			}
 			int status = urlCon.getResponseCode();
-			if( debug ) System.err.println("PUT "+url+" -> "+status);
+			if( debug ) System.err.println("PUT "+url+" ("+totalSize+" bytes) -> "+status);
 			if( status < 200 || status >= 300 ) {
 				throw new RuntimeException("PUT received unexpected response code "+status+"; "+urlCon.getResponseMessage());
 			}
