@@ -1119,7 +1119,7 @@ public class FlowUploader implements FlowUploaderSettings
 			sc.add( a );
 		}
 		if( a == null ) {
-			System.err.println("Warning: no ending '--' found after '-server-command'.");
+			System.err.println("Warning: no ending ';' found after '-server-command'.");
 		}
 		return sc.toArray(new String[sc.size()]);
 	}
