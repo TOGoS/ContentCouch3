@@ -20,6 +20,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import togos.blob.ByteChunk;
 import togos.blob.util.BlobUtil;
+import togos.ccouch3.BlobReferenceScanner.ScanCallback;
 import togos.ccouch3.FlowUploader.Indexer.IndexedObjectSink;
 import togos.ccouch3.FlowUploader.StandardTransferTracker.Counter;
 import togos.ccouch3.hash.BitprintDigest;
@@ -201,10 +202,21 @@ public class FlowUploader implements FlowUploaderSettings
 	static class IndexResult {
 		public final FileInfo fileInfo;
 		public final boolean anyNewData;
+		public final boolean fullyStored;
 		
-		public IndexResult( FileInfo fi, boolean anyNewData ) {
+		public IndexResult( FileInfo fi, boolean anyNewData, boolean fullyStored ) {
 			this.fileInfo = fi;
 			this.anyNewData = anyNewData;
+			this.fullyStored = fullyStored;
+		}
+	}
+	
+	static class DirectoryContentsIndexResult {
+		public final Collection<DirectoryEntry> entries;
+		public final boolean fullyStored;
+		public DirectoryContentsIndexResult( Collection<DirectoryEntry> entries, boolean fullyStored ) {
+			this.entries = entries;
+			this.fullyStored = fullyStored;
 		}
 	}
 	
@@ -316,6 +328,7 @@ public class FlowUploader implements FlowUploaderSettings
 			}
 		}
 		
+		protected final FileResolver localUrnBlobResolver;
 		protected final FileResolver localFileResolver;
 		protected final BlobReferenceScanMode scanMode;
 		protected final DirectorySerializer dirSer;
@@ -326,12 +339,14 @@ public class FlowUploader implements FlowUploaderSettings
 		protected final boolean debug;
 
 		public Indexer(
+			FileResolver localUrnBlobResolver,
 			FileResolver localFileResolver,
 			BlobReferenceScanMode scanMode,
 			DirectorySerializer dirSer, StreamURNifier digestor,
 			HashCache hashCache, IndexedObjectSink[] destinations,
 			int howToHandleFileReadErrors, boolean debug
 		) {
+			this.localUrnBlobResolver = localUrnBlobResolver;
 			this.localFileResolver = localFileResolver;
 			this.scanMode = scanMode;
 			this.dirSer = dirSer;
@@ -342,7 +357,7 @@ public class FlowUploader implements FlowUploaderSettings
 			this.debug = debug;
 		}
 				
-		public Collection<DirectoryEntry> indexDirectoryEntries( File file ) throws Exception {
+		public DirectoryContentsIndexResult indexDirectoryEntries( File file ) throws Exception {
 			assert file.isDirectory();
 			
 			ArrayList<DirectoryEntry> entries = new ArrayList<DirectoryEntry>();
@@ -352,18 +367,24 @@ public class FlowUploader implements FlowUploaderSettings
 				switch( howToHandleFileReadErrors ) {
 				case Actions.SKIP_THE_FILE:
 					System.err.println("Skipping directory because couldn't list files within (.listFiles() returned null): "+file);
-					return entries;
+					// Note that 'fully stored' is true, because the entries
+					// that we found (an empty set) are all fully stored.
+					// 'fullyStored' only refers to the things we actually found.
+					return new DirectoryContentsIndexResult(entries, true);
 				case Actions.THROW_AN_EXCEPTION:
 					throw new Exception("Failed to read files from directory (.listFiles() returned null): "+file);
 				default: throw new Exception("Invalid file read error handling option: "+howToHandleFileReadErrors);
 				}
 			}
+			
+			boolean allEntriesFullyStored = true;
 			for( File c : dirEntries ) {
 				if( FileUtil.shouldIgnore(c) ) continue;
 				
 				IndexResult indexResult;
 				try {
 					indexResult = index(c);
+					allEntriesFullyStored &= indexResult.fullyStored;
 				} catch( FileReadError e ) {
 					switch( howToHandleFileReadErrors ) {
 					case Actions.SKIP_THE_FILE:
@@ -376,7 +397,43 @@ public class FlowUploader implements FlowUploaderSettings
 				entries.add( new DirectoryEntry( c.getName(), indexResult.fileInfo ) );
 			}
 			
-			return entries;
+			return new DirectoryContentsIndexResult(entries, allEntriesFullyStored);
+		}
+		
+		BlobReferenceScanner brs = null;
+		protected BlobReferenceScanner getBlobReferenceScanner() {
+			if( brs == null ) {
+				brs = new BlobReferenceScanner();
+				brs.reportErrors = true; // Yeah always, we don't have a -quiet option
+				brs.reportUnrecursableBlobs = debug;
+			}
+			return brs;
+		}
+		
+		/**
+		 * Returns true if all references found could be resolved
+		 * to blobs and passed on.
+		 */
+		public boolean scanBlobReferences( final BlobInfo blob ) {
+			switch( scanMode ) {
+			case NEVER:
+				return true;
+			case TEXT:
+				try {
+					return getBlobReferenceScanner().scanTextForUrns(blob.getUrn(), blob.openInputStream(), new ScanCallback() {
+						@Override public boolean handle(String urn) {
+							if( debug ) System.err.println("Found "+urn+" referenced by "+blob.getUrn());
+							return indexBlobByUrn(urn);
+						}
+					}, false);
+				} catch( IOException e ) {
+					System.err.println("Failed to recurse into "+blob.getUrn()+": "+e.getMessage());
+					return false;
+				}
+			default:
+				System.err.println(scanMode+" scan mode not supported!");
+				return false;
+			}
 		}
 		
 		protected boolean isFullyUploadedEverywhere(String urn) throws Exception {
@@ -399,16 +456,13 @@ public class FlowUploader implements FlowUploaderSettings
 						file.isDirectory() ? FileInfo.FileType.DIRECTORY : FileInfo.FileType.BLOB,
 						file.length(),
 						file.lastModified()
-					), false
+					), false, true
 				);
 			}
 			
+			boolean fullyUploaded;
 			FileInfo fi;
 			if( file.isFile() ) {
-				if( scanMode != BlobReferenceScanMode.NEVER ) {
-					throw new RuntimeException(scanMode+" scan mode not supported yet!");
-				}
-				
 				String fileUrn;
 				if( cachedUrn != null ) {
 					fileUrn = cachedUrn;
@@ -434,16 +488,30 @@ public class FlowUploader implements FlowUploaderSettings
 				
 				hashCache.cacheFileUrn( file, fileUrn );
 				
+				List<IndexedObjectSink> uploadTo = new ArrayList<IndexedObjectSink>(); 
 				for( IndexedObjectSink d : destinations ) {
-					if( !d.contains(fi.urn) ) d.give(fi);
+					if( !d.contains(fi.urn) ) uploadTo.add(d);
+				}
+				
+				for( IndexedObjectSink d : uploadTo ) {
+					d.give(fi);
+				}
+				
+				fullyUploaded = scanBlobReferences( fi );
+				
+				if( fullyUploaded ) {
+					for( IndexedObjectSink d : uploadTo ) {
+						d.give( new FullyStoredMarker(fileUrn) );
+					}
 				}
 			} else if( file.isDirectory() ) {
 				// Even if we already know the URN, we still need to walk the entire
 				// directory to push all non-fully-uploaded subfiles/directories to the uploader.
-				Collection<DirectoryEntry> entries = indexDirectoryEntries( file );
+				DirectoryContentsIndexResult contentsIndexResult = indexDirectoryEntries( file );
+				fullyUploaded = contentsIndexResult.fullyStored;
 				
 				ByteArrayOutputStream baos = new ByteArrayOutputStream();
-				dirSer.serialize(entries, baos);
+				dirSer.serialize(contentsIndexResult.entries, baos);
 				baos.close();
 				
 				String rdfBlobUrn = digestor.digest(new ByteArrayInputStream(baos.toByteArray()));
@@ -459,7 +527,7 @@ public class FlowUploader implements FlowUploaderSettings
 				
 				if( isFullyUploadedEverywhere(treeUrn) ) {
 					if( debug ) System.err.println("Indexer: "+file+": already uploaded: "+treeUrn); 
-					return new IndexResult( fi, false );
+					return new IndexResult( fi, false, true );
 				}
 				
 				SmallBlobInfo blobInfo = new SmallBlobInfo( rdfBlobUrn, baos.toByteArray() );
@@ -467,7 +535,7 @@ public class FlowUploader implements FlowUploaderSettings
 				for( IndexedObjectSink d : destinations ) {
 					if( !d.contains(fi.urn) ) {
 						d.give( blobInfo );
-						d.give( new FullyStoredMarker(treeUrn) );
+						if( fullyUploaded ) d.give( new FullyStoredMarker(treeUrn) );
 					}
 				}
 			} else if( !file.exists() ) {
@@ -476,7 +544,31 @@ public class FlowUploader implements FlowUploaderSettings
 				throw new RuntimeException("Don't know how to index "+file);
 			}
 			if( debug ) System.err.println("Indexer: "+file+": done: "+fi.urn);
-			return new IndexResult( fi, true );
+			return new IndexResult( fi, true, fullyUploaded );
+		}
+		
+		/**
+		 * Used by callers who already know the URN of the thing,
+		 * and that it's a blob.
+		 * 
+		 * Processes the blob and returns true if all referenced
+		 * (based on scanMode) blobs were successfully scanned
+		 * or already fully stored everywhere.
+		 */
+		protected boolean indexBlobByUrn( String urn ) {
+			// Note: There's no reason this needs to be a file.
+			// Could go all indexBlob(), here.
+			File f = localUrnBlobResolver.getFile(urn);
+			if( f == null ) {
+				System.err.println("Couldn't find "+urn);
+				return false;
+			}
+			try {
+				return index(f).fullyStored;
+			} catch( Exception e ) {
+				System.err.println("Error while processing "+f+": "+e.getMessage());
+				return false;
+			}
 		}
 		
 		protected IndexResult index( String path ) throws Exception {
@@ -634,7 +726,7 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	public void runIdentify() throws Exception {
-		final Indexer indexer = new Indexer( getLocalFileResolver(), BlobReferenceScanMode.NEVER, dirSer, digestor, getHashCache(), new IndexedObjectSink[0], howToHandleFileReadErrors, debug );
+		final Indexer indexer = new Indexer( getLocalRepository(), getLocalFileResolver(), BlobReferenceScanMode.NEVER, dirSer, digestor, getHashCache(), new IndexedObjectSink[0], howToHandleFileReadErrors, debug );
 		for( UploadTask ut : tasks ) {
 			IndexResult indexResult = indexer.index(ut.path);
 			report( indexResult.fileInfo );
@@ -703,12 +795,23 @@ public class FlowUploader implements FlowUploaderSettings
 		final LinkedBlockingQueue<Object> uploadTaskQueue = new LinkedBlockingQueue<Object>(tasks);
 		uploadTaskQueue.add( EndMessage.INSTANCE );
 		
-		final Indexer indexer = new Indexer( getLocalFileResolver(), scanMode, dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors, debug );
-		final QueueRunner indexRunner = new QueueRunner( uploadTaskQueue ) {
+		final Indexer indexer = new Indexer( getLocalRepository(), getLocalFileResolver(), scanMode, dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors, debug );
+		
+		class IndexRunner extends QueueRunner {
+			private boolean success = true;
+			private boolean completed = false;
+			
+			public IndexRunner( LinkedBlockingQueue<Object> q ) {
+				super(q);
+			}
+			
 			public boolean handleMessage( Object m ) throws Exception {
 				if( m instanceof UploadTask ) {
 					UploadTask ut = (UploadTask)m;
 					IndexResult indexResult = indexer.index(ut.path);
+					synchronized(this) {
+						success &= indexResult.fullyStored;
+					}
 					long timestamp = System.currentTimeMillis();
 					report( indexResult.fileInfo );
 					
@@ -756,6 +859,7 @@ public class FlowUploader implements FlowUploaderSettings
 					
 					return true;
 				} else if( m instanceof EndMessage ) {
+					synchronized(this) { completed = true; }
 					return false;
 				} else {
 					throw new RuntimeException("Unrecognised message type "+m.getClass());
@@ -769,7 +873,12 @@ public class FlowUploader implements FlowUploaderSettings
 					d.give( EndMessage.INSTANCE );
 				}
 			}
-		};
+			
+			public synchronized boolean completedSuccessfully() {
+				return completed && success;
+			}
+		}
+		final IndexRunner indexRunner = new IndexRunner(uploadTaskQueue);
 		
 		final Thread indexThread = new Thread( indexRunner, "Indexer" );
 		final Thread progressThread = new Thread() {
@@ -798,6 +907,10 @@ public class FlowUploader implements FlowUploaderSettings
 		try {
 			if( debug ) System.err.println("Waiting for index thread to finish...");
 			indexThread.join();
+			if( !indexRunner.completedSuccessfully() ) {
+				System.err.println("Not everything indexed could be queued for upload.");
+				error = true;
+			}
 			if( debug ) System.err.println("Index thread completed.");
 			
 			if( debug ) System.err.println("Waiting for upload clients to finish...");
@@ -835,6 +948,10 @@ public class FlowUploader implements FlowUploaderSettings
 			for( Map.Entry<String,Counter> thing : tt.counters.entrySet() ) {
 				System.err.println( "Transferred "+thing.getValue().byteCount+" bytes in "+thing.getValue().unitCount+" "+thing.getKey()+"s");
 			}
+		}
+		
+		if( debug ) {
+			System.err.println( error ? "Not entirely successful." : "All was successful!");
 		}
 		
 		return error ? 1 : 0;

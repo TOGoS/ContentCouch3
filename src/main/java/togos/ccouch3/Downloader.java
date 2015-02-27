@@ -14,10 +14,6 @@ import java.net.SocketException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.UnknownHostException;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.Charset;
-import java.nio.charset.CharsetDecoder;
-import java.nio.charset.CodingErrorAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -27,8 +23,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import togos.ccouch3.Downloader.RepositorySet.RemoteRepository;
 import togos.ccouch3.repo.Repository;
@@ -98,10 +92,6 @@ public class Downloader
 		}
 	}
 	
-	interface ScanCallback {
-		public boolean handle(String t);
-	}
-	
 	static class BQ<Item> {
 		private final ArrayList<Item> items = new ArrayList<Item>();
 		private final int capacity;
@@ -129,12 +119,7 @@ public class Downloader
 			return i;
 		}
 	}
-	
-	static final Charset UTF8 = Charset.forName("UTF-8");
-	static final Pattern SHA1_OR_BITPRINT_PATTERN = Pattern.compile(
-		"urn:(sha1:[A-Z0-9]{32}|bitprint:[A-Z0-9]{32}\\.[A-Z0-9]{39})",
-		Pattern.CASE_INSENSITIVE);
-	
+		
 	final ActiveJobSet<String> enqueuedUrns = new ActiveJobSet<String>();
 	
 	private final BQ<String> urnQueue = new BQ<String>(32);
@@ -165,7 +150,6 @@ public class Downloader
 	
 	public BlobReferenceScanMode scanMode;
 	// AS7Q5NVWLNDPLRL3A7RYHPXY3QSMPQVI.3LPFRNN2WLY3WMKEHJ2Y3VYKEYMREOGZARVS4YY
-	public Pattern urnPattern = SHA1_OR_BITPRINT_PATTERN;
 	
 	public Downloader( RepositorySet repoSet, Repository localRepo, AddableSet<String> fullyCachedUrns ) {
 		this.remoteRepoSet = repoSet;
@@ -183,68 +167,49 @@ public class Downloader
 			fullyCachedUrns.contains(urn);
 	}
 	
+	BlobReferenceScanner brs = null;
+	protected BlobReferenceScanner getBlobReferenceScanner() {
+		if( brs == null ) {
+			brs = new BlobReferenceScanner();
+			brs.reportUnrecursableBlobs = reportUnrecursableBlobs;
+			brs.reportErrors = reportErrors;
+		}
+		return brs;
+	}
+	
 	/**
 	 * Scan the blob identified by 'urn' for URNs, calling forEach for each one found.
 	 * It will return true only if the blob identified by 'urn' is successfully found
 	 * and scanned and forEach returns true for all embedded URNs.
 	 * If shortCircuit is true, this will return as soon as forEach returns false.
 	 */
-	protected boolean scanForUrns( String urn, ScanCallback forEach, boolean shortCircuit ) {
-		boolean success = true;
-		InputStream is = null;
+	protected boolean scanForUrns( String urn, BlobReferenceScanner.ScanCallback forEach, boolean shortCircuit ) {
+		InputStream is;
+		
 		try {
 			is = localRepo.getInputStream(urn);
-			if( is == null ) {
-				if( reportUnrecursableBlobs ) {
-					System.err.println("Blob not found in local repo; can't scan: "+urn);
-				}
-				return false;
-			}
-			
-			CharsetDecoder utf8decoder = UTF8.newDecoder();
-			// Have it throw CharacterCodingException on non-UTF-8 input!
-			utf8decoder.onMalformedInput(CodingErrorAction.REPORT);
-			
-			BufferedReader br = new BufferedReader(new InputStreamReader(is, utf8decoder));
-			String line;
-			Matcher matcher = urnPattern.matcher("");
-			while( (line = br.readLine()) != null ) {
-				matcher.reset(line);
-				while( matcher.find() ) {
-					if( !forEach.handle(matcher.group()) ) {
-						success = false;
-						if( shortCircuit ) return false;
-					}
-				}
-			}
-		} catch( CharacterCodingException e ) {
-			// This is normal and counts as success!
-			if( reportUnrecursableBlobs ) {
-				System.err.println("Not valid UTF-8; can't scan: "+urn);
-			}
 		} catch( IOException e ) {
-			// This is not, and doesn't.
-			success = false;
 			if( reportErrors ) {
 				System.err.println("Error while scanning for URNs in "+urn+" due to an "+e.getClass().getName());
 				e.printStackTrace();
 			}
-		} finally {
-			if( is != null ) try {
-				is.close();
-			} catch( IOException e ) {
-				if( reportErrors ) {
-					System.err.println("Failed to close InputStream of "+urn+" after scanning for URNs");
-				}
-			}
+			return false;
 		}
-		return success;
+		
+		if( is == null ) {
+			if( reportUnrecursableBlobs ) {
+				System.err.println("Blob not found in local repo; can't scan: "+urn);
+			}
+			return false;
+		}
+		
+		return getBlobReferenceScanner().scanTextForUrns(urn, is, forEach, shortCircuit);
 	}
 	
 	protected void cacheRecurse( String urn ) {
 		if( scanMode == BlobReferenceScanMode.NEVER ) return;
 		
-		boolean fullyCached = scanForUrns(urn, new ScanCallback() {
+		boolean fullyCached = scanForUrns(urn, new BlobReferenceScanner.ScanCallback() {
 			@Override public boolean handle(String urn) {
 				if( isObviouslyFullyCached(urn) ) return true;
 				
@@ -276,7 +241,7 @@ public class Downloader
 		if( isObviouslyFullyCached(urn) ) return true;
 		
 		if( localRepo.contains(urn) ) {
-			boolean fullyCached = scanForUrns(urn, new ScanCallback() {
+			boolean fullyCached = scanForUrns(urn, new BlobReferenceScanner.ScanCallback() {
 				@Override public boolean handle(String v) {
 					return isFullyCached(v);
 				}

@@ -9,5 +9,5 @@ package togos.ccouch3;
  */
 enum BlobReferenceScanMode {
 	NEVER, // Never scan blobs
-	TEXT   // Scan text blobs for 'urn:....'
+	TEXT   // Scan UTF-8 text blobs for 'urn:....'
 }
