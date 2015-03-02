@@ -36,10 +36,10 @@ class CommandUploadClient implements UploadClient
 					w.writeCmd( new String[]{ "head", fi.path, fi.urn } );
 				} else if( m instanceof SmallBlobInfo ) {
 					SmallBlobInfo bi = (SmallBlobInfo)m;
-					w.writeCmd( new String[]{ "put", bi.urn, bi.urn, "chunk", String.valueOf(bi.length) } );
-					w.writeChunk( bi.blob, bi.offset, bi.length );
+					w.writeCmd( new String[]{ "put", bi.urn, bi.urn, "chunk", String.valueOf(bi.getSize()) } );
+					w.writeChunk( bi );
 					w.endChunks();
-					tt.transferred( bi.blob.length, 1, TransferTracker.TAG_TREENODE );
+					tt.transferred( bi.getSize(), 1, TransferTracker.TAG_TREENODE );
 				} else if( m instanceof FullyStoredMarker ) {
 					FullyStoredMarker fsm = (FullyStoredMarker)m;
 					w.writeCmd( new String[]{ "echo", "fully-stored", fsm.urn} );

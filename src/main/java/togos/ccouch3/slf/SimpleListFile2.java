@@ -10,7 +10,9 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 
 import togos.blob.ByteChunk;
-import togos.blob.SimpleByteChunk;
+import togos.blob.util.BlobUtil;
+import togos.blob.util.SimpleByteChunk;
+import static togos.blob.util.BlobUtil.toInt;
 
 /**
  * Yet another key-value store, designed for speed and simplicity.
@@ -150,6 +152,9 @@ public class SimpleListFile2 implements Flushable, Closeable, SimpleMap<ByteChun
 	}
 	
 	protected static final long chunkRef( long offset, int size ) {
+		if( (size & 0xFFFF) != size ) throw new RuntimeException("Size argument "+size+" too large (doesn't fit in 16 bits)");
+		if( (offset & 0xFFFFFFFFFFl) != offset ) throw new RuntimeException("Offset argument "+offset+" too large (doesn't fit in 48 bits)");
+		
 		return
 			((offset & 0xFFFFFFFFFFl) << 16) |
 			((size & 0xFFFF) << 0);
@@ -261,7 +266,7 @@ public class SimpleListFile2 implements Flushable, Closeable, SimpleMap<ByteChun
 			System.err.println("Tried to read value from malformed pair chunk at "+chunkOffset);
 			return null;
 		}
-		return new SimpleByteChunk( buf, o + 16 + cKeyLen, cValLen );
+		return SimpleByteChunk.get( buf, o + 16 + cKeyLen, cValLen );
 	}
 	
 	protected static final long next( ByteChunk chunk ) {
@@ -285,15 +290,15 @@ public class SimpleListFile2 implements Flushable, Closeable, SimpleMap<ByteChun
 	}
 	
 	protected static final int encodedPairSize( ByteChunk key, ByteChunk value ) {
-		return 16+key.getSize()+value.getSize();
+		return BlobUtil.toInt(16+key.getSize()+value.getSize());
 	}
 	
 	protected static final void encodePairData( ByteChunk key, ByteChunk value, byte[] buffer, int offset ) {
 		copy( pair, buffer, offset+8 );
 		encodeShort( (short)key.getSize(), buffer, offset+12 );
 		encodeShort( (short)value.getSize(), buffer, offset+14 );
-		copy( key.getBuffer(), key.getOffset(), buffer, offset+16, key.getSize() );
-		copy( value.getBuffer(), key.getOffset(), buffer, offset+16+key.getSize(), value.getSize() );
+		copy( key.getBuffer(), key.getOffset(), buffer, offset+16, toInt(key.getSize()) );
+		copy( value.getBuffer(), key.getOffset(), buffer, toInt(offset+16+key.getSize()), toInt(value.getSize()) );
 	}
 	
 	protected static final void encodePair( long next, ByteChunk key, ByteChunk value, byte[] buffer, int offset ) {
@@ -302,7 +307,7 @@ public class SimpleListFile2 implements Flushable, Closeable, SimpleMap<ByteChun
 	}
 	
 	protected static final ByteChunk encodePair( long next, ByteChunk key, ByteChunk value ) {
-		byte[] buffer = new byte[16+key.getSize()+value.getSize()];
+		byte[] buffer = new byte[encodedPairSize(key,value)];
 		encodePair( next, key, value, buffer, 0 );
 		return new SimpleByteChunk( buffer );
 	}
@@ -318,7 +323,7 @@ public class SimpleListFile2 implements Flushable, Closeable, SimpleMap<ByteChun
 		// to avoid crossing 4kB boundaries for possible slight performance
 		// improvement on certain filesystems?
 		blob.put( newListOffset, pair );
-		putLong( indexPos, chunkRef(newListOffset, pair.getSize()) );
+		putLong( indexPos, chunkRef(newListOffset, toInt(pair.getSize())) );
 	}
 	
 	//// The public interface ////

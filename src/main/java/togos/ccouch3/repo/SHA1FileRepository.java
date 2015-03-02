@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 import org.bitpedia.util.Base32;
 
 import togos.blob.ByteChunk;
-import togos.blob.SimpleByteChunk;
+import togos.blob.util.SimpleByteChunk;
 import togos.ccouch3.util.FileUtil;
 
 public class SHA1FileRepository implements Repository

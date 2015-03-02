@@ -1,39 +1,29 @@
 package togos.ccouch3;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-
 import togos.blob.ByteChunk;
+import togos.blob.util.BlobUtil;
+import togos.blob.util.SimpleByteChunk;
 
 /** These get sent through for small blobs, like encoded tree nodes. */
-class SmallBlobInfo implements BlobInfo {
+class SmallBlobInfo extends SimpleByteChunk implements BlobInfo
+{
 	public final String urn;
-	public final byte[] blob;
-	public final int offset, length;
 	
 	public SmallBlobInfo( String urn, byte[] blob, int offset, int length ) {
+		super(blob, offset, length);
+		this.urn = urn;
 		assert offset >= 0;
 		assert offset <= blob.length;
 		assert offset + length <= blob.length;
-		this.urn = urn;
-		this.blob = blob;
-		this.offset = offset;
-		this.length = length;
 	}
 	
 	public SmallBlobInfo( String urn, ByteChunk c ) {
-		this( urn, c.getBuffer(), c.getOffset(), c.getSize() );
+		this( urn, c.getBuffer(), c.getOffset(), BlobUtil.chunkLength(c) );
 	}
 	
 	public SmallBlobInfo( String urn, byte[] blob ) {
 		this( urn, blob, 0, blob.length );
 	}
 	
-	@Override public long getSize() { return length; }
 	@Override public String getUrn() { return urn; }
-
-	@Override public InputStream openInputStream() throws IOException {
-		return new ByteArrayInputStream(blob, offset, length);
-	}
 }

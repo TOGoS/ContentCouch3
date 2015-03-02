@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 import togos.blob.ByteChunk;
+import togos.blob.util.BlobUtil;
 
 public class CmdWriter implements Flushable, Closeable
 {
@@ -53,7 +54,7 @@ public class CmdWriter implements Flushable, Closeable
 	}
 	
 	public void writeChunk( ByteChunk bc ) throws IOException {
-		writeChunk( bc.getBuffer(), bc.getOffset(), bc.getSize() );
+		writeChunk( bc.getBuffer(), bc.getOffset(), BlobUtil.toInt(bc.getSize()) );
 	}
 	
 	public void endChunks() throws IOException {

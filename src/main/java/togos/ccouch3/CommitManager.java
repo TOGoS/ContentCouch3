@@ -10,8 +10,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import togos.blob.ByteChunk;
-import togos.blob.SimpleByteChunk;
 import togos.blob.util.BlobUtil;
+import togos.blob.util.SimpleByteChunk;
 import togos.ccouch3.FlowUploader.CommitConfig;
 import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;

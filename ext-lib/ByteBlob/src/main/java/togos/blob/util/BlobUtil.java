@@ -3,11 +3,18 @@ package togos.blob.util;
 import java.io.UnsupportedEncodingException;
 
 import togos.blob.ByteChunk;
-import togos.blob.SimpleByteChunk;
 
 public class BlobUtil
 {
 	public static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+	
+	public static final ByteChunk byteChunk( byte[] bytes ) {
+		return (bytes.length == 0) ? SimpleByteChunk.EMPTY : new SimpleByteChunk( bytes );
+	}
+	
+	public static final ByteChunk byteChunk( String str ) {
+		return byteChunk(bytes(str));
+	}
 	
 	public static final byte[] bytes( String str ) {
 		try {
@@ -17,8 +24,13 @@ public class BlobUtil
 		}
 	}
 	
-	public static final ByteChunk byteChunk( String str ) {
-		return new SimpleByteChunk( bytes(str) );
+	public static int toInt(long l) {
+		if( l > Integer.MAX_VALUE || l < Integer.MIN_VALUE ) throw new NumberFormatException("Cannot convert long to int because it is TOO BIG: "+l);
+		return (int)l;
+	}
+	
+	public static int chunkLength(ByteChunk b) {
+		return toInt(b.getSize());
 	}
 	
 	public static final String string( byte[] arr, int offset, int len ) {
@@ -29,8 +41,8 @@ public class BlobUtil
 		}
 	}
 	
-	public static final String string( ByteChunk bc ) {
-		return string( bc.getBuffer(), bc.getOffset(), bc.getSize() );
+	public static final String string( ByteChunk chunk ) {
+		return string( chunk.getBuffer(), chunk.getOffset(), toInt(chunk.getSize()) );
 	}
 
 	/**
@@ -49,21 +61,20 @@ public class BlobUtil
 		return hashCode;
 	}
 	
-	public static final boolean equals( ByteChunk c1, ByteChunk c2 ) {
-		if( c1.getSize() != c2.getSize() ) return false;
-		
-		int o1 = c1.getOffset(), o2 = c2.getOffset();
-		byte[] b1 = c1.getBuffer(), b2 = c2.getBuffer();
-		for( int j=c1.getSize()-1; j>=0; --j ) {
-			if( b1[j+o1] != b2[j+o2] ) return false;
+	public static final boolean equals( byte[] b1, int o1, byte[] b2, int o2, int len ) {
+		for( int i=0; i<len; ++i ) {
+			if( b1[o1++] != b2[o2++] ) return false;
 		}
 		return true;
 	}
 	
+	public static final boolean equals( ByteChunk c1, ByteChunk c2 ) {
+		if( c1.getSize() != c2.getSize() ) return false;
+		return equals( c1.getBuffer(), c1.getOffset(), c2.getBuffer(), c2.getOffset(), toInt(c1.getSize()) );
+	}
+	
 	public static final boolean equals( byte[] b1, byte[] b2 ) {
-		if( b1.length != b2.length ) {
-			return false;
-		}
+		if( b1.length != b2.length ) return false;
 		for( int i=0; i<b1.length; ++i ) {
 			if( b1[i] != b2[i] ) return false;
 		}
@@ -94,23 +105,4 @@ public class BlobUtil
 		}
 		return c1.equals(c2);
 	}
-	
-	/**
-	 * Don't compare blobs this way.
-	 * TODO: Implement more efficiently
-	 */
-	/*
-	public static boolean equals( ByteBlob b1, ByteBlob b2 ) {
-		if( b1.getSize() != -1 && b2.getSize() != -1 && b1.getSize() != b2.getSize() ) return false;
-		
-		int r1;
-		ByteBlobInputStream s1 = new ByteBlobInputStream(b1.chunkIterator());
-		ByteBlobInputStream s2 = new ByteBlobInputStream(b2.chunkIterator());
-		do {
-			r1 = s1.read();
-			if( s2.read() != r1 ) return false;
-		} while( r1 != -1 );
-		return true;
-	}
-	*/
 }
