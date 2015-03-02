@@ -461,7 +461,7 @@ public class FlowUploader implements FlowUploaderSettings
 					new FileInfo(
 						file.getCanonicalPath(),
 						cachedUrn,
-						file.isDirectory() ? FileInfo.FileType.DIRECTORY : FileInfo.FileType.BLOB,
+						file.isDirectory() ? FSObjectType.DIRECTORY : FSObjectType.BLOB,
 						file.length(),
 						file.lastModified()
 					), false, true
@@ -489,7 +489,7 @@ public class FlowUploader implements FlowUploaderSettings
 				fi = new FileInfo(
 					file.getCanonicalPath(),
 					fileUrn,
-					FileInfo.FileType.BLOB,
+					FSObjectType.BLOB,
 					file.length(),
 					file.lastModified()
 				);
@@ -528,7 +528,7 @@ public class FlowUploader implements FlowUploaderSettings
 				fi = new FileInfo(
 					file.getCanonicalPath(),
 					treeUrn,
-					FileInfo.FileType.DIRECTORY,
+					FSObjectType.DIRECTORY,
 					file.length(),
 					file.lastModified()
 				);

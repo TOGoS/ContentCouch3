@@ -6,23 +6,13 @@ import java.io.InputStream;
 
 public class FileInfo implements BlobInfo
 {
-	public enum FileType {
-		BLOB("Blob"),
-		DIRECTORY("Directory");
-
-		public final String niceName;
-		FileType( String niceName ) {
-			this.niceName = niceName;
-		}
-	};
-	
 	public final String path;
 	public final String urn;
-	public final FileType fileType;
+	public final FSObjectType fileType;
 	public final long size;
 	public final long mtime;
 	
-	public FileInfo( String path, String urn, FileType fileType, long size, long mtime ) {
+	public FileInfo( String path, String urn, FSObjectType fileType, long size, long mtime ) {
 		this.path     = path;
 		this.urn      = urn;
 		this.fileType = fileType;

@@ -11,7 +11,6 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
-import togos.ccouch3.FileInfo.FileType;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;
@@ -209,7 +208,7 @@ public class UpBacker
 				throw new RuntimeException(e);
 			}
 			
-			return new StoreResult(errorCount, totalCount, storedCount, new FileInfo(f.getPath(), dirUrn, FileType.DIRECTORY, f.length(), f.lastModified()));
+			return new StoreResult(errorCount, totalCount, storedCount, new FileInfo(f.getPath(), dirUrn, FSObjectType.DIRECTORY, f.length(), f.lastModified()));
 		}
 		
 		String fileUrn = null;
@@ -246,7 +245,7 @@ public class UpBacker
 			}
 		}
 		
-		return new StoreResult(0, 1, storedCount, new FileInfo(f.getPath(), fileUrn, FileType.BLOB, size, mtime));
+		return new StoreResult(0, 1, storedCount, new FileInfo(f.getPath(), fileUrn, FSObjectType.BLOB, size, mtime));
 	}
 	
 	public int store( List<File> thingsToStore ) {
