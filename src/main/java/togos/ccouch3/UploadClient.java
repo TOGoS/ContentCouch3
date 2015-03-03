@@ -19,4 +19,5 @@ import togos.service.Service;
  */
 public interface UploadClient extends Service, Sink<Object> {
 	public String getServerName();
+	public boolean completedSuccessfully();
 }

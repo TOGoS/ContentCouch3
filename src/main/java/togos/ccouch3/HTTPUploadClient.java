@@ -26,6 +26,9 @@ class HTTPUploadClient implements UploadClient
 	protected final ArrayBlockingQueue<Object> putTasks = new ArrayBlockingQueue<Object>(1024);
 	
 	public boolean debug = false;
+	protected boolean headCompleted = false;
+	protected boolean putCompleted = false;
+	protected boolean anyFailures = false;
 	
 	public HTTPUploadClient(
 		String serverName, String serverUrl, AddableSet<String> uc, TransferTracker tt
@@ -124,6 +127,7 @@ class HTTPUploadClient implements UploadClient
 				// Ignored
 				return false;
 			} else if( m instanceof EndMessage ) {
+				headCompleted = true;
 				keepGoing = false;
 				// Caller will send an EndMessage onward
 				// as part of its shutdown sequence.
@@ -173,6 +177,7 @@ class HTTPUploadClient implements UploadClient
 				// Ignored
 			} else if( m instanceof EndMessage ) {
 				keepGoing = false;
+				putCompleted = true;
 			} else {
 				throw new RuntimeException("Unrecognized message: "+m.getClass());
 			}
@@ -200,6 +205,10 @@ class HTTPUploadClient implements UploadClient
 	
 	@Override public String toString() {
 		return getClass().getSimpleName()+" "+serverName+" ("+serverUrl+")";
+	}
+	
+	@Override public boolean completedSuccessfully() {
+		return headCompleted && putCompleted && !anyFailures;
 	}
 	
 	@Override public void start() {

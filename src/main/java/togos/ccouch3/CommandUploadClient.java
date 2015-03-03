@@ -312,4 +312,8 @@ class CommandUploadClient implements UploadClient
 		headErrorPiper.join();
 		uploadErrorPiper.join();
 	}
+	
+	@Override public boolean completedSuccessfully() {
+		return headProcExitCode == 0 && uploadProcExitCode == 0;
+	}
 }

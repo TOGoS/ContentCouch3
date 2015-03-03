@@ -948,33 +948,38 @@ public class FlowUploader implements FlowUploaderSettings
 		indexThread.start();
 		if( showProgress ) progressThread.start();
 		
-		boolean error = false;
+		boolean completeSuccess = true;
 		try {
-			if( debug ) System.err.println("Waiting for index thread to finish...");
-			indexThread.join();
-			if( !indexRunner.completedSuccessfully() ) {
-				System.err.println("Not everything indexed could be queued for upload.");
-				error = true;
-			}
-			if( debug ) System.err.println("Index thread completed.");
-			
 			if( debug ) System.err.println("Waiting for upload clients to finish...");
 			for( UploadClient uc : uploadClients ) uc.join();
 			if( debug ) System.err.println("Upload clients all completed.");
 			
+			if( debug ) System.err.println("Waiting for index thread to finish...");
+			indexThread.join();
+			if( debug ) System.err.println("Index thread completed.");
+			
 			progressThread.interrupt();
 			
+			if( !indexRunner.completedSuccessfully() ) {
+				System.err.println("Not everything indexed could be queued for upload.");
+				completeSuccess = false;
+			}
+			
 			for( UploadClient uc : uploadClients ) {
+				if( !uc.completedSuccessfully() ) {
+					completeSuccess = false;
+				}
 				if( uc instanceof CommandUploadClient ) {
+					// Get more specific
 					CommandUploadClient cuc = (CommandUploadClient)uc; 
 					if( cuc.anythingSent ) {
 						if( cuc.headProcExitCode != 0 ) {
 							System.err.println("Error: "+uc.getServerName()+" head process exited with code "+cuc.headProcExitCode);
-							error = true;
+							completeSuccess = false;
 						}
 						if( cuc.uploadProcExitCode != 0 ) {
 							System.err.println("Error: "+uc.getServerName()+" upload process exited with code "+cuc.uploadProcExitCode);
-							error = true;
+							completeSuccess = false;
 						}
 					}
 				}
@@ -996,10 +1001,10 @@ public class FlowUploader implements FlowUploaderSettings
 		}
 		
 		if( debug ) {
-			System.err.println( error ? "Not entirely successful." : "All was successful!");
+			System.err.println(completeSuccess ? "All was successful!" : "Not entirely successful.");
 		}
 		
-		return error ? 1 : 0;
+		return completeSuccess ? 0 : 1;
 	}
 	
 	static String stripTrailingSlash( String path ) {
