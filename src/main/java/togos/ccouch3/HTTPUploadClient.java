@@ -19,6 +19,19 @@ import togos.ccouch3.util.StreamUtil;
 
 class HTTPUploadClient implements UploadClient
 {
+	static abstract class WorkerThread extends Thread {
+		protected boolean completed = false;
+		protected boolean anyFailures = false;
+		
+		public WorkerThread( String name ) {
+			super(name);
+		}
+		
+		public boolean completedSuccessfully() {
+			return completed && !anyFailures;
+		}
+	}
+	
 	protected final String serverName;
 	protected final String serverUrl;
 	protected final AddableSet<String> fullyCachedUrnSet;
@@ -28,11 +41,10 @@ class HTTPUploadClient implements UploadClient
 	protected final ArrayBlockingQueue<Object> putTasks = new ArrayBlockingQueue<Object>(1024);
 	
 	public boolean debug = false;
-	protected boolean headCompleted = false;
-	protected boolean putCompleted = false;
-	protected boolean anyFailures = false;
+	protected final WorkerThread headThread, putThread;
 	
-	protected final Thread headThread, putThread;
+	boolean indiceRandomHeadErrors = true;
+	boolean induceRandomPutErrors = true;
 	
 	public HTTPUploadClient(
 		String serverName, String serverUrl, AddableSet<String> uc, TransferTracker tt
@@ -53,6 +65,8 @@ class HTTPUploadClient implements UploadClient
 	}
 	
 	protected boolean existsOnServer( String urn ) throws IOException {
+		if( indiceRandomHeadErrors ) throw new ServerError("Not a real error ha ha h", 599, null);
+		
 		URL url = urlFor(urn);
 		HttpURLConnection urlCon = (HttpURLConnection)url.openConnection();
 		urlCon.setRequestMethod("HEAD");
@@ -91,10 +105,14 @@ class HTTPUploadClient implements UploadClient
 			return super.getMessage();
 		}
 	}
-	
+		
 	protected void _upload( BlobInfo bi, String tag ) throws ServerError, IOException {
 		if( bi instanceof FileInfo ) {
 			transferTracker.sendingFile( ((FileInfo)bi).path );
+		}
+		
+		if( induceRandomPutErrors && Math.random() <= 1.0 ) {
+			throw new ServerError("Not a real server error; yuk yuk.", 599, null);
 		}
 		
 		InputStream is = bi.openInputStream();
@@ -133,8 +151,10 @@ class HTTPUploadClient implements UploadClient
 		transferTracker.transferred(bi.getSize(), 1, tag);
 	}
 	
+	int maxUploadAttempts = 1;
+	
 	protected void upload( BlobInfo bi, String tag ) throws IOException {
-		int attemptsLeft = 3;
+		int attemptsLeft = maxUploadAttempts;
 		int waitBetweenAttempts = 1000;
 		while( true ) {
 			try {
@@ -186,7 +206,7 @@ class HTTPUploadClient implements UploadClient
 		}
 	}
 	
-	class HeadThread extends Thread {
+	class HeadThread extends WorkerThread {
 		public HeadThread( String name ) { super(name); }
 		
 		protected boolean endReceived = false;
@@ -215,7 +235,7 @@ class HTTPUploadClient implements UploadClient
 				// Ignored
 				return false;
 			} else if( m instanceof EndMessage ) {
-				headCompleted = true;
+				completed = true;
 				endReceived = true;
 				keepGoing = false;
 				// Caller will send an EndMessage onward
@@ -243,7 +263,6 @@ class HTTPUploadClient implements UploadClient
 				System.err.println(getName()+" exiting due to error");
 				e.printStackTrace(System.err);
 			} finally {
-				headCompleted = true;
 				try {
 					putTasks.put(EndMessage.INSTANCE);
 				} catch( InterruptedException e ) {
@@ -254,7 +273,7 @@ class HTTPUploadClient implements UploadClient
 		}
 	};
 	
-	class PutThread extends Thread {
+	class PutThread extends WorkerThread {
 		public PutThread( String name ) { super(name); }
 		
 		boolean endReceived = false;
@@ -272,9 +291,9 @@ class HTTPUploadClient implements UploadClient
 			} else if( m instanceof PutHead ) {
 				// Ignored
 			} else if( m instanceof EndMessage ) {
+				completed = true;
 				endReceived = true;
 				keepGoing = false;
-				putCompleted = true;
 			} else {
 				throw new RuntimeException("Unrecognized message: "+m.getClass());
 			}
@@ -296,8 +315,6 @@ class HTTPUploadClient implements UploadClient
 				System.err.println(getName()+" exiting due to error");
 				e.printStackTrace(System.err);
 				anyFailures = true;
-			} finally {
-				putCompleted = true;
 			}
 			if( !endReceived && !interrupted() ) QueueDrainer.drain(putTasks);
 		};
@@ -312,7 +329,11 @@ class HTTPUploadClient implements UploadClient
 	}
 	
 	@Override public boolean completedSuccessfully() {
-		return headCompleted && putCompleted && !anyFailures;
+		WorkerThread[] threads = {headThread, putThread};
+		for( WorkerThread t : threads ) {
+			if( !t.completedSuccessfully() ) return false;
+		}
+		return true;
 	}
 	
 	@Override public void start() {
