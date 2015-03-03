@@ -18,6 +18,10 @@ public class SLFStringSet implements AddableSet<String>
 		this.slfFile = slfFile;
 	}
 	
+	@Override public String toString() {
+		return slfFile.getName();
+	}
+	
 	protected synchronized SimpleListFile2 getSlf() {
 		if( slfFile2 == null ) {
 			slfFile2 = SimpleListFile2.mkSlf(slfFile);

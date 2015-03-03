@@ -217,6 +217,10 @@ class CommandUploadClient implements UploadClient
 	
 	@Override public String getServerName() { return serverName; }
 	
+	@Override public String toString() {
+		return getClass().getSimpleName()+" "+serverName+" ("+serverCommand[0]+" ...)";
+	}
+	
 	public void give( Object m ) throws Exception {
 		if( !anythingSent && m instanceof EndMessage && dieWhenNothingToSend ) {
 			// Then we can quit without waiting for the server to

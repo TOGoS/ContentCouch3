@@ -198,6 +198,10 @@ class HTTPUploadClient implements UploadClient
 		headTasks.put(value);
 	}
 	
+	@Override public String toString() {
+		return getClass().getSimpleName()+" "+serverName+" ("+serverUrl+")";
+	}
+	
 	@Override public void start() {
 		headThread.start();
 		putThread.start();
