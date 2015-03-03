@@ -1188,7 +1188,7 @@ public class FlowUploader implements FlowUploaderSettings
 			} else if( "-server-name".equals(a) ) {
 				serverName = args.next();
 			} else if( a.startsWith("-http-server:") ) {
-				final String sn = a.substring(16);
+				final String sn = a.substring(13);
 				config.uploadClientSpecs.add( new HTTPUploadClientSpec(sn, RepoURLDefuzzer.defuzzRemoteRepoPrefix(args.next())) );
 			} else if( a.startsWith("-command-server:") ) {
 				final String sn = a.substring(16);
