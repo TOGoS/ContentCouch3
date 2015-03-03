@@ -729,13 +729,7 @@ public class FlowUploader implements FlowUploaderSettings
 				@Override
 				public File getFile(String name) {
 					if( name.startsWith("urn:") ) {
-						File g = localRepo.getFile(name);
-						// TODO: Maybe want to iven if it is null.
-						// Do we really want urn:... to resolve if
-						// a file by the same name happens to be in the current directory?
-						// that could cause a lot of confusion if it wasn't actually
-						// the file named by the URN!
-						if( g != null ) return g;
+						return localRepo.getFile(name);
 					}
 					return new File(name);
 				}
