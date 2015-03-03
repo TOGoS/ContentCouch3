@@ -202,8 +202,11 @@ class CommandUploadClient implements UploadClient
 	Thread uploadResponseReaderThread;
 	Piper uploadErrorPiper;
 	
-	public int headProcExitCode = 0;
-	public int uploadProcExitCode = 0;
+	/** The exit code that gets reported for processes that we didn't actually see finish */
+	public static final int INCOMPLETE_EXIT_CODE = -1336;
+	
+	public int headProcExitCode   = INCOMPLETE_EXIT_CODE;
+	public int uploadProcExitCode = INCOMPLETE_EXIT_CODE;
 	
 	public CommandUploadClient( String serverName, String[] serverCommand, AddableSet<String> uc, TransferTracker tt ) {
 		this.serverName = serverName;
