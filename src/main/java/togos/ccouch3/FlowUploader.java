@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -334,7 +335,6 @@ public class FlowUploader implements FlowUploaderSettings
 		protected final DirectorySerializer dirSer;
 		protected final StreamURNifier digestor;
 		protected final HashCache hashCache;
-		protected final IndexedObjectSink[] destinations;
 		protected final int howToHandleFileReadErrors;
 		protected final boolean debug;
 
@@ -343,7 +343,7 @@ public class FlowUploader implements FlowUploaderSettings
 			FileResolver localFileResolver,
 			BlobReferenceScanMode scanMode,
 			DirectorySerializer dirSer, StreamURNifier digestor,
-			HashCache hashCache, IndexedObjectSink[] destinations,
+			HashCache hashCache,
 			int howToHandleFileReadErrors, boolean debug
 		) {
 			this.localUrnBlobResolver = localUrnBlobResolver;
@@ -351,13 +351,12 @@ public class FlowUploader implements FlowUploaderSettings
 			this.scanMode = scanMode;
 			this.dirSer = dirSer;
 			this.digestor = digestor;
-			this.destinations = destinations;
 			this.hashCache = hashCache;
 			this.howToHandleFileReadErrors = howToHandleFileReadErrors;
 			this.debug = debug;
 		}
 				
-		public DirectoryContentsIndexResult indexDirectoryEntries( File file ) throws Exception {
+		public DirectoryContentsIndexResult indexDirectoryEntries( File file, Collection<IndexedObjectSink> destinations) throws Exception {
 			assert file.isDirectory();
 			
 			ArrayList<DirectoryEntry> entries = new ArrayList<DirectoryEntry>();
@@ -383,7 +382,7 @@ public class FlowUploader implements FlowUploaderSettings
 				
 				IndexResult indexResult;
 				try {
-					indexResult = index(c);
+					indexResult = index(c, destinations);
 					allEntriesFullyStored &= indexResult.fullyStored;
 				} catch( FileReadError e ) {
 					switch( howToHandleFileReadErrors ) {
@@ -414,7 +413,7 @@ public class FlowUploader implements FlowUploaderSettings
 		 * Returns true if all references found could be resolved
 		 * to blobs and passed on.
 		 */
-		public boolean scanBlobReferences( final BlobInfo blob ) {
+		public boolean scanBlobReferences( final BlobInfo blob, final Collection<IndexedObjectSink> destinations ) {
 			switch( scanMode ) {
 			case NEVER:
 				return true;
@@ -423,7 +422,7 @@ public class FlowUploader implements FlowUploaderSettings
 					return getBlobReferenceScanner().scanTextForUrns(blob.getUrn(), blob.openInputStream(), new ScanCallback() {
 						@Override public boolean handle(String urn) {
 							if( debug ) System.err.println("Found "+urn+" referenced by "+blob.getUrn());
-							return indexBlobByUrn(urn);
+							return indexBlobByUrn(urn, destinations);
 						}
 					}, false);
 				} catch( IOException e ) {
@@ -436,11 +435,28 @@ public class FlowUploader implements FlowUploaderSettings
 			}
 		}
 		
-		protected boolean isFullyUploadedEverywhere(String urn) throws Exception {
+		protected Collection<IndexedObjectSink> getNeedySinks(String urn, Collection<IndexedObjectSink> destinations) throws Exception {
+			Collection<IndexedObjectSink> needy = Collections.emptyList();
+			
 			for( IndexedObjectSink d : destinations ) {
-				if( !d.contains(urn) ) return false;
+				if( !d.contains(urn) ) {
+					if( needy.size() == 0 ) needy = new ArrayList<IndexedObjectSink>();
+					needy.add(d);
+				}
 			}
-			return true;
+			
+			return needy;
+		}
+		
+		protected byte[] serializeDirectory( Collection<DirectoryEntry> entries ) {
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			try {
+				dirSer.serialize(entries, baos);
+				baos.close();
+			} catch( IOException e ) {
+				throw new RuntimeException(e);
+			}
+			return baos.toByteArray();
 		}
 		
 		// TODO: Probably want to refactor
@@ -451,11 +467,18 @@ public class FlowUploader implements FlowUploaderSettings
 		// once the file is found, the original URN gets ignored and
 		// the URN has to be re-calculated!
 		
-		protected IndexResult index( File file ) throws Exception {
+		protected IndexResult index( File file, Collection<IndexedObjectSink> destinations ) throws Exception {
 			if( debug ) System.err.println("Indexer: "+file+"...");
 			String cachedUrn = hashCache.getFileUrn( file );
-			if( cachedUrn != null && isFullyUploadedEverywhere(cachedUrn) ) {
-				if( debug ) System.err.println("Indexer: "+file+": already hashed+uploaded: "+cachedUrn);
+			if( debug ) {
+				if( cachedUrn == null ) {
+					System.err.println("Indexer: Hash cache has no entry for "+file);
+				} else {
+					System.err.println("Indexer: Hash cache says "+file+" = "+cachedUrn);
+				}
+			}
+			if( cachedUrn != null && (destinations = getNeedySinks(cachedUrn, destinations)).size() == 0 ) {
+				if( debug ) System.err.println("Indexer: "+cachedUrn+" already uploaded everywhere!");
 				// Then we don't need to recurse into subdirectories!
 				return new IndexResult(
 					new FileInfo(
@@ -468,7 +491,7 @@ public class FlowUploader implements FlowUploaderSettings
 				);
 			}
 			
-			boolean fullyUploaded;
+			final boolean fullyUploaded;
 			FileInfo fi;
 			if( file.isFile() ) {
 				String fileUrn;
@@ -479,12 +502,15 @@ public class FlowUploader implements FlowUploaderSettings
 					try {
 						fis = new FileInputStream( file );
 						fileUrn = digestor.digest(fis);
+						hashCache.cacheFileUrn( file, fileUrn );
 					} catch( IOException e ) {
 						throw new FileReadError( file, e );
 					} finally {
 						if( fis != null ) fis.close();
 					}
 				}
+				
+				if( debug ) System.err.println("Indexer: "+file+" = "+fileUrn);
 				
 				fi = new FileInfo(
 					file.getCanonicalPath(),
@@ -494,35 +520,30 @@ public class FlowUploader implements FlowUploaderSettings
 					file.lastModified()
 				);
 				
-				hashCache.cacheFileUrn( file, fileUrn );
-				
-				List<IndexedObjectSink> uploadTo = new ArrayList<IndexedObjectSink>(); 
-				for( IndexedObjectSink d : destinations ) {
-					if( !d.contains(fi.urn) ) uploadTo.add(d);
+				destinations = getNeedySinks(fi.urn, destinations);
+				if( destinations.size() == 0 ) {
+					if( debug ) System.err.println("Indexer: "+file+": already uploaded: "+fileUrn); 
+					return new IndexResult( fi, false, true );
 				}
 				
-				for( IndexedObjectSink d : uploadTo ) {
-					d.give(fi);
-				}
+				if( debug ) System.err.println("Indexer: Some destinations don't yet have "+fi.urn);
 				
-				fullyUploaded = scanBlobReferences( fi );
+				for( IndexedObjectSink d : destinations ) d.give(fi);
+				
+				fullyUploaded = scanBlobReferences( fi, destinations );
 				
 				if( fullyUploaded ) {
-					for( IndexedObjectSink d : uploadTo ) {
+					for( IndexedObjectSink d : destinations ) {
 						d.give( new FullyStoredMarker(fileUrn) );
 					}
 				}
 			} else if( file.isDirectory() ) {
-				// Even if we already know the URN, we still need to walk the entire
-				// directory to push all non-fully-uploaded subfiles/directories to the uploader.
-				DirectoryContentsIndexResult contentsIndexResult = indexDirectoryEntries( file );
+				DirectoryContentsIndexResult contentsIndexResult = indexDirectoryEntries( file, destinations );
 				fullyUploaded = contentsIndexResult.fullyStored;
 				
-				ByteArrayOutputStream baos = new ByteArrayOutputStream();
-				dirSer.serialize(contentsIndexResult.entries, baos);
-				baos.close();
+				byte[] serialized = serializeDirectory(contentsIndexResult.entries);
 				
-				String rdfBlobUrn = digestor.digest(new ByteArrayInputStream(baos.toByteArray()));
+				String rdfBlobUrn = digestor.digest(new ByteArrayInputStream(serialized));
 				String treeUrn = "x-rdf-subject:" + rdfBlobUrn;
 				
 				fi = new FileInfo(
@@ -533,12 +554,14 @@ public class FlowUploader implements FlowUploaderSettings
 					file.lastModified()
 				);
 				
-				if( isFullyUploadedEverywhere(treeUrn) ) {
+				destinations = getNeedySinks(treeUrn, destinations);
+				
+				if( destinations.size() == 0 ) {
 					if( debug ) System.err.println("Indexer: "+file+": already uploaded: "+treeUrn); 
 					return new IndexResult( fi, false, true );
 				}
 				
-				SmallBlobInfo blobInfo = new SmallBlobInfo( rdfBlobUrn, baos.toByteArray() );
+				SmallBlobInfo blobInfo = new SmallBlobInfo( rdfBlobUrn, serialized );
 				
 				for( IndexedObjectSink d : destinations ) {
 					if( !d.contains(fi.urn) ) {
@@ -589,7 +612,7 @@ public class FlowUploader implements FlowUploaderSettings
 		 * (based on scanMode) blobs were successfully scanned
 		 * or already fully stored everywhere.
 		 */
-		protected boolean indexBlobByUrn( String urn ) {
+		protected boolean indexBlobByUrn( String urn, Collection<IndexedObjectSink> destinations ) {
 			Boolean b = urnsAlreadyIndexed.get(urn);
 			if( b != null ) return b.booleanValue();
 			
@@ -602,7 +625,7 @@ public class FlowUploader implements FlowUploaderSettings
 				return false;
 			}
 			try {
-				boolean success = index(f).fullyStored;
+				boolean success = index(f, destinations).fullyStored;
 				indexedBlobByUrn(urn, success);
 				return success;
 			} catch( Exception e ) {
@@ -611,8 +634,8 @@ public class FlowUploader implements FlowUploaderSettings
 			}
 		}
 		
-		protected IndexResult index( String path ) throws Exception {
-			return index( localFileResolver.getFile(path) );
+		protected IndexResult index( String path, Collection<IndexedObjectSink> destinations ) throws Exception {
+			return index( localFileResolver.getFile(path), destinations );
 		}
 	}
 	
@@ -765,9 +788,9 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	public void runIdentify() throws Exception {
-		final Indexer indexer = new Indexer( getLocalRepository(), getLocalFileResolver(), BlobReferenceScanMode.NEVER, dirSer, digestor, getHashCache(), new IndexedObjectSink[0], howToHandleFileReadErrors, debug );
+		final Indexer indexer = new Indexer( getLocalRepository(), getLocalFileResolver(), BlobReferenceScanMode.NEVER, dirSer, digestor, getHashCache(), howToHandleFileReadErrors, debug );
 		for( UploadTask ut : tasks ) {
-			IndexResult indexResult = indexer.index(ut.path);
+			IndexResult indexResult = indexer.index(ut.path, Collections.<IndexedObjectSink>emptyList());
 			report( indexResult.fileInfo );
 		}
 	}
@@ -824,17 +847,23 @@ public class FlowUploader implements FlowUploaderSettings
 	public int runUpload() {
 		final StandardTransferTracker tt = new StandardTransferTracker();
 		final UploadClient[] uploadClients = new UploadClient[uploadClientSpecs.length];
-		final IndexedObjectSink[] indexedObjectSinks = new IndexedObjectSink[uploadClientSpecs.length];
+		final ArrayList<IndexedObjectSink> indexedObjectSinks = new ArrayList<IndexedObjectSink>(uploadClientSpecs.length);
 		for( int i=0; i<uploadClientSpecs.length; ++i ) {
-			final AddableSet<String> uc = getUploadCache(uploadClientSpecs[i].getServerName(), scanMode);
+			String serverName = uploadClientSpecs[i].getServerName();
+			final AddableSet<String> uc = getUploadCache(serverName, scanMode);
 			uploadClients[i] = uploadClientSpecs[i].createClient( uc, tt, this );
-			indexedObjectSinks[i] = new IndexedObjectSink( uc, uploadClients[i] );
+			indexedObjectSinks.add(new IndexedObjectSink( uc, uploadClients[i]));
+			if( debug ) {
+				System.err.println("For remote server '"+serverName+"'...");
+				System.err.println("  Using "+uc+" to remember fully-uploaded blobs");
+				System.err.println("  Created "+uploadClients[i].toString());
+			}
 		}
 		
 		final LinkedBlockingQueue<Object> uploadTaskQueue = new LinkedBlockingQueue<Object>(tasks);
 		uploadTaskQueue.add( EndMessage.INSTANCE );
-		
-		final Indexer indexer = new Indexer( getLocalRepository(), getLocalFileResolver(), scanMode, dirSer, digestor, getHashCache(), indexedObjectSinks, howToHandleFileReadErrors, debug );
+
+		final Indexer indexer = new Indexer( getLocalRepository(), getLocalFileResolver(), scanMode, dirSer, digestor, getHashCache(), howToHandleFileReadErrors, debug );
 		
 		class IndexRunner extends QueueRunner {
 			private boolean success = true;
@@ -847,7 +876,7 @@ public class FlowUploader implements FlowUploaderSettings
 			public boolean handleMessage( Object m ) throws Exception {
 				if( m instanceof UploadTask ) {
 					UploadTask ut = (UploadTask)m;
-					IndexResult indexResult = indexer.index(ut.path);
+					IndexResult indexResult = indexer.index(ut.path, indexedObjectSinks);
 					synchronized(this) {
 						success &= indexResult.fullyStored;
 					}
