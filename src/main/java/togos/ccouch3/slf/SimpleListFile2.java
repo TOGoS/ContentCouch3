@@ -93,6 +93,14 @@ public class SimpleListFile2 implements Flushable, Closeable, SimpleMap<ByteChun
 		init( defaultIndexSizePower );
 	}
 	
+	protected String getFilename() {
+		if( blob instanceof RandomAccessFileBlob ) {
+			return ((RandomAccessFileBlob)blob).getFilePath();
+		} else {
+			return "some "+blob.getClass().getSimpleName();
+		}
+	}
+	
 	protected static final void copy( byte[] src, byte[] buf, int offset ) {
 		for( int i=0; i<src.length; ++i ) {
 			buf[offset++] = src[i];
@@ -196,7 +204,7 @@ public class SimpleListFile2 implements Flushable, Closeable, SimpleMap<ByteChun
 		} else {
 			ByteChunk headerBlob = blob.get( 0, headerSize );
 			if( headerBlob.getSize() < headerSize ) {
-				throw new RuntimeException("Couldn't read entire "+headerSize+"-byte SLF2 header (read "+headerBlob.getSize()+" bytes)");
+				throw new RuntimeException("Couldn't read entire "+headerSize+"-byte SLF2 header (read "+headerBlob.getSize()+" bytes) from "+getFilename());
 			}
 			byte[] buf = headerBlob.getBuffer();
 			int o = headerBlob.getOffset();

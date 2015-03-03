@@ -12,12 +12,20 @@ import togos.blob.util.SimpleByteChunk;
 public class RandomAccessFileBlob extends RandomAccessFile
 	implements RandomAccessBlob
 {
+	protected final String filePath;
+	
 	public RandomAccessFileBlob( String arg0, String arg1 ) throws FileNotFoundException {
 		super( arg0, arg1 );
+		filePath = arg0;
 	}
 	
 	public RandomAccessFileBlob( File arg0, String arg1 ) throws FileNotFoundException {
 		super( arg0, arg1 );
+		filePath = arg0.getPath();
+	}
+	
+	public String getFilePath() {
+		return filePath;
 	}
 	
 	public long getSize() {
