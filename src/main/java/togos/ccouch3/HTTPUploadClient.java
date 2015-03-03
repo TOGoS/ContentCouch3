@@ -7,6 +7,7 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 import togos.ccouch3.FlowUploader.EndMessage;
 import togos.ccouch3.FlowUploader.FullyStoredMarker;
@@ -14,6 +15,7 @@ import togos.ccouch3.FlowUploader.LogMessage;
 import togos.ccouch3.FlowUploader.PutHead;
 import togos.ccouch3.FlowUploader.TransferTracker;
 import togos.ccouch3.util.AddableSet;
+import togos.ccouch3.util.StreamUtil;
 
 class HTTPUploadClient implements UploadClient
 {
@@ -30,6 +32,8 @@ class HTTPUploadClient implements UploadClient
 	protected boolean putCompleted = false;
 	protected boolean anyFailures = false;
 	
+	protected final Thread headThread, putThread;
+	
 	public HTTPUploadClient(
 		String serverName, String serverUrl, AddableSet<String> uc, TransferTracker tt
 	) {
@@ -37,6 +41,9 @@ class HTTPUploadClient implements UploadClient
 		this.serverUrl = serverUrl;
 		this.fullyCachedUrnSet = uc;
 		this.transferTracker = tt;
+		
+		this.headThread = new HeadThread(serverName+" PUT thread");
+		this.putThread = new HeadThread(serverName+" HEAD thread");
 	}
 	
 	@Override public String getServerName() { return serverName; }
@@ -61,7 +68,31 @@ class HTTPUploadClient implements UploadClient
 		}
 	}
 	
-	protected void upload( BlobInfo bi, String tag ) throws IOException {
+	static class ServerError extends IOException {
+		private static final long serialVersionUID = 1L;
+		
+		public final int statusCode;
+		public final byte[] data;
+		public ServerError( String message, int statusCode, byte[] data ) {
+			super(message);
+			this.statusCode = statusCode;
+			this.data = data;
+		}
+		
+		@Override public String getMessage() {
+			if( this.data != null ) {
+				try {
+					String text = new String(data, "UTF-8");
+					return super.getMessage()+"\n\n-- Data --\n"+text;
+				} catch( Exception e ) {
+					return super.getMessage()+"\n(Error while converting response data to string)";
+				}
+			}
+			return super.getMessage();
+		}
+	}
+	
+	protected void _upload( BlobInfo bi, String tag ) throws ServerError, IOException {
 		if( bi instanceof FileInfo ) {
 			transferTracker.sendingFile( ((FileInfo)bi).path );
 		}
@@ -87,12 +118,46 @@ class HTTPUploadClient implements UploadClient
 			int status = urlCon.getResponseCode();
 			if( debug ) System.err.println("PUT "+url+" ("+totalSize+" bytes) -> "+status);
 			if( status < 200 || status >= 300 ) {
-				throw new RuntimeException("PUT received unexpected response code "+status+"; "+urlCon.getResponseMessage());
+				byte[] errorText = null;
+				try {
+					errorText = StreamUtil.slurp(urlCon.getErrorStream());
+				} catch( Exception e ) { }
+				
+				throw new ServerError(
+					"PUT received unexpected response code "+status+"; "+urlCon.getResponseMessage(),
+					status, errorText);
 			}
 		} finally {
 			is.close();
 		}
 		transferTracker.transferred(bi.getSize(), 1, tag);
+	}
+	
+	protected void upload( BlobInfo bi, String tag ) throws IOException {
+		int attemptsLeft = 3;
+		int waitBetweenAttempts = 1000;
+		while( true ) {
+			try {
+				_upload( bi, tag );
+				return;
+			} catch( ServerError serverError ) {
+				--attemptsLeft;
+				if( attemptsLeft == 0 ) {
+					throw serverError;
+				}
+				
+				if( debug ) {
+					System.err.println(serverError.getMessage());
+					System.err.println("Will try again in "+waitBetweenAttempts/1000+" seconds");
+				}
+				try {
+					Thread.sleep(waitBetweenAttempts);
+				} catch( InterruptedException e1 ) {
+					throw serverError;
+				}
+				waitBetweenAttempts *= 2;
+			}
+		}
 	}
 	
 	protected void upload( BlobInfo bi ) throws IOException {
@@ -101,12 +166,35 @@ class HTTPUploadClient implements UploadClient
 	
 	final int SMALL_BLOB_SIZE = 8192;
 	
-	protected final Thread headThread = new Thread() {
+	/** Drains queues that we've given up on so the input process doesn't block */
+	static class QueueDrainer<T> extends Thread {
+		BlockingQueue<T> q;
+		public QueueDrainer( BlockingQueue<T> q ) {
+			setDaemon(true);
+			this.q = q;
+		}
+		@Override public void run() {
+			try {
+				while( !(q.take() instanceof EndMessage) );
+			} catch( InterruptedException e ) {
+				// Okay, that's enough, then.
+				interrupt();
+			}
+		}
+		public static <T> void drain( BlockingQueue<T> q ) {
+			new QueueDrainer<T>(q).start();
+		}
+	}
+	
+	class HeadThread extends Thread {
+		public HeadThread( String name ) { super(name); }
+		
+		protected boolean endReceived = false;
 		protected boolean keepGoing = true;
 		
 		/** Returns true to indicate that the message should be forwarded */
 		protected boolean handle(Object m) throws Exception {
-			if( debug ) System.err.println("headThread received "+m.getClass());
+			if( debug ) System.err.println(getName()+" received "+m.getClass());
 			if( m instanceof BlobInfo ) {
 				// Is it small?  Then just upload it.
 				BlobInfo bi = (BlobInfo)m;
@@ -128,6 +216,7 @@ class HTTPUploadClient implements UploadClient
 				return false;
 			} else if( m instanceof EndMessage ) {
 				headCompleted = true;
+				endReceived = true;
 				keepGoing = false;
 				// Caller will send an EndMessage onward
 				// as part of its shutdown sequence.
@@ -146,27 +235,34 @@ class HTTPUploadClient implements UploadClient
 					} catch( InterruptedException e ) {
 						keepGoing = false;
 						this.interrupt();
-					} catch( Exception e ) {
-						throw new RuntimeException(e);
 					}
 				}
+				if( debug ) System.err.println(getName()+" exiting naturally.");
+			} catch( Exception e ) {
+				anyFailures = true;
+				System.err.println(getName()+" exiting due to error");
+				e.printStackTrace(System.err);
 			} finally {
+				headCompleted = true;
 				try {
 					putTasks.put(EndMessage.INSTANCE);
 				} catch( InterruptedException e ) {
 					this.interrupt();
 				}
 			}
-			if( debug ) System.err.println("headThread completing naturally.");
+			if( !endReceived && !interrupted() ) QueueDrainer.drain(headTasks);
 		}
 	};
 	
-	protected final Thread putThread = new Thread() {
+	class PutThread extends Thread {
+		public PutThread( String name ) { super(name); }
+		
+		boolean endReceived = false;
 		boolean keepGoing = true;
 		
 		/** Returns true to indicate that the message should be forwarded */
 		protected void handle(Object m) throws Exception {
-			if( debug ) System.err.println("putThread received "+m.getClass());
+			if( debug ) System.err.println(getName()+" received "+m.getClass());
 			if( m instanceof BlobInfo ) {
 				upload((BlobInfo)m);
 			} else if( m instanceof FullyStoredMarker ) {
@@ -176,6 +272,7 @@ class HTTPUploadClient implements UploadClient
 			} else if( m instanceof PutHead ) {
 				// Ignored
 			} else if( m instanceof EndMessage ) {
+				endReceived = true;
 				keepGoing = false;
 				putCompleted = true;
 			} else {
@@ -184,21 +281,28 @@ class HTTPUploadClient implements UploadClient
 		}
 		
 		public void run() {
-			while(keepGoing) {
-				try {
-					Object m = putTasks.take();
-					handle(m);
-				} catch( InterruptedException e ) {
-					keepGoing = false;
-					this.interrupt();
-				} catch( Exception e ) {
-					throw new RuntimeException(e);
+			try {
+				while(keepGoing) {
+					try {
+						Object m = putTasks.take();
+						handle(m);
+					} catch( InterruptedException e ) {
+						keepGoing = false;
+						this.interrupt();
+					}
 				}
+				if( debug ) System.err.println(getName()+" exiting naturally.");
+			} catch( Exception e ) {
+				System.err.println(getName()+" exiting due to error");
+				e.printStackTrace(System.err);
+				anyFailures = true;
+			} finally {
+				putCompleted = true;
 			}
-			if( debug ) System.err.println("putThread completing naturally.");
+			if( !endReceived && !interrupted() ) QueueDrainer.drain(putTasks);
 		};
 	};
-		
+	
 	@Override public void give(Object value) throws Exception {
 		headTasks.put(value);
 	}

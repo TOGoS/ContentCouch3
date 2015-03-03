@@ -1,9 +1,11 @@
 package togos.ccouch3.util;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 public class StreamUtil
 {
@@ -17,5 +19,21 @@ public class StreamUtil
 		} catch( IOException e ) {
 			System.err.println("Error while closing something!");
 		}
+	}
+
+	public static void copy(InputStream in, OutputStream out)
+		throws IOException
+	{
+		int r;
+		byte[] buffer = new byte[1024*128];
+		while( (r = in.read(buffer)) > 0 ) {
+			out.write(buffer, 0, r);
+		}
+	}
+	
+	public static byte[] slurp(InputStream in) throws IOException {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		copy(in, baos);
+		return baos.toByteArray();
 	}
 }
