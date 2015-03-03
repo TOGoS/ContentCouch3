@@ -955,6 +955,11 @@ public class FlowUploader implements FlowUploaderSettings
 			if( debug ) System.err.println("Upload clients all completed.");
 			
 			if( debug ) System.err.println("Waiting for index thread to finish...");
+			indexThread.join(1000);
+			if( indexThread.isAlive() ) {
+				if( debug ) System.err.println("Killing index thread.");
+				indexThread.interrupt();
+			}
 			indexThread.join();
 			if( debug ) System.err.println("Index thread completed.");
 			
