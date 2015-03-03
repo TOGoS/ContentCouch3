@@ -42,8 +42,8 @@ class HTTPUploadClient implements UploadClient
 		this.fullyCachedUrnSet = uc;
 		this.transferTracker = tt;
 		
-		this.headThread = new HeadThread(serverName+" PUT thread");
-		this.putThread = new HeadThread(serverName+" HEAD thread");
+		this.headThread = new HeadThread(serverName+" HEAD thread");
+		this.putThread  = new PutThread(serverName+" PUT thread");
 	}
 	
 	@Override public String getServerName() { return serverName; }
