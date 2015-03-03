@@ -43,8 +43,9 @@ class HTTPUploadClient implements UploadClient
 	public boolean debug = false;
 	protected final WorkerThread headThread, putThread;
 	
-	boolean indiceRandomHeadErrors = true;
-	boolean induceRandomPutErrors = true;
+	// To test error handling, set these to true:
+	boolean induceHeadErrors = false;
+	boolean inducePutErrors = false;
 	
 	public HTTPUploadClient(
 		String serverName, String serverUrl, AddableSet<String> uc, TransferTracker tt
@@ -65,7 +66,7 @@ class HTTPUploadClient implements UploadClient
 	}
 	
 	protected boolean existsOnServer( String urn ) throws IOException {
-		if( indiceRandomHeadErrors ) throw new ServerError("Not a real error ha ha h", 599, null);
+		if( induceHeadErrors ) throw new ServerError("Not a real error ha ha h", 599, null);
 		
 		URL url = urlFor(urn);
 		HttpURLConnection urlCon = (HttpURLConnection)url.openConnection();
@@ -111,7 +112,7 @@ class HTTPUploadClient implements UploadClient
 			transferTracker.sendingFile( ((FileInfo)bi).path );
 		}
 		
-		if( induceRandomPutErrors && Math.random() <= 1.0 ) {
+		if( inducePutErrors ) {
 			throw new ServerError("Not a real server error; yuk yuk.", 599, null);
 		}
 		
