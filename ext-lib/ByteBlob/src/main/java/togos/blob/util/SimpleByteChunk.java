@@ -23,8 +23,10 @@ public class SimpleByteChunk implements ByteChunk
 	
 	public static SimpleByteChunk get( byte[] buf, long offset, long size ) {
 		int _offset = BlobUtil.toInt(offset);
-		int _size = BlobUtil.toInt(offset);
-		if( size == 0 ) return EMPTY;
+		int _size = BlobUtil.toInt(size);
+		assert _size == size;
+		assert _offset == offset;
+		if( _size == 0 ) return EMPTY;
 		return new SimpleByteChunk( buf, _offset, _size );
 	}
 	
