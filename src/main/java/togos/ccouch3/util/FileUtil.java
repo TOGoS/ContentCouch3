@@ -7,7 +7,8 @@ import java.io.IOException;
 import java.util.Random;
 
 import togos.blob.ByteChunk;
-import togos.blob.SimpleByteChunk;
+import togos.blob.util.BlobUtil;
+import togos.blob.util.SimpleByteChunk;
 
 public class FileUtil
 {
@@ -71,7 +72,7 @@ public class FileUtil
 		File tempFile = tempFile( f );
 		FileOutputStream fos = new FileOutputStream( tempFile );
 		try {
-			fos.write( c.getBuffer(), c.getOffset(), c.getSize() );
+			fos.write( c.getBuffer(), c.getOffset(), BlobUtil.chunkLength(c) );
 			if( !tempFile.renameTo( f ) ) {
 				throw new IOException("Failed to rename "+tempFile+" to "+f);
 			}

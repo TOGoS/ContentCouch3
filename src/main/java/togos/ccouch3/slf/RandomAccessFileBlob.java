@@ -6,7 +6,8 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 
 import togos.blob.ByteChunk;
-import togos.blob.SimpleByteChunk;
+import togos.blob.util.BlobUtil;
+import togos.blob.util.SimpleByteChunk;
 
 public class RandomAccessFileBlob extends RandomAccessFile
 	implements RandomAccessBlob
@@ -45,7 +46,9 @@ public class RandomAccessFileBlob extends RandomAccessFile
 				if( r == -1 ) break;
 				z += r;
 			}
-			return new SimpleByteChunk(buf, 0, z);
+			return length == z ?
+				SimpleByteChunk.get(buf, 0, length) :
+				SimpleByteChunk.copyOf(buf, 0, z);
 		} catch( IOException e ) {
 			throw new RuntimeException(e);
 		}
@@ -54,7 +57,7 @@ public class RandomAccessFileBlob extends RandomAccessFile
 	public void put( long offset, ByteChunk data ) {
 		try {
 			seek( offset );
-			write( data.getBuffer(), data.getOffset(), data.getSize() );
+			write( data.getBuffer(), data.getOffset(), BlobUtil.chunkLength(data) );
 		} catch( IOException e ) {
 			throw new RuntimeException(e);
 		}

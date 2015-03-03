@@ -8,9 +8,9 @@ import java.util.Arrays;
 import java.util.Collection;
 
 
+
 import junit.framework.TestCase;
 import togos.ccouch3.util.DateUtil;
-import togos.ccouch3.FileInfo.FileType;
 
 public class NewStyleRDFDirectorySerializerTest extends TestCase
 {
@@ -46,7 +46,7 @@ public class NewStyleRDFDirectorySerializerTest extends TestCase
 	
 	public void testBlobEntry() {
 		assertSerializesTo( blobEntryString, new DirectoryEntry[] {
-			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FileType.BLOB, -1, -1)
+			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FSObjectType.BLOB, -1, -1)
 		} );
 	}
 	
@@ -82,10 +82,10 @@ public class NewStyleRDFDirectorySerializerTest extends TestCase
 		
 	public void testMultiBlobEntry() {
 		assertSerializesTo( multiBlobEntryString, new DirectoryEntry[] {
-			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZF", FileType.BLOB, -1, -1),
-			new DirectoryEntry("goo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZG", FileType.BLOB, -1, -1),
-			new DirectoryEntry("boo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZB", FileType.BLOB, -1, -1),
-			new DirectoryEntry("doo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZD", FileType.BLOB, -1, -1),
+			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZF", FSObjectType.BLOB, -1, -1),
+			new DirectoryEntry("goo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZG", FSObjectType.BLOB, -1, -1),
+			new DirectoryEntry("boo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZB", FSObjectType.BLOB, -1, -1),
+			new DirectoryEntry("doo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZD", FSObjectType.BLOB, -1, -1),
 		} );
 	}
 		
@@ -105,7 +105,7 @@ public class NewStyleRDFDirectorySerializerTest extends TestCase
 	
 	public void testBlobWithSizeEntry() {
 		assertSerializesTo( blobWithSizeEntryString, new DirectoryEntry[] {
-			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FileType.BLOB, 1234, -1)
+			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FSObjectType.BLOB, 1234, -1)
 		});
 	}
 	
@@ -126,7 +126,7 @@ public class NewStyleRDFDirectorySerializerTest extends TestCase
 	
 	public void testBlobWithSizeAndMtimeEntry() throws ParseException {
 		assertSerializesTo( blobWithSizeAndMtimeEntryString, new DirectoryEntry[] {
-			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FileType.BLOB, 1234, DateUtil.parseDate("2010-01-01 06:00:32 GMT").getTime())
+			new DirectoryEntry("foo", "urn:sha1:3CL2HWDOYOLPUXLWTKY6PAP63D7VOYZO", FSObjectType.BLOB, 1234, DateUtil.parseDate("2010-01-01 06:00:32 GMT").getTime())
 		});
 	}
 	
@@ -144,7 +144,7 @@ public class NewStyleRDFDirectorySerializerTest extends TestCase
 	
 	public void testDirectoryEntry() throws ParseException {
 		assertSerializesTo( directoryEntryString, new DirectoryEntry[] {
-			new DirectoryEntry("2010-01", "x-rdf-subject:urn:sha1:AO6BBOUDVIXOV6PEDR7GM536K3WLO6ES", FileType.DIRECTORY, 1234, DateUtil.parseDate("2010-01-01 06:00:32 GMT").getTime())
+			new DirectoryEntry("2010-01", "x-rdf-subject:urn:sha1:AO6BBOUDVIXOV6PEDR7GM536K3WLO6ES", FSObjectType.DIRECTORY, 1234, DateUtil.parseDate("2010-01-01 06:00:32 GMT").getTime())
 		});
 	}
 }

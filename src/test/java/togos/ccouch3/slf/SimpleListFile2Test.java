@@ -9,7 +9,6 @@ import java.util.Random;
 
 import junit.framework.TestCase;
 import togos.blob.ByteChunk;
-import togos.blob.SimpleByteChunk;
 
 @SuppressWarnings({"unchecked","rawtypes"})
 public class SimpleListFile2Test extends TestCase
@@ -19,7 +18,7 @@ public class SimpleListFile2Test extends TestCase
 	protected ByteChunk fixedRand( int length ) {
 		byte[] data = new byte[length];
 		r.nextBytes(data);
-		return new SimpleByteChunk(data);
+		return togos.blob.util.SimpleByteChunk.get(data);
 	}
 	
 	protected ByteChunk rand( int maxLen ) {
