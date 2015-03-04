@@ -1145,15 +1145,23 @@ public class FlowUploader implements FlowUploaderSettings
 		}
 	}
 	
-	static String[] readSubCommandArguments( Iterator<String> args ) {
+	static class NoEndSemicolon extends Exception {
+		private static final long serialVersionUID = 1L;
+		
+		public final String[] command;
+		public NoEndSemicolon( String[] command ) {
+			this.command = command;
+		}
+	}
+	
+	static String[] readSubCommandArguments( Iterator<String> args ) throws NoEndSemicolon {
 		String a;
 		List<String> sc = new ArrayList<String>();
-		for( a = args.hasNext() ? args.next() : null; a != null && !"--".equals(a) && !";".equals(a); a = args.hasNext() ? args.next() : null ) {
+		for( a = args.hasNext() ? args.next() : null; a != null && !";".equals(a); a = args.hasNext() ? args.next() : null ) {
+			if( a.equals(";;") ) a = ";";
 			sc.add( a );
 		}
-		if( a == null ) {
-			System.err.println("Warning: no ending ';' found after '-server-command'.");
-		}
+		if( a == null ) throw new NoEndSemicolon(sc.toArray(new String[sc.size()]));
 		return sc.toArray(new String[sc.size()]);
 	}
 	
@@ -1225,7 +1233,20 @@ public class FlowUploader implements FlowUploaderSettings
 				config.uploadClientSpecs.add( new HTTPUploadClientSpec(sn, RepoURLDefuzzer.defuzzRemoteRepoPrefix(args.next())) );
 			} else if( a.startsWith("-command-server:") ) {
 				final String sn = a.substring(16);
-				config.uploadClientSpecs.add( new CommandUploadClientSpec(sn, readSubCommandArguments(args)) );
+				try {
+					config.uploadClientSpecs.add( new CommandUploadClientSpec(sn, readSubCommandArguments(args)) );
+				} catch( NoEndSemicolon e ) {
+					String summary = "";
+					for( String arg : e.command ) {
+						if( summary.length() > 0 ) summary += " ";
+						if( arg.contains(" ") ) arg = '"'+arg+'"'; 
+						summary += arg;
+					}
+					if( summary.length() > 40 ) {
+						summary = summary.substring(0, 37)+"...";
+					}
+					return FlowUploaderCommand.error("No ending ';' found after '-server-command': "+summary);
+				}
 			} else if( "-server-command".equals(a) ) {
 				serverCommand = readSubCommandArguments(args);
 			
