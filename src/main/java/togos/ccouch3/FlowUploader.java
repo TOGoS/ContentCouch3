@@ -520,13 +520,13 @@ public class FlowUploader implements FlowUploaderSettings
 					file.lastModified()
 				);
 				
-				destinations = getNeedySinks(fi.urn, destinations);
+				destinations = getNeedySinks(fi.getUrn(), destinations);
 				if( destinations.size() == 0 ) {
 					if( debug ) System.err.println("Indexer: "+file+": already uploaded: "+fileUrn); 
 					return new IndexResult( fi, false, true );
 				}
 				
-				if( debug ) System.err.println("Indexer: Some destinations don't yet have "+fi.urn);
+				if( debug ) System.err.println("Indexer: Some destinations don't yet have "+fi.getUrn());
 				
 				for( IndexedObjectSink d : destinations ) d.give(fi);
 				
@@ -564,7 +564,7 @@ public class FlowUploader implements FlowUploaderSettings
 				SmallBlobInfo blobInfo = new SmallBlobInfo( rdfBlobUrn, serialized );
 				
 				for( IndexedObjectSink d : destinations ) {
-					if( !d.contains(fi.urn) ) {
+					if( !d.contains(fi.getUrn()) ) {
 						d.give( blobInfo );
 						if( fullyUploaded ) d.give( new FullyStoredMarker(treeUrn) );
 					}
@@ -574,7 +574,7 @@ public class FlowUploader implements FlowUploaderSettings
 			} else {
 				throw new RuntimeException("Don't know how to index "+file);
 			}
-			if( debug ) System.err.println("Indexer: "+file+": done: "+fi.urn);
+			if( debug ) System.err.println("Indexer: "+file+": done: "+fi.getUrn());
 			return new IndexResult( fi, true, fullyUploaded );
 		}
 		
@@ -780,10 +780,10 @@ public class FlowUploader implements FlowUploaderSettings
 	
 	protected void report( FileInfo fileInfo ) {
 		if( reportUrn ) {
-			System.out.println(fileInfo.urn);
+			System.out.println(fileInfo.getUrn());
 		}
 		if( reportPathUrnMapping ) {
-			System.out.println(fileInfo.path+"\t"+fileInfo.urn);
+			System.out.println(fileInfo.getPath()+"\t"+fileInfo.getUrn());
 		}
 	}
 	
@@ -887,14 +887,14 @@ public class FlowUploader implements FlowUploaderSettings
 						// If any new data was uploaded, send the name -> URN mapping to the server
 						// to be logged.  We want to NOT do this if we are only indexing and not
 						// sending!  In this case anyNewData will also be false.
-						String message = LogUtil.formatStorageLogEntry(new Date(), indexResult.fileInfo.fileType, ut.name, indexResult.fileInfo.urn);
+						String message = LogUtil.formatStorageLogEntry(new Date(), indexResult.fileInfo.getFsObjectType(), ut.name, indexResult.fileInfo.getUrn());
 						LogMessage lm = new LogMessage(BlobUtil.bytes(message));
 						for( IndexedObjectSink d : indexedObjectSinks ) d.give( lm );
 					}
 					
 					if( ut.commitConfig != null ) {
 						CommitManager.CommitSaveResult csr = getCommitManager().saveCommit(
-							new File(ut.path), indexResult.fileInfo.urn, timestamp, ut.commitConfig );
+							new File(ut.path), indexResult.fileInfo.getUrn(), timestamp, ut.commitConfig );
 						
 						SmallBlobInfo commitBlobInfo = new SmallBlobInfo( csr.latestCommitDataUrn, csr.latestCommitData );
 						for( IndexedObjectSink d : indexedObjectSinks ) {

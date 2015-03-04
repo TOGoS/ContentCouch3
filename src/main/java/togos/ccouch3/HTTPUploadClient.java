@@ -109,7 +109,7 @@ class HTTPUploadClient implements UploadClient
 		
 	protected void _upload( BlobInfo bi, String tag ) throws ServerError, IOException {
 		if( bi instanceof FileInfo ) {
-			transferTracker.sendingFile( ((FileInfo)bi).path );
+			transferTracker.sendingFile( ((FileInfo)bi).getPath() );
 		}
 		
 		if( inducePutErrors ) {

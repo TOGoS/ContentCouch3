@@ -7,14 +7,11 @@ import togos.blob.util.SimpleByteChunk;
 /** These get sent through for small blobs, like encoded tree nodes. */
 class SmallBlobInfo extends SimpleByteChunk implements BlobInfo
 {
-	public final String urn;
+	protected final String urn;
 	
 	public SmallBlobInfo( String urn, byte[] blob, int offset, int length ) {
 		super(blob, offset, length);
 		this.urn = urn;
-		assert offset >= 0;
-		assert offset <= blob.length;
-		assert offset + length <= blob.length;
 	}
 	
 	public SmallBlobInfo( String urn, ByteChunk c ) {

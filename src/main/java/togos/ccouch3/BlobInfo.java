@@ -1,11 +1,8 @@
 package togos.ccouch3;
 
-import java.io.IOException;
-import java.io.InputStream;
+import togos.blob.ByteBlob;
 
-public interface BlobInfo
+public interface BlobInfo extends ByteBlob
 {
 	public String getUrn();
-	public long getSize();
-	public InputStream openInputStream() throws IOException;
 }

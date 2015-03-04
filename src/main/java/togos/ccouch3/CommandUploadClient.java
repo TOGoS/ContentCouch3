@@ -33,7 +33,7 @@ class CommandUploadClient implements UploadClient
 			try {
 				if( m instanceof FileInfo ) {
 					FileInfo fi = (FileInfo)m;
-					w.writeCmd( new String[]{ "head", fi.path, fi.urn } );
+					w.writeCmd( new String[]{ "head", fi.getPath(), fi.getUrn() } );
 				} else if( m instanceof SmallBlobInfo ) {
 					SmallBlobInfo bi = (SmallBlobInfo)m;
 					w.writeCmd( new String[]{ "put", bi.urn, bi.urn, "chunk", String.valueOf(bi.getSize()) } );

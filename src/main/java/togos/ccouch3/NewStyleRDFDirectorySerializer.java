@@ -20,9 +20,9 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 
 		boolean needBzNamespace = false, needDcNamespace = false;
 		for( FileInfo f : sortedEntries ) {
-			if( f.fileType == FSObjectType.BLOB ) {
-				if( f.mtime != -1 ) needDcNamespace = true;
-				if( f.size != -1 ) needBzNamespace = true;
+			if( f.getFsObjectType() == FSObjectType.BLOB ) {
+				if( f.getLastModificationTime() != -1 ) needDcNamespace = true;
+				if( f.getSize() != -1 ) needBzNamespace = true;
 			}
 		}
 		
@@ -36,34 +36,34 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 		for( DirectoryEntry f : sortedEntries ) {
 			String tag;
 			boolean showSize, showMtime;
-			switch( f.fileType ) {
+			switch( f.getFsObjectType() ) {
 			case BLOB:
 				tag = "Blob";
-				showSize = f.size != -1;
-				showMtime = f.mtime != -1;
+				showSize = f.getSize() != -1;
+				showMtime = f.getLastModificationTime() != -1;
 				break;
 			case DIRECTORY:
 				tag = "Directory";
 				showSize = false;
 				showMtime = false;
 				break;
-			default: throw new RuntimeException("Don't know how to encode directory entry with file type "+f.fileType);
+			default: throw new RuntimeException("Don't know how to encode directory entry with file type "+f.pathSeparator);
 			}
 			
 			w.write("\t\t<DirectoryEntry>\n");
 			w.write("\t\t\t<name>" + XMLUtil.xmlEscapeText(f.name) + "</name>\n");
 			w.write("\t\t\t<target>\n");
-			w.write("\t\t\t\t<" + tag + " rdf:about=\"" + XMLUtil.xmlEscapeAttribute(f.urn) + "\"");
+			w.write("\t\t\t\t<" + tag + " rdf:about=\"" + XMLUtil.xmlEscapeAttribute(f.getUrn()) + "\"");
 			if( showSize ) {
 				w.write(">\n");
-				w.write( "\t\t\t\t\t<bz:fileLength>" + String.valueOf(f.size) + "</bz:fileLength>\n" );
+				w.write( "\t\t\t\t\t<bz:fileLength>" + String.valueOf(f.getSize()) + "</bz:fileLength>\n" );
 				w.write("\t\t\t\t</" + tag + ">\n");
 			} else {
 				w.write("/>\n");
 			}
 			w.write("\t\t\t</target>\n");
 			if( showMtime ) {
-				w.write( "\t\t\t<dc:modified>" + DateUtil.formatDate(f.mtime) + "</dc:modified>\n" );
+				w.write( "\t\t\t<dc:modified>" + DateUtil.formatDate(f.getLastModificationTime()) + "</dc:modified>\n" );
 			}
 			w.write("\t\t</DirectoryEntry>\n");
 		}

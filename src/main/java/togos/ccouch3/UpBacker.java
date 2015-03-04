@@ -115,7 +115,7 @@ public class UpBacker
 	
 	protected void rootStored( File f, StoreResult sr ) {
 		if( sr.storedObjectCount > 0 && sr.fileInfo != null ) {
-			String message = LogUtil.formatStorageLogEntry(new Date(), sr.fileInfo.fileType, sr.fileInfo.path, sr.fileInfo.urn);
+			String message = LogUtil.formatStorageLogEntry(new Date(), sr.fileInfo.getFsObjectType(), sr.fileInfo.getPath(), sr.fileInfo.getUrn());
 			try {
 				FileOutputStream log = getIncomingLogStream();
 				log.write( (message + "\n\n").getBytes() );
@@ -132,7 +132,7 @@ public class UpBacker
 			if( shouldShowProgress ) hideProgress();
 		}
 		if( shouldReportResults ) {
-			System.err.println(f.getPath()+" -> "+(sr.fileInfo == null ? "(error)" : sr.fileInfo.urn));
+			System.err.println(f.getPath()+" -> "+(sr.fileInfo == null ? "(error)" : sr.fileInfo.getUrn()));
 			System.err.println("  "+sr.errorCount+" errors, "+sr.totalObjectCount+" objects read, "+sr.storedObjectCount+" objects stored");
 		}
 	}
@@ -271,6 +271,7 @@ public class UpBacker
 	public static BackupCmd fromArgs( Iterator<String> argi ) {
 		ArrayList<String> pathsToStore = new ArrayList<String>();
 		String repoPath = null;
+		@SuppressWarnings("unused")
 		String repoName = null; // Someday may be used for making heads and stuff
 		String storeSector = "local";
 		boolean showReport = false, showProgress = false;

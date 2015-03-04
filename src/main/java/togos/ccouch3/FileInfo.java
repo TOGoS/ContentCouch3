@@ -4,30 +4,41 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 
-public class FileInfo implements BlobInfo
+import togos.blob.ByteBlob;
+import togos.blob.file.FileBlob;
+
+public class FileInfo extends FileBlob implements BlobInfo
 {
-	public final String path;
-	public final String urn;
-	public final FSObjectType fileType;
-	public final long size;
-	public final long mtime;
+	private static final long serialVersionUID = 1L;
+	
+	private final String urn;
+	private final long size;
+	private final FSObjectType fsObjectType;
+	private final long mtime;
 	
 	public FileInfo( String path, String urn, FSObjectType fileType, long size, long mtime ) {
-		this.path     = path;
+		super(path);
 		this.urn      = urn;
-		this.fileType = fileType;
+		this.fsObjectType = fileType;
 		this.size     = size;
 		this.mtime    = mtime;
 	}
 
 	public FileInfo( FileInfo fileInfo ) {
-		this( fileInfo.path, fileInfo.urn, fileInfo.fileType, fileInfo.size, fileInfo.mtime );
+		this( fileInfo.getPath(), fileInfo.urn, fileInfo.fsObjectType, fileInfo.size, fileInfo.mtime );
 	}
-
+	
 	@Override public String getUrn() { return urn; }
 	@Override public long getSize() { return size; }
 	
 	public InputStream openInputStream() throws FileNotFoundException {
-		return new FileInputStream(path);
+		return new FileInputStream(this);
 	}
+	
+	@Override public ByteBlob slice(long offset, long length) {
+		throw new UnsupportedOperationException();
+	}
+	
+	public FSObjectType getFsObjectType() { return fsObjectType; }
+	public long getLastModificationTime() { return mtime; }
 }

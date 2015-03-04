@@ -11,9 +11,8 @@ public class FileBlob extends File implements ByteBlob
 {
 	private static final long serialVersionUID = 1L;
 	
-	public FileBlob(File file) {
-		super(file.getPath());
-	}
+	public FileBlob(String path) { super(path); }
+	public FileBlob(File file) { this(file.getPath()); }
 	
 	@Override public InputStream openInputStream() throws IOException {
 		return new FileInputStream(this);
