@@ -99,6 +99,6 @@ public class Copy
 			return 1;
 		}
 		
-		return 1;
+		return 0;
 	}
 }
