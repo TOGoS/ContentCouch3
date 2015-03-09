@@ -91,6 +91,10 @@ public class BlobUtil
 		return r;
 	}
 	
+	public static ByteChunk slice(ByteChunk bc, long offset, long length) {
+		return SimpleByteChunk.get(bc.getBuffer(), bc.getOffset()+offset, Math.min(bc.getSize() - offset, length));
+	}
+	
 	public static final int contentHashCode( Object c ) {
 		if( c == null ) return 0;
 		if( c instanceof byte[] ) return hashCode( (byte[])c );

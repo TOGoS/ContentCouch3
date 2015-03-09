@@ -61,7 +61,11 @@ public class SimpleByteChunk implements ByteChunk
 	}
 	
 	@Override public ByteBlob slice(long offset, long length) {
-		return get(buffer, this.offset + offset, Math.min(size - offset, length));
+		return slice(this, offset, length);
+	}
+	
+	public static ByteChunk slice(ByteChunk bc, long offset, long length) {
+		return get(bc.getBuffer(), bc.getOffset()+offset, Math.min(bc.getSize() - offset, length));
 	}
 	
 	//// Normal stuff

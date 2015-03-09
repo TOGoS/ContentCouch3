@@ -13,6 +13,7 @@ public class FileBlob extends File implements ByteBlob
 	
 	public FileBlob(String path) { super(path); }
 	public FileBlob(File file) { this(file.getPath()); }
+	public FileBlob(File parent, String path) { super(parent, path); }
 	
 	@Override public InputStream openInputStream() throws IOException {
 		return new FileInputStream(this);
