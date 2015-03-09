@@ -17,6 +17,7 @@ public class CCouch3Command
 		"  identify          ; identify files/directories\n" +
 		"  upload            ; upload files to a remote repository\n" +
 		"  cache             ; download and cache files from remote repositories\n" +
+		"  copy              ; copy files\n" +
 		"  backup            ; back up files locally\n" +
 		"  command-server    ; run a command server\n" +
 		"  <subcommand> -?   ; get help on a specific command";
