@@ -1,3 +1,8 @@
+# May need to override this on Windows to the full path to git.exe, e.g. by running
+# > set git_exe="C:\Program Files (x86)\Git\bin\git.exe"
+# before running make.
+git_exe?=git
+
 default: CCouch3.jar.urn
 
 .PHONY: \
@@ -19,3 +24,6 @@ CCouch3.jar: $(shell find src/main)
 
 clean:
 	rm -rf target CCouch3.jar ccouch3.jar CCouch3.jar.urn java-bin
+
+update-libraries:
+	${git_exe} subtree pull --prefix=ext-lib/ByteBlob https://github.com/TOGoS/ByteBlob.git master
