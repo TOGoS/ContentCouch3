@@ -1,7 +1,11 @@
-.PHONY: clean default
-.DELETE_ON_ERROR:
-
 default: CCouch3.jar.urn
+
+.PHONY: \
+	clean \
+	default \
+	update-libraries
+
+.DELETE_ON_ERROR:
 
 CCouch3.jar: $(shell find src/main)
 	rm -rf "target"
