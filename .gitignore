@@ -1,7 +1,9 @@
+.*-src.lst
 .classpath
 .project
 .settings
 CCouch3.jar
+ext-lib/JUnit.jar
 java-src.lst
 target
 temp
