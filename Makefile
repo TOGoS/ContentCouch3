@@ -45,7 +45,11 @@ clean:
 update-libraries:
 	${git_exe} subtree pull --prefix=ext-lib/ByteBlob https://github.com/TOGoS/ByteBlob.git master
 
-run-unit-tests: ext-lib/JUnit.jar
+unit_test_dependencies := ext-lib/JUnit.jar
+
+test-dependencies: ${unit_test_dependencies}
+
+run-unit-tests: ${unit_test_dependencies}
 	rm -rf target/test
 	find src/main src/test ext-lib/*/src/main -name *.java >.java-test-src.lst
 	mkdir -p target/test
