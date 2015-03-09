@@ -32,6 +32,8 @@ public class CCouch3Command
 			return FlowUploader.uploadMain(argi);
 		} else if( "cache".equals(cmd) ) {
 			return Downloader.main(argi);
+		} else if( "copy".equals(cmd) ) {
+			return Copy.main(argi);
 		} else if( "backup".equals(cmd) ) {
 			return UpBacker.backupMain(argi);
 		} else if( "id".equals(cmd) || "identify".equals(cmd) ) {

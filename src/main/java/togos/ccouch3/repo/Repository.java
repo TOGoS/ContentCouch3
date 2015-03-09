@@ -3,6 +3,7 @@ package togos.ccouch3.repo;
 import java.io.IOException;
 import java.io.InputStream;
 
+import togos.blob.ByteBlob;
 import togos.blob.ByteChunk;
 
 /**
@@ -21,5 +22,13 @@ public interface Repository extends FileResolver
 	
 	public ByteChunk getChunk( String urn, int maxSize );
 	
+	/**
+	 * Return null if the blob does not exist in this repository.
+	 */
+	public ByteBlob getBlob( String urn ) throws IOException;
+	
+	/**
+	 * Throws IOException if the blob does not exist in this repository.
+	 */
 	public InputStream getInputStream( String urn ) throws IOException;
 }

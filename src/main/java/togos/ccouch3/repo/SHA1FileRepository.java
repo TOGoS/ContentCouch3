@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 import org.bitpedia.util.Base32;
 
 import togos.blob.ByteChunk;
+import togos.blob.file.FileBlob;
 import togos.blob.util.SimpleByteChunk;
 import togos.ccouch3.util.FileUtil;
 
@@ -32,8 +33,7 @@ public class SHA1FileRepository implements Repository
 	
 	Pattern SHA1EXTRACTOR = Pattern.compile("^urn:(?:sha1|bitprint):([A-Z0-9]{32})");
 	
-	@Override
-	public File getFile( String urn ) {
+	@Override public FileBlob getBlob( String urn ) {
 		Matcher m = SHA1EXTRACTOR.matcher(urn);
 		if( !m.find() ) return null;
 		if( !dataDir.exists() ) return null;
@@ -46,19 +46,19 @@ public class SHA1FileRepository implements Repository
 		if( sectorFileList == null ) return null;
 		
 		for( File sector : sectorFileList ) {
-			File blobFile = new File(sector.getPath() + "/" + postSectorPath); 
+			FileBlob blobFile = new FileBlob(sector, postSectorPath); 
 			if( blobFile.exists() ) return blobFile;
 		}
 		return null;
 	}
 	
-	@Override
-	public boolean contains(String urn) {
+	@Override  public FileBlob getFile( String urn ) { return getBlob(urn); }
+	
+	@Override public boolean contains(String urn) {
 		return getFile( urn ) != null; 
 	}
 	
-	@Override
-	public ByteChunk getChunk( String urn, int maxSize ) {
+	@Override public ByteChunk getChunk( String urn, int maxSize ) {
 		try {
 			File f = getFile( urn );
 			if( f == null || f.length() > maxSize ) return null;
@@ -79,11 +79,10 @@ public class SHA1FileRepository implements Repository
 		}
 	}
 	
-	@Override
-	public InputStream getInputStream( String urn ) throws FileNotFoundException {
-		File f = getFile( urn );
-		if( f == null ) return null;
-		return new FileInputStream(f);
+	@Override public InputStream getInputStream( String urn ) throws IOException {
+		FileBlob f = getFile( urn );
+		if( f == null ) throw new FileNotFoundException();
+		return f.openInputStream();
 	}
 	
 	public void put(String urn, InputStream is) throws StoreException {
@@ -135,4 +134,8 @@ public class SHA1FileRepository implements Repository
 			}
 		}
 	};
+	
+	public String toString() {
+		return getClass().getName()+"( dataDir @ '"+dataDir+"' )";
+	}
 }
