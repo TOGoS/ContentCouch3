@@ -1013,6 +1013,8 @@ public class FlowUploader implements FlowUploaderSettings
 				}
 			}
 		} catch( InterruptedException e ) {
+			System.err.println("Interrupted!");
+			completeSuccess = false;
 			indexThread.interrupt();
 			for( UploadClient uc : uploadClients ) uc.halt();
 			Thread.currentThread().interrupt();
@@ -1028,8 +1030,8 @@ public class FlowUploader implements FlowUploaderSettings
 			}
 		}
 		
-		if( debug ) {
-			System.err.println(completeSuccess ? "All was successful!" : "Not entirely successful.");
+		if( debug || !completeSuccess ) {
+			System.err.println(completeSuccess ? "All uploads successful!" : "Error: Some uploads did not complete successfully.");
 		}
 		
 		return completeSuccess ? 0 : 1;
