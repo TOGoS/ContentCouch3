@@ -41,6 +41,8 @@ public class CCouch3Command
 			return FlowUploader.identifyMain(argi);
 		} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {
 			return CmdServer.main(argi);
+		} else if( "verify-tree".equals(cmd) ) {
+			return TreeVerifier.main(argi);
 		} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
 			System.out.println(USAGE);
 			return 0;
