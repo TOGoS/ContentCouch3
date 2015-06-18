@@ -47,7 +47,8 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 				showSize = false;
 				showMtime = false;
 				break;
-			default: throw new RuntimeException("Don't know how to encode directory entry with file type "+f.pathSeparator);
+			default:
+				throw new RuntimeException("Don't know how to encode directory entry with file type "+f.getFsObjectType());
 			}
 			
 			w.write("\t\t<DirectoryEntry>\n");
