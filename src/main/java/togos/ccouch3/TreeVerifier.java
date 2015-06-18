@@ -2,11 +2,20 @@ package togos.ccouch3;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 
 import togos.blob.ByteBlob;
+import togos.ccouch3.rdf.CCouchNamespace;
+import togos.ccouch3.rdf.DCNamespace;
+import togos.ccouch3.rdf.RDFIO;
+import togos.ccouch3.rdf.RDFNamespace;
+import togos.ccouch3.rdf.RDFNode;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 
@@ -23,22 +32,22 @@ import togos.ccouch3.repo.SHA1FileRepository;
  */
 public class TreeVerifier
 {
+	enum LinkType { DIRECTORY_ENTRY, COMMIT_PARENT, COMMIT_TARGET };
+	
 	/** What does the thing referencing a blob think it represents */
 	enum ObjectType { UNKNOWN, COMMIT, DIRECTORY, FILE };
-	
-	enum LinkTargetDisposition { FILE, PARENT, TARGET };
 	
 	static class PathLink {
 		public final Path origin;
 		public final String linkName;
-		public final ObjectType targetType;
-		public final LinkTargetDisposition targetDisposition;
+		public final ObjectType expectedTargetType;
+		public final LinkType linkType;
 		
-		public PathLink( Path origin, String linkName, ObjectType targetType, LinkTargetDisposition targetDisposition ) {
+		public PathLink( Path origin, String linkName, LinkType linkType, ObjectType targetType ) {
 			this.origin = origin;
 			this.linkName = linkName;
-			this.targetType = targetType;
-			this.targetDisposition = targetDisposition;
+			this.linkType = linkType;
+			this.expectedTargetType = targetType;
 		}
 		
 		public String toString(String separator) {
@@ -68,7 +77,8 @@ public class TreeVerifier
 		@Override public String toString() { return toString(" > "); }
 	}
 		
-	protected final Repository repo; 
+	protected final Repository repo;
+	boolean followCommitAncestry = true;
 	
 	public TreeVerifier( Repository repo ) {
 		this.repo = repo;
@@ -79,7 +89,7 @@ public class TreeVerifier
 	
 	protected void logPathError( String error, Path path ) {
 		System.err.println(error);
-		System.err.println("  from "+path);
+		System.err.println("  in "+path.toString("\n   > "));
 	}
 	
 	protected void logMissingBlob( String urn, Path path ) {
@@ -108,7 +118,121 @@ public class TreeVerifier
 		return b;
 	}
 	
-	public void walk( Path path ) {
+	protected void ensureSimpleValues(Map.Entry<String,Set<RDFNode>> prop, Class expectedClass, Path path) {
+		for( RDFNode n : prop.getValue() ) {
+			if( !n.hasOnlySimpleValue() ) {
+				logPathError("Expected a simple value for "+prop.getKey(), path);
+				anyErrors = true;
+			}
+			if( n.simpleValue != null && !expectedClass.isInstance(n.simpleValue) ) {
+				logPathError("Expected "+prop.getKey()+" to be a "+expectedClass.getSimpleName()+
+					", but found a "+n.simpleValue.getClass().getSimpleName(), path);
+			}
+		}
+	}
+	
+	protected void ensureSingleValue(Map.Entry<String,Set<RDFNode>> prop, Path path) {
+		if( prop.getValue().size() != 1 ) {
+			logPathError("Expected a single value for "+prop.getKey()+", but there are "+prop.getValue().size(), path);
+			anyErrors = true;
+		}
+	}
+	
+	protected void ensureSimpleValue(Map.Entry<String,Set<RDFNode>> prop, Class expectedClass, Path path) {
+		ensureSingleValue(prop, path);
+		ensureSimpleValues(prop, expectedClass, path);
+	}
+	
+	protected void walk( RDFNode node, Path path ) {
+		// Could check that path.trace's expected target type matches actual
+		String typeUri = node.getRdfTypeUri();
+		if( CCouchNamespace.DIRECTORY.equals(typeUri) ) {
+			for( Map.Entry<String,Set<RDFNode>> prop : node.properties.entrySet() ) {
+				String propKey = prop.getKey();
+				if( RDFNamespace.RDF_TYPE.equals(propKey) ) {
+					// We know.  Ignore.
+				} else if( CCouchNamespace.ENTRIES.equals(propKey) ) {
+					for( RDFNode entriesNode : prop.getValue() ) {
+						if( !(entriesNode.simpleValue instanceof Collection) ) {
+							logPathError("Directory#entries is not a collection", path);
+							anyErrors = true;
+							continue;
+						}
+						for( RDFNode entry : (Collection<RDFNode>)entriesNode.simpleValue ) {
+							//System.err.println(entry.toString());
+							Object nameObj = entry.properties.getSingle(CCouchNamespace.NAME, RDFNode.EMPTY).simpleValue;
+							if( nameObj == null ) {
+								logPathError("Directory entry lacks a name", path);
+								continue;
+							} else if( !(nameObj instanceof String) ) {
+								logPathError("Directory entry name is not a string", path);
+								continue;
+							}
+							String name = (String)nameObj;
+							String targetUri = entry.properties.getSingle(CCouchNamespace.TARGET, RDFNode.EMPTY).subjectUri;
+							if( targetUri == null ) {
+								logPathError("Directory entry lacks a target URI", path);
+								continue;
+							}
+							
+							ObjectType targetType = ObjectType.UNKNOWN; // TODO: should guess based on entry.target type
+							walk( new Path(new PathLink(path, name, LinkType.DIRECTORY_ENTRY, targetType), targetUri) );
+						}
+					}
+				} else {
+					logPathError("Don't know what to do with Directory property: "+prop.getKey(), path);
+					anyErrors = true;
+				}
+			}
+		} else if( CCouchNamespace.COMMIT.equals(typeUri) ) {
+			int targetCount = 0;
+			for( Map.Entry<String,Set<RDFNode>> prop : node.properties.entrySet() ) {
+				String propKey = prop.getKey();
+				if( RDFNamespace.RDF_TYPE.equals(propKey) ) {
+					// We know.  Ignore.
+				} else if( CCouchNamespace.TARGET.equals(propKey) ) {
+					targetCount += prop.getValue().size();
+					for( RDFNode target : prop.getValue() ) {
+						if( !target.hasOnlySubjectUri() ) {
+							logPathError("Commit target is not a simple reference: "+target, path);
+							anyErrors = true;
+						} else {
+							walk( new Path(new PathLink(path, "target", LinkType.COMMIT_TARGET, ObjectType.UNKNOWN), target.getSubjectUri()) );
+						}
+					}
+				} else if( CCouchNamespace.PARENT.equals(propKey) ) {
+					for( RDFNode parent : prop.getValue() ) {
+						if( !parent.hasOnlySubjectUri() ) {
+							logPathError("Commit parent is not a simple reference: "+parent, path);
+							anyErrors = true;
+						} else {
+							if( followCommitAncestry ) {
+								walk( new Path(new PathLink(path, "parent", LinkType.COMMIT_PARENT, ObjectType.COMMIT), parent.getSubjectUri()) );
+							}
+						}
+					}
+				} else if( DCNamespace.DC_CREATOR.equals(propKey) ) {
+					ensureSimpleValues(prop, String.class, path);
+				} else if( DCNamespace.DC_CREATED.equals(propKey) ) {
+					ensureSimpleValue(prop, String.class, path);
+				} else if( DCNamespace.DC_DESCRIPTION.equals(propKey) ) {
+					ensureSimpleValue(prop, String.class, path);
+				} else {
+					logPathError("Don't know what to do with Commit property: "+prop.getKey(), path);
+					anyErrors = true;
+				}
+			}
+			if( targetCount != 1 ) {
+				logPathError("Commit should have exactly 1 target, but this one has "+targetCount+".", path);
+				anyErrors = true;
+			}
+		} else {
+			logPathError("Don't know what to do with a "+typeUri, path);
+			anyErrors = true;
+		}
+	}
+	
+	protected void walk( Path path ) {
 		String blobUri;
 		boolean interpret;
 		String uri = path.urn;
@@ -123,10 +247,22 @@ public class TreeVerifier
 			interpret = false;
 		}
 		ByteBlob b = verifyBlob(blobUri, path);
-		if( interpret ) {
-			System.err.println("Don't know how to interpret RDF blobs, yet.");
+		if( !interpret || b == null ) return;
+		
+		RDFNode node;
+		try {
+			node = RDFIO.parseRdf(b, blobUri);
+		} catch( IOException e ) {
+			System.err.println("IOException while tryig to parse "+blobUri+": "+e.getMessage());
 			anyErrors = true;
+			return;
+		} catch( ParseException e ) {
+			System.err.println("ParseException while tryig to parse "+blobUri+": "+e.getMessage());
+			anyErrors = true;
+			return;
 		}
+		
+		walk(node, path);
 	}
 	
 	public void walk( String uri ) {
@@ -176,6 +312,6 @@ public class TreeVerifier
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(CmdServer.main( Arrays.asList(args).iterator() ));
+		System.exit(main( Arrays.asList(args).iterator() ));
 	}
 }
