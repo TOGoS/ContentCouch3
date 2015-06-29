@@ -2,7 +2,7 @@ package togos.ccouch3.path;
 
 public class Path
 {
-	/** The path leading here */
+	/** The path leading here.  May be null if this was some kind of root. */
 	public final PathLink trace;
 	/** URN of the current object */
 	public final String urn;

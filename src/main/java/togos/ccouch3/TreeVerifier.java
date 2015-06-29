@@ -2,6 +2,7 @@ package togos.ccouch3;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,12 +36,29 @@ import togos.ccouch3.repo.SHA1FileRepository;
  * @author TOGoS
  */
 public class TreeVerifier
-{		
+{
+	public static interface PathCallback {
+		public void pathVisited( Path p ) throws Exception;
+	}
+	
+	public static class NoopPathCallback implements PathCallback {
+		public static final NoopPathCallback INSTANCE = new NoopPathCallback();
+		private NoopPathCallback() { }
+		@Override
+		public void pathVisited( Path p ) { }
+	}
+	
 	protected final Repository repo;
+	protected final PathCallback pathCallback;
 	boolean followCommitAncestry = true;
 	
-	public TreeVerifier( Repository repo ) {
+	public TreeVerifier( Repository repo, PathCallback callback ) {
 		this.repo = repo;
+		this.pathCallback = callback;
+	}
+	
+	public TreeVerifier( Repository repo ) {
+		this( repo, NoopPathCallback.INSTANCE );
 	}
 	
 	boolean anythingMissing = false;
@@ -102,7 +120,9 @@ public class TreeVerifier
 		ensureSimpleValues(prop, expectedClass, path);
 	}
 	
-	protected void walk( RDFNode node, Path path ) {
+	protected void walk( RDFNode node, Path path ) throws Exception {
+		this.pathCallback.pathVisited(path);
+		
 		// Could check that path.trace's expected target type matches actual
 		String typeUri = node.getRdfTypeUri();
 		if( CCouchNamespace.DIRECTORY.equals(typeUri) ) {
@@ -191,7 +211,7 @@ public class TreeVerifier
 		}
 	}
 	
-	protected void walk( Path path ) {
+	protected void walk( Path path ) throws Exception {
 		String blobUri;
 		boolean interpret;
 		String uri = path.urn;
@@ -224,7 +244,7 @@ public class TreeVerifier
 		walk(node, path);
 	}
 	
-	public void walk( String uri ) {
+	public void walk( String uri ) throws Exception {
 		walk( new Path(null,uri) );
 	}
 	
@@ -236,15 +256,49 @@ public class TreeVerifier
 		"Usage: ccouch3 verify-tree <URN> <URN> ...\n"+
 		"Walk an object tree to find problems";
 	
+	enum OutputMode {
+		SILENT,
+		PATH_TO_URN,
+		URN_LIST
+	}
+	
+	protected static PathCallback pathCallback( OutputMode om, final PrintStream dest ) {
+		switch( om ) {
+		case SILENT:
+			return NoopPathCallback.INSTANCE;
+		case PATH_TO_URN:
+			return new PathCallback() {
+				protected String pathStr(PathLink l) {
+					if( l == null ) return "";
+					
+					String parent = pathStr(l.origin.trace);
+					if( parent.length() > 0 ) parent += "/";
+					
+					return parent + l.linkName;
+				}
+				
+				@Override
+				public void pathVisited(Path p) throws IOException {
+					dest.println(pathStr(p.trace)+"\t"+p.urn);
+				}
+			};
+		default:
+			throw new RuntimeException("Idk "+om);
+		}
+	}
+	
 	public static int main( Iterator<String> argi ) throws Exception {
 		String homeDir = System.getProperty("user.home");
 		if( homeDir == null ) homeDir = ".";
 		String repoDir = homeDir + "/.ccouch";
 		ArrayList<String> urns = new ArrayList<String>();
+		OutputMode outputMode = OutputMode.SILENT;
 		for( ; argi.hasNext(); ) {
 			String arg = argi.next();
 			if( "-repo".equals(arg) ) {
 				repoDir = argi.next();
+			} else if( "-v".equals(arg) ) {
+				outputMode = OutputMode.PATH_TO_URN;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println( USAGE );
 				return 0;
@@ -260,7 +314,7 @@ public class TreeVerifier
 		// We shouldn't be writing anything to it.
 		// If 'wat' sector shows up, something's gone wrong.
 		
-		TreeVerifier tv = new TreeVerifier(repo);
+		TreeVerifier tv = new TreeVerifier(repo, pathCallback(outputMode, System.out));
 		for( String urn : urns ) tv.walk(urn);
 		if( !tv.allIsWell() ) {
 			System.err.println("Stuff's hosed up.");
