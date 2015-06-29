@@ -121,8 +121,6 @@ public class TreeVerifier
 	}
 	
 	protected void walk( RDFNode node, Path path ) throws Exception {
-		this.pathCallback.pathVisited(path);
-		
 		// Could check that path.trace's expected target type matches actual
 		String typeUri = node.getRdfTypeUri();
 		if( CCouchNamespace.DIRECTORY.equals(typeUri) ) {
@@ -212,6 +210,8 @@ public class TreeVerifier
 	}
 	
 	protected void walk( Path path ) throws Exception {
+		this.pathCallback.pathVisited(path);
+		
 		String blobUri;
 		boolean interpret;
 		String uri = path.urn;
