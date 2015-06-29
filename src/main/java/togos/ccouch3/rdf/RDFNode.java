@@ -1,5 +1,6 @@
 package togos.ccouch3.rdf;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 
@@ -74,5 +75,13 @@ public class RDFNode
 		if( s.length() > 9 ) s += "\n";
 		s += "}";
 		return s;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public Collection<RDFNode> getItems() {
+		if( !(simpleValue instanceof Collection) ) {
+			throw new RuntimeException("Not a collection");
+		}
+		return (Collection<RDFNode>)simpleValue;
 	}
 }

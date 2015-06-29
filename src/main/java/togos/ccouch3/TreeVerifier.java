@@ -77,7 +77,7 @@ public class TreeVerifier
 		return b;
 	}
 	
-	protected void ensureSimpleValues(Map.Entry<String,Set<RDFNode>> prop, Class expectedClass, Path path) {
+	protected void ensureSimpleValues(Map.Entry<String,Set<RDFNode>> prop, Class<?> expectedClass, Path path) {
 		for( RDFNode n : prop.getValue() ) {
 			if( !n.hasOnlySimpleValue() ) {
 				logPathError("Expected a simple value for "+prop.getKey(), path);
@@ -97,7 +97,7 @@ public class TreeVerifier
 		}
 	}
 	
-	protected void ensureSimpleValue(Map.Entry<String,Set<RDFNode>> prop, Class expectedClass, Path path) {
+	protected void ensureSimpleValue(Map.Entry<String,Set<RDFNode>> prop, Class<?> expectedClass, Path path) {
 		ensureSingleValue(prop, path);
 		ensureSimpleValues(prop, expectedClass, path);
 	}
@@ -117,7 +117,7 @@ public class TreeVerifier
 							anyErrors = true;
 							continue;
 						}
-						for( RDFNode entry : (Collection<RDFNode>)entriesNode.simpleValue ) {
+						for( RDFNode entry : entriesNode.getItems() ) {
 							//System.err.println(entry.toString());
 							Object nameObj = entry.properties.getSingle(CCouchNamespace.NAME, RDFNode.EMPTY).simpleValue;
 							if( nameObj == null ) {

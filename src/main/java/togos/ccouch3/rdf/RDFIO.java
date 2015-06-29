@@ -58,7 +58,7 @@ public class RDFIO {
 		} else if( value.hasOnlySimpleValue() ) {
 			if( value.simpleValue instanceof Collection ) {
 				w.append(padding + "<" + propNodeName + " rdf:parseType=\"Collection\"");
-				Collection<RDFNode> c = (Collection<RDFNode>)value.simpleValue;
+				Collection<RDFNode> c = value.getItems();
 				// In old style, empty list -> \t<List rdf:parseType="Collection">\n\t</List>
 				// In new style, empty list -> \t<List rdf:parseType="Collection"/>
 				if( c.size() > 0 ) {
@@ -156,6 +156,8 @@ public class RDFIO {
 	
 	static class RDFXMLParseException extends ParseException
 	{
+		private static final long serialVersionUID = 1L;
+		
 		public RDFXMLParseException(String message, int offset) {
 			super(message, offset);
 		}
