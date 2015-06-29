@@ -268,18 +268,21 @@ public class TreeVerifier
 			return NoopPathCallback.INSTANCE;
 		case PATH_TO_URN:
 			return new PathCallback() {
-				protected String pathStr(PathLink l) {
-					if( l == null ) return "";
-					
-					String parent = pathStr(l.origin.trace);
-					if( parent.length() > 0 ) parent += "/";
-					
-					return parent + l.linkName;
+				protected String abbreviate(String originUrn) {
+					return originUrn.length() > 8 ?
+						"..."+originUrn.substring(originUrn.length()-5) :
+						originUrn;
+				}
+				
+				protected String pathStr(Path l) {
+					return l.trace == null ?
+						abbreviate(l.urn) :
+						pathStr(l.trace.origin) + "/" + l.trace.linkName;
 				}
 				
 				@Override
 				public void pathVisited(Path p) throws IOException {
-					dest.println(pathStr(p.trace)+"\t"+p.urn);
+					dest.println(pathStr(p)+"\t"+p.urn);
 				}
 			};
 		default:
