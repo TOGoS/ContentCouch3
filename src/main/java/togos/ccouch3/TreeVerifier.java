@@ -232,11 +232,11 @@ public class TreeVerifier
 		try {
 			node = RDFIO.parseRdf(b, blobUri);
 		} catch( IOException e ) {
-			System.err.println("IOException while tryig to parse "+blobUri+": "+e.getMessage());
+			System.err.println("IOException while trying to parse "+blobUri+": "+e.getMessage());
 			anyErrors = true;
 			return;
 		} catch( ParseException e ) {
-			System.err.println("ParseException while tryig to parse "+blobUri+": "+e.getMessage());
+			System.err.println("ParseException while trying to parse "+blobUri+": "+e.getMessage());
 			anyErrors = true;
 			return;
 		}
