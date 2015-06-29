@@ -11,6 +11,10 @@ import java.util.Map;
 import java.util.Set;
 
 import togos.blob.ByteBlob;
+import togos.ccouch3.path.LinkType;
+import togos.ccouch3.path.ObjectType;
+import togos.ccouch3.path.Path;
+import togos.ccouch3.path.PathLink;
 import togos.ccouch3.rdf.CCouchNamespace;
 import togos.ccouch3.rdf.DCNamespace;
 import togos.ccouch3.rdf.RDFIO;
@@ -31,52 +35,7 @@ import togos.ccouch3.repo.SHA1FileRepository;
  * @author TOGoS
  */
 public class TreeVerifier
-{
-	enum LinkType { DIRECTORY_ENTRY, COMMIT_PARENT, COMMIT_TARGET };
-	
-	/** What does the thing referencing a blob think it represents */
-	enum ObjectType { UNKNOWN, COMMIT, DIRECTORY, FILE };
-	
-	static class PathLink {
-		public final Path origin;
-		public final String linkName;
-		public final ObjectType expectedTargetType;
-		public final LinkType linkType;
-		
-		public PathLink( Path origin, String linkName, LinkType linkType, ObjectType targetType ) {
-			this.origin = origin;
-			this.linkName = linkName;
-			this.linkType = linkType;
-			this.expectedTargetType = targetType;
-		}
-		
-		public String toString(String separator) {
-			return origin.toString(separator) + separator + linkName; 
-		}
-		@Override public String toString() { return toString(" > "); }
-	}
-	
-	static class Path {
-		/** The path leading here */
-		public final PathLink trace;
-		/** URN of the current object */
-		public final String urn;
-		
-		public Path( PathLink trace, String urn ) {
-			this.trace = trace;
-			this.urn = urn;
-		}
-		
-		public String toString(String separator) {
-			if( trace != null ) {
-				return trace.toString(separator) + " ("+urn+")";
-			} else {
-				return urn;
-			}
-		}
-		@Override public String toString() { return toString(" > "); }
-	}
-		
+{		
 	protected final Repository repo;
 	boolean followCommitAncestry = true;
 	
