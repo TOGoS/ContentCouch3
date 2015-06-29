@@ -33,7 +33,7 @@ CCouch3.jar: $(shell find src/main)
 	jar -ce togos.ccouch3.CCouch3Command -C target/main . >CCouch3.jar
 
 ext-lib/JUnit.jar: ext-lib/JUnit.jar.urn | CCouch3.jar
-	${ccouch3} cache -remote-repo pvps1.nuke24.net -sector build `cat "$<"`
+	${ccouch3} cache -remote-repo @build-resource-repos.lst -sector build `cat "$<"`
 	${ccouch3} copy -repo ~/.ccouch `cat "$<"` "$@"
 
 CCouch3.jar.urn: CCouch3.jar
