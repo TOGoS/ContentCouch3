@@ -1211,7 +1211,7 @@ public class FlowUploader implements FlowUploaderSettings
 				cacheEnabled = false;
 			
 			// Local repository options
-			} else if( "-repo".equals(a) || a.startsWith("-local-repo:") ) {
+			} else if( "-local-repo".equals(a) || a.startsWith("-local-repo:") ) {
 				if( a.startsWith("-local-repo:") ) {
 					repoName = a.substring(12);
 				}
