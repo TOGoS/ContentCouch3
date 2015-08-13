@@ -36,6 +36,7 @@ class HTTPUploadClient implements UploadClient
 	protected final String serverUrl;
 	protected final AddableSet<String> fullyCachedUrnSet;
 	protected final TransferTracker transferTracker;
+	protected final Logger logger;
 	
 	protected final ArrayBlockingQueue<Object> headTasks = new ArrayBlockingQueue<Object>(1024);
 	protected final ArrayBlockingQueue<Object> putTasks = new ArrayBlockingQueue<Object>(1024);
@@ -48,12 +49,13 @@ class HTTPUploadClient implements UploadClient
 	boolean inducePutErrors = false;
 	
 	public HTTPUploadClient(
-		String serverName, String serverUrl, AddableSet<String> uc, TransferTracker tt
+		String serverName, String serverUrl, AddableSet<String> uc, TransferTracker tt, Logger logger
 	) {
 		this.serverName = serverName;
 		this.serverUrl = serverUrl;
 		this.fullyCachedUrnSet = uc;
 		this.transferTracker = tt;
+		this.logger = logger;
 		
 		this.headThread = new HeadThread(serverName+" HEAD thread");
 		this.putThread  = new PutThread(serverName+" PUT thread");
@@ -66,9 +68,10 @@ class HTTPUploadClient implements UploadClient
 	}
 	
 	protected boolean existsOnServer( String urn ) throws IOException {
-		if( induceHeadErrors ) throw new ServerError("Not a real error ha ha h", 599, null);
-		
 		URL url = urlFor(urn);
+		
+		if( induceHeadErrors ) throw new ServerError("Not a real error ha ha h", 599, null, "HEAD", url.toString());
+		
 		HttpURLConnection urlCon = (HttpURLConnection)url.openConnection();
 		urlCon.setRequestMethod("HEAD");
 		urlCon.connect();
@@ -85,13 +88,18 @@ class HTTPUploadClient implements UploadClient
 	
 	static class ServerError extends IOException {
 		private static final long serialVersionUID = 1L;
-		
+				
 		public final int statusCode;
 		public final byte[] data;
-		public ServerError( String message, int statusCode, byte[] data ) {
+		public final String requestMethod;
+		public final String requestUrl;
+		
+		public ServerError( String message, int statusCode, byte[] data, String requestMethod, String requestUrl ) {
 			super(message);
 			this.statusCode = statusCode;
 			this.data = data;
+			this.requestMethod = requestMethod;
+			this.requestUrl = requestUrl;
 		}
 		
 		@Override public String getMessage() {
@@ -112,13 +120,14 @@ class HTTPUploadClient implements UploadClient
 			transferTracker.sendingFile( ((FileInfo)bi).getPath() );
 		}
 		
-		if( inducePutErrors ) {
-			throw new ServerError("Not a real server error; yuk yuk.", 599, null);
-		}
-		
 		InputStream is = bi.openInputStream();
 		try {
 			URL url = urlFor(bi.getUrn());
+			
+			if( inducePutErrors ) {
+				throw new ServerError("Not a real server error; yuk yuk.", 599, null, "PUT", url.toString());
+			}
+			
 			HttpURLConnection urlCon = (HttpURLConnection)url.openConnection();
 			urlCon.setRequestMethod("PUT");
 			urlCon.setDoOutput(true);
@@ -144,7 +153,9 @@ class HTTPUploadClient implements UploadClient
 				
 				throw new ServerError(
 					"PUT received unexpected response code "+status+"; "+urlCon.getResponseMessage(),
-					status, errorText);
+					status, errorText,
+					"PUT", url.toString()
+				);
 			}
 		} finally {
 			is.close();
@@ -152,7 +163,7 @@ class HTTPUploadClient implements UploadClient
 		transferTracker.transferred(bi.getSize(), 1, tag);
 	}
 	
-	int maxUploadAttempts = 1;
+	public int maxUploadAttempts = 1;
 	
 	protected void upload( BlobInfo bi, String tag ) throws IOException {
 		int attemptsLeft = maxUploadAttempts;
@@ -183,6 +194,20 @@ class HTTPUploadClient implements UploadClient
 	
 	protected void upload( BlobInfo bi ) throws IOException {
 		upload( bi, bi instanceof FileInfo ? TransferTracker.TAG_FILE : TransferTracker.TAG_TREENODE );
+	}
+	
+	protected void reportServerError( ServerError e, boolean isFailure ) {
+		System.err.println("Server error"+(isFailure ? "" : " (but not necessarily a failure)")+" from "+e.requestMethod+" "+e.requestUrl);
+		try {
+			System.err.println("  status="+e.statusCode+"; see "+logger.dumpToLog(e.data)+" for details");
+		} catch( IOException le ) {
+			System.err.println("  status="+e.statusCode+"; failed to dump output to file ("+le.getMessage()+", so here it is:");
+			try {
+				System.err.write(e.data);
+			} catch( IOException le2 ) {
+				System.err.println("  Also failed to dump server output to STDERR.  I give up.");
+			}
+		}
 	}
 	
 	final int SMALL_BLOB_SIZE = 8192;
@@ -219,21 +244,43 @@ class HTTPUploadClient implements UploadClient
 			if( m instanceof BlobInfo ) {
 				// Is it small?  Then just upload it.
 				BlobInfo bi = (BlobInfo)m;
+				boolean putAttemptedAndFailed = false;
 				if( bi.getSize() < SMALL_BLOB_SIZE ) {
-					upload(bi);
-					return false;
-				} else if( existsOnServer(bi.getUrn()) ) {
+					// Try uploading it!
+					try {
+						upload(bi);
+						return false;
+					} catch( ServerError e ) {
+						// If that errors, report the error but otherwise continue as if we hadn't tried.
+						// We might next find that it exists on the server, in which case everything's
+						// fine.  But if it /doesn't/ then that was a failure.
+						reportServerError(e, false);
+						putAttemptedAndFailed = true;
+					}
+				}
+				if( existsOnServer(bi.getUrn()) ) {
 					return false;
 				} else {
+					if( putAttemptedAndFailed ) {
+						System.err.println("Okay, that failed PUT actually was a failure, since the file's not on the server.");
+						anyFailures = true;
+						// No point passing this on.
+						return false;
+					}
 					return true;
 				}
 			} else if( m instanceof FullyStoredMarker ) {
-				return true;
+				// These are only 'guaranteed' (assuming the server's behaving) to be true if no errors occur.
+				// So if errors have occurred, don't forward these!
+				return !anyFailures;
 			} else if( m instanceof LogMessage ) {
 				// Ignored
 				return false;
 			} else if( m instanceof PutHead ) {
-				// Ignored
+				// Ignored!
+				// But it would be neat if there was a way to do this!
+				// Maybe using PK crypto or something.
+				// Feature for the future, maybe.
 				return false;
 			} else if( m instanceof EndMessage ) {
 				completed = true;
@@ -284,9 +331,14 @@ class HTTPUploadClient implements UploadClient
 		protected void handle(Object m) throws Exception {
 			if( debug ) System.err.println(getName()+" received "+m.getClass());
 			if( m instanceof BlobInfo ) {
-				upload((BlobInfo)m);
+				try {
+					upload((BlobInfo)m);
+				} catch( ServerError e ) {
+					anyFailures = true;
+					reportServerError(e, true);
+				}
 			} else if( m instanceof FullyStoredMarker ) {
-				fullyCachedUrnSet.add( ((FullyStoredMarker)m).urn );
+				if( !anyFailures ) fullyCachedUrnSet.add( ((FullyStoredMarker)m).urn );
 			} else if( m instanceof LogMessage ) {
 				// Ignored
 			} else if( m instanceof PutHead ) {

@@ -67,12 +67,12 @@ public class FileUtil
 		return new File( f + ext );
 	}
 	
-	public static void writeAtomic( File f, ByteChunk c ) throws IOException {
+	public static void writeAtomic( File f, byte[] data, int offset, int length ) throws IOException {
 		FileUtil.mkParentDirs( f );
 		File tempFile = tempFile( f );
 		FileOutputStream fos = new FileOutputStream( tempFile );
 		try {
-			fos.write( c.getBuffer(), c.getOffset(), BlobUtil.chunkLength(c) );
+			fos.write( data, offset, length );
 			if( !tempFile.renameTo( f ) ) {
 				throw new IOException("Failed to rename "+tempFile+" to "+f);
 			}
@@ -80,5 +80,13 @@ public class FileUtil
 			if( tempFile.exists() ) tempFile.delete();
 			fos.close();
 		}
+	}
+	
+	public static void writeAtomic( File f, byte[] data ) throws IOException {
+		writeAtomic(f, data, 0, data.length);
+	}
+	
+	public static void writeAtomic( File f, ByteChunk c ) throws IOException {
+		writeAtomic( f, c.getBuffer(), c.getOffset(), BlobUtil.chunkLength(c) );
 	}
 }

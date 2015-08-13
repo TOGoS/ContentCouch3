@@ -40,6 +40,7 @@ import togos.ccouch3.util.SLFStringSet;
 interface FlowUploaderSettings {
 	public boolean isDebugging();
 	public boolean isFastExitEnabled();
+	public Logger getLogger();
 }
 
 public class FlowUploader implements FlowUploaderSettings
@@ -650,12 +651,22 @@ public class FlowUploader implements FlowUploaderSettings
 		public boolean reportUrn = false;
 		public StreamURNifier digestor = BitprintDigest.STREAM_URNIFIER;
 		public DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
+		public File primaryRepoDir;
 		public File cacheDir;
 		public File dataDir;
 		public File headDir;
 		public String storeSector = "user";
 		public Collection<UploadClientSpec> uploadClientSpecs = new ArrayList<UploadClientSpec>();
-		public BlobReferenceScanMode scanMode = BlobReferenceScanMode.NEVER; 
+		public BlobReferenceScanMode scanMode = BlobReferenceScanMode.NEVER;
+		
+		public static FlowUploaderConfig defaults() {
+			FlowUploaderConfig config = new FlowUploaderConfig();
+			String home = System.getProperty("user.home");
+			if( home != null ) {
+				config.primaryRepoDir = new File(home, ".ccouch");
+			}
+			return config;
+		}
 	}
 	
 	//// Put it all together ////
@@ -670,6 +681,7 @@ public class FlowUploader implements FlowUploaderSettings
 	protected final boolean reportUrn;
 	protected final StreamURNifier digestor;
 	protected final DirectorySerializer dirSer;
+	protected final File primaryRepoDir;
 	protected final File cacheDir;
 	protected final BlobReferenceScanMode scanMode;
 	
@@ -692,6 +704,7 @@ public class FlowUploader implements FlowUploaderSettings
 		this.reportUrn = config.reportUrn;
 		this.digestor = config.digestor;
 		this.dirSer = config.dirSer;
+		this.primaryRepoDir = config.primaryRepoDir;
 		this.cacheDir = config.cacheDir;
 		this.dataDir = config.dataDir;
 		this.headDir = config.headDir;
@@ -705,6 +718,13 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	public boolean isFastExitEnabled() {
 		return fastExitEnabled;
+	}
+	protected Logger logger;
+	public Logger getLogger() {
+		if( logger == null ) {
+			logger = new NormalLogger(new File(primaryRepoDir, "log"));
+		}
+		return logger;
 	}
 	
 	protected HashCache hashCache;
@@ -1046,8 +1066,8 @@ public class FlowUploader implements FlowUploaderSettings
 	 * Returns an appropriate directory for storing cache files
 	 * within the repository at the given path.
 	 */
-	static String repoCacheDir( String repoPath ) {
-		return stripTrailingSlash(repoPath) + "/cache/flow-uploader";
+	static File repoCacheDir( File repoDir ) {
+		return new File( repoDir, "cache" + File.separator + "flow-uploader");
 	}
 	
 	/**
@@ -1055,16 +1075,16 @@ public class FlowUploader implements FlowUploaderSettings
 	 * (this directory will contain 'sector' directories)
 	 * within the repository at the given path.
 	 */
-	static String repoDataDir( String repoPath ) {
-		return stripTrailingSlash(repoPath) + "/data";
+	static File repoDataDir( File repoDir ) {
+		return new File(repoDir, "data");
 	}
 	
 	/**
 	 * Returns an appropriate directory for storing head files
 	 * within the repository at the given path.
 	 */
-	static String repoHeadDir( String repoPath ) {
-		return stripTrailingSlash(repoPath) + "/heads";
+	static File repoHeadDir( File repoDir ) {
+		return new File(repoDir, "heads");
 	}
 	
 	static class FlowUploaderCommand {
@@ -1131,6 +1151,7 @@ public class FlowUploader implements FlowUploaderSettings
 	static class HTTPUploadClientSpec implements UploadClientSpec {
 		public final String name;
 		public final String url;
+		public int maxUploadAttempts;
 		
 		public HTTPUploadClientSpec( String name, String url ) {
 			this.name = name;
@@ -1140,8 +1161,9 @@ public class FlowUploader implements FlowUploaderSettings
 		public String getServerName() { return name; }
 		
 		public UploadClient createClient( AddableSet<String> uc, TransferTracker tt, FlowUploaderSettings fus ) {
-			HTTPUploadClient huc = new HTTPUploadClient( name, url, uc, tt );
+			HTTPUploadClient huc = new HTTPUploadClient( name, url, uc, tt, fus.getLogger() );
 			huc.debug = fus.isDebugging();
+			huc.maxUploadAttempts = maxUploadAttempts;
 			//huc.dieWhenNothingToSend = fus.isFastExitEnabled();
 			return huc;
 		}
@@ -1168,13 +1190,13 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	static FlowUploaderCommand fromArgs( Iterator<String> args, boolean requireServer, boolean alwaysShowUrns ) throws Exception {
-		FlowUploaderConfig config = new FlowUploaderConfig();
+		FlowUploaderConfig config = FlowUploaderConfig.defaults();
 		
 		boolean verbose = false;
 		boolean cacheEnabled = true;
-		String cacheDir = null;
-		String dataDir = null;
-		String headDir = null;
+		File cacheDir = null;
+		File dataDir = null;
+		File headDir = null;
 		String serverName = null;
 		String[] serverCommand = null;
 		
@@ -1211,28 +1233,31 @@ public class FlowUploader implements FlowUploaderSettings
 				cacheEnabled = false;
 			
 			// Local repository options
-			} else if( "-local-repo".equals(a) || a.startsWith("-local-repo:") ) {
-				if( a.startsWith("-local-repo:") ) {
-					repoName = a.substring(12);
-				}
+			} else if(
+				"-local-repo".equals(a) || a.startsWith("-local-repo:") ||
+				"-repo".equals(a) || a.startsWith("-repo:") // For backwards compatibility!
+			) {
+				if( a.contains(":") ) repoName = a.substring(a.indexOf(":")+1);
 				
-				String repoDir = args.next();
-				cacheDir = repoCacheDir( repoDir );
-				dataDir  = repoDataDir( repoDir );
-				headDir  = repoHeadDir( repoDir ); 
-				
+				config.primaryRepoDir = new File(args.next());
+				cacheDir = repoCacheDir( config.primaryRepoDir );
+				dataDir  = repoDataDir( config.primaryRepoDir );
+				headDir  = repoHeadDir( config.primaryRepoDir );
 			} else if( "-cache-dir".equals(a) ) {
-				cacheDir = args.next();
+				cacheDir = new File(args.next());
 			} else if( "-data-dir".equals(a) ) {
-				dataDir = args.next();
-				
+				dataDir = new File(args.next());
 			} else if( "-sector".equals(a) ) {
 				config.storeSector = args.next();
 			} else if( "-server-name".equals(a) ) {
 				serverName = args.next();
-			} else if( a.startsWith("-http-server:") ) {
-				final String sn = a.substring(13);
-				config.uploadClientSpecs.add( new HTTPUploadClientSpec(sn, RepoURLDefuzzer.defuzzRemoteRepoPrefix(args.next())) );
+			} else if( a.startsWith("-http-server:") || a.startsWith("-flaky-http-server:") ) {
+				final String sn = a.substring(a.indexOf(":"));
+				HTTPUploadClientSpec hucs = new HTTPUploadClientSpec(sn, RepoURLDefuzzer.defuzzRemoteRepoPrefix(args.next()));
+				if( a.startsWith("-flaky") ) {
+					hucs.maxUploadAttempts = 4;
+				}
+				config.uploadClientSpecs.add( hucs );
 			} else if( a.startsWith("-command-server:") ) {
 				final String sn = a.substring(16);
 				try {
@@ -1285,29 +1310,23 @@ public class FlowUploader implements FlowUploaderSettings
 		if( !cacheEnabled ) {
 			config.cacheDir = null;
 		} else if( cacheDir == null ) {
-			String homeDir = System.getProperty("user.home");
-			if( homeDir == null ) homeDir = ".";
-			config.cacheDir = new File(repoCacheDir(homeDir + "/.ccouch"));
+			config.cacheDir = repoCacheDir(config.primaryRepoDir);
 		} else {
-			config.cacheDir = new File(cacheDir);
+			config.cacheDir = cacheDir;
 		}
 		
 		// TODO: Allow multiple data directories for reading
 		
 		if( dataDir == null ) {
-			String homeDir = System.getProperty("user.home");
-			if( homeDir == null ) homeDir = ".";
-			config.dataDir = new File(repoDataDir(homeDir + "/.ccouch"));
+			config.dataDir = repoDataDir(config.primaryRepoDir);
 		} else {
-			config.dataDir = new File(dataDir);
+			config.dataDir = dataDir;
 		}
 		
 		if( headDir == null ) {
-			String homeDir = System.getProperty("user.home");
-			if( homeDir == null ) homeDir = ".";
-			config.headDir = new File(repoHeadDir(homeDir + "/.ccouch"));
+			config.headDir = repoHeadDir(config.primaryRepoDir);
 		} else {
-			config.headDir = new File(headDir);
+			config.headDir = headDir;
 		}
 		
 		// Set up upload clients //
@@ -1351,6 +1370,7 @@ public class FlowUploader implements FlowUploaderSettings
 		"                 ; when creating a named commit with '-n'\n" +
 		"  -no-cache      ; Do not cache file hashes or upload records.\n" +
 		"  -http-server:<name> <url> ; PUT files to a N2R server.\n" +
+		"  -flaky-http-server:<name> <url> ; Same, but retry a few times on server errors.\n" +
 		"  -command-server:<name> <cmd> <arg> <arg> ... ';' ; Add a command to pipe\n" +
 		"                 ; cmd-server commands to\n" +
 		//"  -server-name <name> ; name of repository you are uploading to;\n" +
