@@ -1,4 +1,8 @@
-- "-upload-queue-size infinite" option to upload so that slow servers don't prevent indexer from finishing or fast servers from being uploaded to
+- "-upload-queue-size 99999" option to upload
+  so that slow servers don't prevent indexer from finishing or fast
+  servers from being uploaded to
+- support x-ccouch-head URIs as command-line arguments
+  to 'id', 'upload', 'download' (and any others where they are applicable)
 
 - When -n (name) is given, report that instead of path in log
 - When -m and/or -a are given, create a commit and log its URN in addition or in place of the file URN 
@@ -6,3 +10,4 @@
 * Online help text
 * Upload to multiple servers at once
 * Fix uploading zero-length file bug
+* Link to server error message instead of including inline
