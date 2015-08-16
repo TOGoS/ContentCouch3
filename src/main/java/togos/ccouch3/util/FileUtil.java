@@ -72,13 +72,16 @@ public class FileUtil
 		File tempFile = tempFile( f );
 		FileOutputStream fos = new FileOutputStream( tempFile );
 		try {
-			fos.write( data, offset, length );
+			try {
+				fos.write( data, offset, length );
+			} finally {
+				fos.close();
+			}
 			if( !tempFile.renameTo( f ) ) {
 				throw new IOException("Failed to rename "+tempFile+" to "+f);
 			}
 		} finally {
 			if( tempFile.exists() ) tempFile.delete();
-			fos.close();
 		}
 	}
 	
