@@ -52,15 +52,21 @@ public class SHA1FileRepository implements Repository
 		return null;
 	}
 	
-	@Override  public FileBlob getFile( String urn ) { return getBlob(urn); }
+	protected FileBlob _getFile( String urn ) { return getBlob(urn); }
+	
+	@Override public FileBlob getFile( String urn ) throws FileNotFoundException {
+		FileBlob f = _getFile(urn);
+		if( f == null ) throw new FileNotFoundException(urn+" not found in repository");
+		return f;
+	}
 	
 	@Override public boolean contains(String urn) {
-		return getFile( urn ) != null; 
+		return _getFile( urn ) != null; 
 	}
 	
 	@Override public ByteChunk getChunk( String urn, int maxSize ) {
 		try {
-			File f = getFile( urn );
+			File f = _getFile( urn );
 			if( f == null || f.length() > maxSize ) return null;
 			
 			int size = (int)f.length();
@@ -80,7 +86,7 @@ public class SHA1FileRepository implements Repository
 	}
 	
 	@Override public InputStream getInputStream( String urn ) throws IOException {
-		FileBlob f = getFile( urn );
+		FileBlob f = _getFile( urn );
 		if( f == null ) throw new FileNotFoundException();
 		return f.openInputStream();
 	}

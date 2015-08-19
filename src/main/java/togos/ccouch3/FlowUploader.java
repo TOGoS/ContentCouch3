@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -619,9 +620,11 @@ public class FlowUploader implements FlowUploaderSettings
 			
 			// Note: There's no reason this needs to be a file.
 			// Could go all indexBlob(), here.
-			File f = localUrnBlobResolver.getFile(urn);
-			if( f == null ) {
-				System.err.println("Couldn't find "+urn);
+			File f;
+			try {
+				f = localUrnBlobResolver.getFile(urn);
+			} catch( FileNotFoundException e ) {
+				System.err.println(e.getMessage());
 				indexedBlobByUrn(urn, false);
 				return false;
 			}
@@ -636,7 +639,8 @@ public class FlowUploader implements FlowUploaderSettings
 		}
 		
 		protected IndexResult index( String path, Collection<IndexedObjectSink> destinations ) throws Exception {
-			return index( localFileResolver.getFile(path), destinations );
+			File f = localFileResolver.getFile(path);
+			return index( f, destinations );
 		}
 	}
 	
@@ -770,7 +774,7 @@ public class FlowUploader implements FlowUploaderSettings
 			
 			localFileResolver = new FileResolver() {
 				@Override
-				public File getFile(String name) {
+				public File getFile(String name) throws FileNotFoundException {
 					if( name.startsWith("urn:") ) {
 						return localRepo.getFile(name);
 					}
