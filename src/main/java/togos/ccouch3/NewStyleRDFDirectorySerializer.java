@@ -31,44 +31,48 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 		if( needBzNamespace ) w.write(" xmlns:bz=\"http://bitzi.com/xmlns/2002/01/bz-core#\"");
 		if( needDcNamespace ) w.write(" xmlns:dc=\"http://purl.org/dc/terms/\"");
 		w.write(" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n");
-		w.write("\t<entries rdf:parseType=\"Collection\">\n");
-		
-		for( DirectoryEntry f : sortedEntries ) {
-			String tag;
-			boolean showSize, showMtime;
-			switch( f.getFsObjectType() ) {
-			case BLOB:
-				tag = "Blob";
-				showSize = f.getSize() != -1;
-				showMtime = f.getLastModificationTime() != -1;
-				break;
-			case DIRECTORY:
-				tag = "Directory";
-				showSize = false;
-				showMtime = false;
-				break;
-			default:
-				throw new RuntimeException("Don't know how to encode directory entry with file type "+f.getFsObjectType());
-			}
+		if( sortedEntries.size() > 0 ) { 
+			w.write("\t<entries rdf:parseType=\"Collection\">\n");
 			
-			w.write("\t\t<DirectoryEntry>\n");
-			w.write("\t\t\t<name>" + XMLUtil.xmlEscapeText(f.name) + "</name>\n");
-			w.write("\t\t\t<target>\n");
-			w.write("\t\t\t\t<" + tag + " rdf:about=\"" + XMLUtil.xmlEscapeAttribute(f.getUrn()) + "\"");
-			if( showSize ) {
-				w.write(">\n");
-				w.write( "\t\t\t\t\t<bz:fileLength>" + String.valueOf(f.getSize()) + "</bz:fileLength>\n" );
-				w.write("\t\t\t\t</" + tag + ">\n");
-			} else {
-				w.write("/>\n");
+			for( DirectoryEntry f : sortedEntries ) {
+				String tag;
+				boolean showSize, showMtime;
+				switch( f.getFsObjectType() ) {
+				case BLOB:
+					tag = "Blob";
+					showSize = f.getSize() != -1;
+					showMtime = f.getLastModificationTime() != -1;
+					break;
+				case DIRECTORY:
+					tag = "Directory";
+					showSize = false;
+					showMtime = false;
+					break;
+				default:
+					throw new RuntimeException("Don't know how to encode directory entry with file type "+f.getFsObjectType());
+				}
+				
+				w.write("\t\t<DirectoryEntry>\n");
+				w.write("\t\t\t<name>" + XMLUtil.xmlEscapeText(f.name) + "</name>\n");
+				w.write("\t\t\t<target>\n");
+				w.write("\t\t\t\t<" + tag + " rdf:about=\"" + XMLUtil.xmlEscapeAttribute(f.getUrn()) + "\"");
+				if( showSize ) {
+					w.write(">\n");
+					w.write( "\t\t\t\t\t<bz:fileLength>" + String.valueOf(f.getSize()) + "</bz:fileLength>\n" );
+					w.write("\t\t\t\t</" + tag + ">\n");
+				} else {
+					w.write("/>\n");
+				}
+				w.write("\t\t\t</target>\n");
+				if( showMtime ) {
+					w.write( "\t\t\t<dc:modified>" + DateUtil.formatDate(f.getLastModificationTime()) + "</dc:modified>\n" );
+				}
+				w.write("\t\t</DirectoryEntry>\n");
 			}
-			w.write("\t\t\t</target>\n");
-			if( showMtime ) {
-				w.write( "\t\t\t<dc:modified>" + DateUtil.formatDate(f.getLastModificationTime()) + "</dc:modified>\n" );
-			}
-			w.write("\t\t</DirectoryEntry>\n");
+			w.write("\t</entries>\n");
+		} else {
+			w.write("\t<entries rdf:parseType=\"Collection\"/>\n");
 		}
-		w.write("\t</entries>\n");
 		w.write("</Directory>\n");
 		w.flush();
 	}

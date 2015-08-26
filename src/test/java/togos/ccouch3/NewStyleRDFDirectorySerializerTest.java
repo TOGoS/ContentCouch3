@@ -147,4 +147,13 @@ public class NewStyleRDFDirectorySerializerTest extends TestCase
 			new DirectoryEntry("2010-01", "x-rdf-subject:urn:sha1:AO6BBOUDVIXOV6PEDR7GM536K3WLO6ES", FSObjectType.DIRECTORY, 1234, DateUtil.parseDate("2010-01-01 06:00:32 GMT").getTime())
 		});
 	}
+	
+	protected static final String emptyDirectoryString =
+		"<Directory xmlns=\"http://ns.nuke24.net/ContentCouch/\" xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n" +
+		"\t<entries rdf:parseType=\"Collection\"/>\n" +
+		"</Directory>\n";
+	
+	public void testEmptyDirectory() throws ParseException {
+		assertSerializesTo( emptyDirectoryString, new DirectoryEntry[] {} );
+	}
 }
