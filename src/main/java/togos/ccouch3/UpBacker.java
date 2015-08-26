@@ -152,7 +152,7 @@ public class UpBacker
 		System.err.print( s10+s10+s10+s10+s10+s10+s10+"     \r" );
 	}
 	
-	protected StoreResult store( File f ) {
+	protected StoreResult store( File f, Glob ignores ) {
 		if( shouldShowProgress ) {
 			currentPath = f.getPath();
 			showProgress();
@@ -164,6 +164,13 @@ public class UpBacker
 		}
 
 		if( f.isDirectory() ) {
+			File ignoreFile = new File(f, ".ccouchignore");
+			try {
+				if( ignoreFile.exists() ) ignores = Glob.load(ignoreFile, ignores);
+			} catch( IOException e1 ) {
+				System.err.println("Error loading ignore file: "+ignoreFile);
+			}
+			
 			File[] subFiles = f.listFiles();
 			if( subFiles == null ) {
 				System.err.println("Failed to store "+f+"; unable to list directory");
@@ -175,9 +182,9 @@ public class UpBacker
 			
 			ArrayList<DirectoryEntry> entries = new ArrayList<DirectoryEntry>();
 			for( File sf : subFiles ) {
-				if( FileUtil.shouldIgnore(sf) ) continue;
+				if( FileUtil.shouldIgnore(ignores, sf) ) continue;
 				
-				StoreResult r = store(sf);
+				StoreResult r = store(sf, ignores);
 				errorCount += r.errorCount;
 				if( r.fileInfo != null ) {
 					entries.add( new DirectoryEntry(sf.getName(), r.fileInfo ) );
@@ -260,7 +267,7 @@ public class UpBacker
 		
 		int errorCount = 0;
 		for( File f : thingsToStore ) {
-			StoreResult r = store(f);
+			StoreResult r = store(f, FileUtil.DEFAULT_IGNORES);
 			errorCount += r.errorCount;
 			rootStored(f, r);
 		}

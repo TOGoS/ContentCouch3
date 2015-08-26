@@ -358,7 +358,7 @@ public class FlowUploader implements FlowUploaderSettings
 			this.debug = debug;
 		}
 				
-		public DirectoryContentsIndexResult indexDirectoryEntries( File file, Collection<IndexedObjectSink> destinations) throws Exception {
+		public DirectoryContentsIndexResult indexDirectoryEntries( File file, Collection<IndexedObjectSink> destinations, Glob ignores) throws Exception {
 			assert file.isDirectory();
 			
 			ArrayList<DirectoryEntry> entries = new ArrayList<DirectoryEntry>();
@@ -380,11 +380,11 @@ public class FlowUploader implements FlowUploaderSettings
 			
 			boolean allEntriesFullyStored = true;
 			for( File c : dirEntries ) {
-				if( FileUtil.shouldIgnore(c) ) continue;
+				if( FileUtil.shouldIgnore(ignores, c) ) continue;
 				
 				IndexResult indexResult;
 				try {
-					indexResult = index(c, destinations);
+					indexResult = index(c, destinations, ignores);
 					allEntriesFullyStored &= indexResult.fullyStored;
 				} catch( FileReadError e ) {
 					switch( howToHandleFileReadErrors ) {
@@ -469,7 +469,7 @@ public class FlowUploader implements FlowUploaderSettings
 		// once the file is found, the original URN gets ignored and
 		// the URN has to be re-calculated!
 		
-		protected IndexResult index( File file, Collection<IndexedObjectSink> destinations ) throws Exception {
+		protected IndexResult index( File file, Collection<IndexedObjectSink> destinations, final Glob ignores ) throws Exception {
 			if( debug ) System.err.println("Indexer: "+file+"...");
 			String cachedUrn = hashCache.getFileUrn( file );
 			if( debug ) {
@@ -540,7 +540,10 @@ public class FlowUploader implements FlowUploaderSettings
 					}
 				}
 			} else if( file.isDirectory() ) {
-				DirectoryContentsIndexResult contentsIndexResult = indexDirectoryEntries( file, destinations );
+				File ignoreFile = new File(file, ".ccouchignore");
+				Glob myIgnores = ignoreFile.exists() ? Glob.load(ignoreFile, ignores) : ignores;
+				
+				DirectoryContentsIndexResult contentsIndexResult = indexDirectoryEntries( file, destinations, myIgnores );
 				fullyUploaded = contentsIndexResult.fullyStored;
 				
 				byte[] serialized = serializeDirectory(contentsIndexResult.entries);
@@ -629,7 +632,7 @@ public class FlowUploader implements FlowUploaderSettings
 				return false;
 			}
 			try {
-				boolean success = index(f, destinations).fullyStored;
+				boolean success = index(f, destinations, FileUtil.DEFAULT_IGNORES).fullyStored;
 				indexedBlobByUrn(urn, success);
 				return success;
 			} catch( Exception e ) {
@@ -640,7 +643,7 @@ public class FlowUploader implements FlowUploaderSettings
 		
 		protected IndexResult index( String path, Collection<IndexedObjectSink> destinations ) throws Exception {
 			File f = localFileResolver.getFile(path);
-			return index( f, destinations );
+			return index( f, destinations, FileUtil.DEFAULT_IGNORES);
 		}
 	}
 	

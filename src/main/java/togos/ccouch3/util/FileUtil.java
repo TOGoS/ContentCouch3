@@ -9,19 +9,31 @@ import java.util.Random;
 import togos.blob.ByteChunk;
 import togos.blob.util.BlobUtil;
 import togos.blob.util.SimpleByteChunk;
+import togos.ccouch3.Glob;
 
 public class FileUtil
 {
 	private FileUtil() { }
 	
 	static final String[] IGNORE_FILENAMES = {
-		"thumbs.db", "desktop.ini"
+		"thumbs.db", "desktop.ini",
 	};
 	
-	public static boolean shouldIgnore( File f ) {
-		if( f.isHidden() || f.getName().startsWith(".") ) return true;
-		String name = f.getName().toLowerCase();
-		for( String ifn : IGNORE_FILENAMES ) if( ifn.equals(name) ) return true;
+	public static final Glob DEFAULT_IGNORES = Glob.load(null, new String[] { ".*" }, null);
+	
+	public static boolean shouldIgnore( Glob ignores, File f ) {
+		Boolean matchGlobs = Glob.anyMatch(ignores, f, null);
+		if( matchGlobs != null ) return matchGlobs.booleanValue();
+		
+		// If the globs didn't explicitly say to keep or ignore it,
+		// follow a few additional rules
+		// (maybe eventually these can be encoded by Globs):
+		
+		if( f.isHidden() ) return true;
+		
+		String lowerCaseName = f.getName().toLowerCase();
+		for( String ifn : IGNORE_FILENAMES ) if( ifn.equals(lowerCaseName) ) return true;
+		
 		return false;
 	}
 	
