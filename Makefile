@@ -33,8 +33,9 @@ CCouch3.jar: $(shell find src/main)
 	jar -ce togos.ccouch3.CCouch3Command -C target/main . >CCouch3.jar
 
 ext-lib/JUnit.jar: ext-lib/JUnit.jar.urn | CCouch3.jar
-	${ccouch3} cache -remote-repo @build-resource-repos.lst -sector build `cat "$<"`
-	${ccouch3} copy -repo ~/.ccouch `cat "$<"` "$@"
+	#${ccouch3} cache -remote-repo @build-resource-repos.lst -sector build `cat "$<"`
+	#${ccouch3} copy -repo ~/.ccouch `cat "$<"` "$@"
+	wget http://zappie1.nuke24.net/uri-res/raw/urn:bitprint:TEJJ6FSEFBCPNJFBDLRC7O7OICYU252P.XZMJNNSDGM456CHQCJI22DUDWYK6ZASNPLJ26GA/JUnit.jar -O "$@"
 
 CCouch3.jar.urn: CCouch3.jar
 	java -ea -jar CCouch3.jar id "$<" >"$@"
