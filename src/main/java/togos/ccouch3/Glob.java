@@ -4,18 +4,17 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Glob {
-	public static final Glob NUL = new Glob(false, Pattern.compile("(?!x)x"), null);
-	
 	/** For purposes of pattern matching, always use this instead of File.separator */
 	public static final String SEPARATOR = "/";
 	
-	public final boolean negate;
-	public final Pattern pattern;
-	public final Glob next;
-	public Glob( boolean negate, Pattern p, Glob next ) {
+	protected final boolean negate;
+	protected final Pattern pattern;
+	protected final Glob next;
+	protected Glob( boolean negate, Pattern p, Glob next ) {
 		this.negate = negate;
 		this.pattern = p;
 		this.next = next;
@@ -24,6 +23,8 @@ public class Glob {
 	protected static String path( File f ) {
 		return f.getPath().replace(File.separator, SEPARATOR);
 	}
+	
+	protected static Pattern ASTERSTICKS = Pattern.compile("/\\*\\*/|\\*\\*|\\*");
 	
 	protected static Glob parseGlobPattern( File relativeTo, String glob, Glob next ) {
 		boolean negate;
@@ -34,12 +35,13 @@ public class Glob {
 			negate = false;
 		}
 		
-		String prefix;
+		String regex;
 		if( glob.startsWith("/") ) {
-			prefix = "^"+Pattern.quote(path(relativeTo)+"/");
+			assert relativeTo != null;
+			regex = "^"+Pattern.quote(path(relativeTo)+"/");
 			glob = glob.substring(1);
 		} else {
-			prefix = "(?:^|.*/)";
+			regex = "(?:^|.*/)";
 		}
 		
 		// Based on the * and ** rules used by .gitignore:
@@ -47,35 +49,56 @@ public class Glob {
 		
 		if( glob.startsWith("**/") ) glob = glob.substring(3);
 		
-		glob = glob.replace("/**/", "/[ANY DIRECTORIES]");
-		glob = glob.replace("**", "[ANYTHING]");
-		glob = glob.replace("*", "[ANYTHING BUT A SLASH]");
+		Matcher starMatcher = ASTERSTICKS.matcher(glob);
 		
-		glob = glob.replace("[ANY DIRECTORIES]", "(?:.*/)*");
-		glob = glob.replace("[ANYTHING]", ".*");
-		glob = glob.replace("[ANYTHING BUT A SLASH]", "[^/]*");
+		int i = 0;
+		while( starMatcher.find() ) {
+			regex += Pattern.quote(glob.substring(i,starMatcher.start()));
+			if( "/**/".equals(starMatcher.group()) ) {
+				regex += "(?:.*/)*";
+			} else if( "**".equals(starMatcher.group()) ) {
+				regex += ".*";
+			} else if( "*".equals(starMatcher.group()) ) {
+				regex += "[^/]*";
+			} else {
+				throw new RuntimeException("Weird match: "+starMatcher.group());
+			}
+			i = starMatcher.end();
+		}
+		regex += Pattern.quote(glob.substring(i));
 		
-		return new Glob(negate, Pattern.compile(prefix+glob), next);
+		return new Glob(negate, Pattern.compile(regex), next);
 	}
 	
-	public boolean anyMatch( File f ) {
+	public static Boolean anyMatch( Glob g, File f, Boolean defaultValue ) {
 		String path = path(f);
-		Glob g = this;
 		while( g != null ) {
 			if( g.pattern.matcher(path).matches() ) {
-				return !g.negate;
+				return Boolean.valueOf(!g.negate);
 			}
 			g = g.next;
 		}
-		return false;
+		return defaultValue;
 	}
 	
-	public static Glob load( File f ) throws IOException {
+	public static boolean anyMatch( Glob g, File f ) {
+		return anyMatch(g, f, false);
+	}
+	
+	public static Glob load( File relativeTo, String[] lines, Glob next ) {
+		for( String line : lines ) {
+			line = line.trim();
+			if( line.startsWith("#") || line.isEmpty() ) continue;
+			next = Glob.parseGlobPattern(relativeTo, line, next);
+		}
+		return next;
+	}
+	
+	public static Glob load( File f, Glob next ) throws IOException {
 		File relativeTo = f.getParentFile();
 		assert relativeTo != null;
 		
 		FileReader fr = new FileReader(f);
-		Glob glob = NUL;
 		try {
 			@SuppressWarnings("resource")
 			BufferedReader br = new BufferedReader(fr);
@@ -83,11 +106,11 @@ public class Glob {
 			while( (line = br.readLine()) != null ) {
 				line = line.trim();
 				if( line.startsWith("#") || line.isEmpty() ) continue;
-				glob = parseGlobPattern(relativeTo, line, glob);
+				next = parseGlobPattern(relativeTo, line, next);
 			}
 		} finally {
 			fr.close();
 		}
-		return glob;
+		return next;
 	}
 }
