@@ -3,6 +3,7 @@ package togos.blob.util;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 import togos.blob.ByteBlob;
 import togos.blob.ByteChunk;
@@ -58,6 +59,10 @@ public class SimpleByteChunk implements ByteChunk
 	
 	@Override public InputStream openInputStream() throws IOException {
 		return new ByteArrayInputStream(buffer, offset, size);
+	}
+	
+	@Override public void writeTo(OutputStream os) throws IOException {
+		os.write(buffer, offset, size);
 	}
 	
 	@Override public ByteBlob slice(long offset, long length) {

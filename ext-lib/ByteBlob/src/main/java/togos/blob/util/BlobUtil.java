@@ -1,8 +1,12 @@
 package togos.blob.util;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 
 import togos.blob.ByteChunk;
+import togos.blob.InputStreamable;
 
 public class BlobUtil
 {
@@ -14,6 +18,23 @@ public class BlobUtil
 	
 	public static final ByteChunk byteChunk( String str ) {
 		return byteChunk(bytes(str));
+	}
+	
+	public static void pipe( InputStream is, OutputStream os ) throws IOException {
+		byte[] buf = new byte[65536];
+		int z;
+		while( (z = is.read(buf)) > 0 ) {
+			os.write(buf, 0, z);
+		}
+	}
+	
+	public static void pipe( InputStreamable isa, OutputStream os ) throws IOException {
+		InputStream is = isa.openInputStream();
+		try {
+			pipe(is, os);
+		} finally {
+			is.close();
+		}
 	}
 	
 	public static final byte[] bytes( String str ) {

@@ -3,11 +3,13 @@ package togos.ccouch3;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 
 import togos.blob.ByteBlob;
+import togos.blob.util.BlobUtil;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.util.StreamUtil;
@@ -66,6 +68,9 @@ public class Copy
 					}
 					@Override public ByteBlob slice(long offset, long length) {
 						throw new UnsupportedOperationException();
+					}
+					@Override public void writeTo(OutputStream os) throws IOException {
+						BlobUtil.pipe(System.in, os);
 					}
 				};
 			} else if( fromName.startsWith("urn:") ) {
