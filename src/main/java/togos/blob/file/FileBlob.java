@@ -4,8 +4,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 import togos.blob.ByteBlob;
+import togos.blob.InputStreamable;
+import togos.blob.util.BlobUtil;
 
 public class FileBlob extends File implements ByteBlob
 {
@@ -25,5 +28,9 @@ public class FileBlob extends File implements ByteBlob
 	
 	@Override public ByteBlob slice(long offset, long length) {
 		throw new UnsupportedOperationException();
+	}
+	
+	@Override public void writeTo(OutputStream os) throws IOException {
+		BlobUtil.pipe((InputStreamable)this, os);
 	}
 }
