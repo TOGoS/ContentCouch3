@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import togos.blob.ByteBlob;
+import togos.blob.util.BlobUtil;
 import togos.blob.util.SimpleByteChunk;
 import togos.service.Service;
 
@@ -110,9 +111,17 @@ public class WebServer implements Runnable, Service {
 					hl = readLine(is);
 				}
 				
-				String[] rp = rl.split("\\s");
-				HTTPRequest req = new HTTPRequest(rp[0], rp[1], rp[2], headers, is);
-				HTTPResponse res = requestHandler.handle(req);
+				String[] rp = rl.split("\\s", 3);
+				HTTPResponse res;
+				if( rp.length < 3 ) {
+					res = new HTTPResponse("HTTP/1.0", 400, "Malformed request",
+						mkHeaders("content-type", "text/plain"),
+						BlobUtil.byteChunk("Your request line,\n  "+rl+"\ndoesn't seem to have enough parts")
+					);
+				} else {
+					HTTPRequest req = new HTTPRequest(rp[0], rp[1], rp[2], headers, is);
+					res = requestHandler.handle(req);
+				}
 				
 				OutputStream os = cs.getOutputStream();
 				String responseHeaders = res.protocol+" "+res.statusCode+" "+res.statusText+"\r\n";
