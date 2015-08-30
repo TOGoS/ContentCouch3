@@ -20,6 +20,7 @@ public class CCouch3Command
 		"  copy              ; copy files\n" +
 		"  backup            ; back up files locally\n" +
 		"  command-server    ; run a command server\n" +
+		"  web-server        ; run a web server\n" +
 		"  <subcommand> -?   ; get help on a specific command";
 	
 	public static int main( Iterator<String> argi ) throws Exception {
@@ -41,6 +42,8 @@ public class CCouch3Command
 			return FlowUploader.identifyMain(argi);
 		} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {
 			return CmdServer.main(argi);
+		} else if( "web-server".equals(cmd) || "ws".equals(cmd) || "webserv".equals(cmd) ) {
+			return WebServerCommand.main(argi);
 		} else if( "verify-tree".equals(cmd) ) {
 			return TreeVerifier.main(argi);
 		} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
