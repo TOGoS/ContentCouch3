@@ -32,7 +32,7 @@ public class WebServer implements Runnable, Service {
 		return headers;
 	}
 	
-	static class HTTPRequest {
+	public static class HTTPRequest {
 		public final String method;
 		public final String path;
 		public final String protocol;
@@ -48,7 +48,7 @@ public class WebServer implements Runnable, Service {
 		}
 	}
 	
-	static class HTTPResponse {
+	public static class HTTPResponse {
 		public final String protocol;
 		public final int statusCode;
 		public final String statusText;
@@ -64,7 +64,7 @@ public class WebServer implements Runnable, Service {
 		}
 	}
 	
-	interface HTTPRequestHandler {
+	public interface HTTPRequestHandler {
 		HTTPResponse handle(HTTPRequest req);
 	}
 	
