@@ -224,7 +224,7 @@ public class WebServerCommand
 	protected static final String USAGE_TEXT =
 		"Usage: ccouch3 web-server [options]\n"+
 		"Options:\n"+
-		"  -port 12345                     ; Indicate port to listen on\n"+
+		String.format("  -port %5d                     ; Indicate port to listen on\n", DEFAULT_PORT)+
 		"  -repo[:name] /path/to/repo      ; Add a repository to back N2R requests\n"+
 		"  -file[:/webpath] /path/to/file  ; Serve a file or directory at /webpath\n"+
 		"  -union[:/webpath] /path/to/file ; Same, but allow falling through to the\n"+
