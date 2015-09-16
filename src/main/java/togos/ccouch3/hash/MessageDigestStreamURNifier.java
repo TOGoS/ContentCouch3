@@ -23,7 +23,6 @@ public class MessageDigestStreamURNifier implements StreamURNifier {
 			int z = is.read( buffer );
 			if( z <= 0 ) break;
 			d.update( buffer, 0, z );
-				
 		}
 		
 		return hform.format( d.digest() );

@@ -48,6 +48,8 @@ public class CCouch3Command
 			return TreeVerifier.main(argi);
 		} else if( "extract-urns".equals(cmd) ) {
 			return BlobReferenceScanner.main(argi);
+		} else if( "annotate-m3u".equals(cmd) ) {
+			return M3UAnnotator.main(argi);
 		} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
 			System.out.println(USAGE);
 			return 0;
