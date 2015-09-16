@@ -7,6 +7,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
+import java.util.Iterator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -76,5 +77,18 @@ public class BlobReferenceScanner
 			}
 		}
 		return success;
+	}
+	
+	public static int main(Iterator<String> argi) {
+		BlobReferenceScanner brs = new BlobReferenceScanner();
+		String inputStreamName = "stdin";
+		InputStream is = System.in;
+		brs.scanTextForUrns(inputStreamName, is, new ScanCallback() {
+			@Override public boolean handle(String t) {
+				System.out.println(t);
+				return true;
+			}
+		}, false);
+		return 0;
 	}
 }

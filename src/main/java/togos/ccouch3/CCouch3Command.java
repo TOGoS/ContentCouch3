@@ -46,6 +46,8 @@ public class CCouch3Command
 			return WebServerCommand.main(argi);
 		} else if( "verify-tree".equals(cmd) ) {
 			return TreeVerifier.main(argi);
+		} else if( "extract-urns".equals(cmd) ) {
+			return BlobReferenceScanner.main(argi);
 		} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
 			System.out.println(USAGE);
 			return 0;
