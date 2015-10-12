@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.util.Random;
 
 import junit.framework.TestCase;
-
 import togos.blob.ByteChunk;
 import togos.ccouch3.hash.BitprintDigest;
 

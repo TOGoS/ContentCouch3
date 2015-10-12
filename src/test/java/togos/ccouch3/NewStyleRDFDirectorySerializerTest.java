@@ -7,8 +7,6 @@ import java.text.ParseException;
 import java.util.Arrays;
 import java.util.Collection;
 
-
-
 import junit.framework.TestCase;
 import togos.ccouch3.util.DateUtil;
 

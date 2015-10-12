@@ -3,11 +3,10 @@ package togos.ccouch3;
 import java.io.File;
 import java.io.IOException;
 
+import junit.framework.TestCase;
 import togos.blob.ByteChunk;
 import togos.blob.util.BlobUtil;
 import togos.ccouch3.util.FileUtil;
-
-import junit.framework.TestCase;
 
 public class HeadManagerTest extends TestCase
 {

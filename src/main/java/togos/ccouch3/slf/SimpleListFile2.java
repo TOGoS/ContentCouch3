@@ -1,5 +1,7 @@
 package togos.ccouch3.slf;
 
+import static togos.blob.util.BlobUtil.toInt;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -12,7 +14,6 @@ import java.nio.channels.FileLock;
 import togos.blob.ByteChunk;
 import togos.blob.util.BlobUtil;
 import togos.blob.util.SimpleByteChunk;
-import static togos.blob.util.BlobUtil.toInt;
 
 /**
  * Yet another key-value store, designed for speed and simplicity.
