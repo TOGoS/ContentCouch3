@@ -3,7 +3,6 @@ package togos.ccouch3;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -24,7 +23,10 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import togos.blob.ByteBlob;
 import togos.ccouch3.Downloader.RepositorySet.RemoteRepository;
+import togos.ccouch3.hash.BitprintDigest;
+import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.repo.StoreException;
@@ -129,6 +131,12 @@ public class Downloader
 	final AddableSet<String> fullyCachedUrns;
 	final ArrayList<DownloadThread> downloadThreads;
 	final AtomicInteger failCount = new AtomicInteger();
+	
+	/**
+	 * The digestor to use to generate URNs when asked to cache something
+	 * other than by its URN.
+	 */
+	public StreamURNifier digestor = BitprintDigest.STREAM_URNIFIER;
 	
 	/**
 	 * Errors other than 404s
@@ -382,6 +390,7 @@ public class Downloader
 	}
 	
 	protected boolean prequeue( String urn ) {
+		assert urn.startsWith("urn:");
 		assert !stopped;
 		
 		if( isFullyCached(urn) ) return false;
@@ -398,34 +407,51 @@ public class Downloader
 		if( prequeue(urn) ) urnQueue.add(urn);
 	}
 	
-	public void enqueueArg( String arg, InputStream stdin )
+	public void enqueueArg( String arg, BlobResolver rez )
 		throws IOException, FileNotFoundException, InterruptedException
 	{
 		if( arg.startsWith("@") && arg.length() > 1 ) {
-			final boolean closeOnEnd;
-			final BufferedReader stream;
-			
-			if( "@-".equals(arg) ) {
-				stream = new BufferedReader(new InputStreamReader(stdin));
-				closeOnEnd = false;
-			} else {
-				String filename = arg.substring(1);
-				// TODO: handle URIs, too
-				stream = new BufferedReader(new FileReader(filename));
-				closeOnEnd = true;
+			final String listUrn = arg.substring(1);
+			final ByteBlob listBlob;
+			try {
+				listBlob = rez.getBlob(listUrn);
+			} catch( IOException e ) {
+				failCount.incrementAndGet();
+				if( reportFailures ) {
+					System.err.println("Error finding "+listUrn+": "+e.getMessage());
+				}
+				return;
 			}
-			
-			String line;
-			while( (line = stream.readLine()) != null ) {
-				line = line.trim();
-				if( line.startsWith("#") ) continue;
-				
-				enqueue(line);
+			final BufferedReader listReader = new BufferedReader(new InputStreamReader(listBlob.openInputStream()));
+			try {
+				String line;
+				while( (line = listReader.readLine()) != null ) {
+					line = line.trim();
+					if( line.startsWith("#") || line.isEmpty() ) continue;
+					
+					enqueue(line);
+				}
+			} finally {
+				listReader.close();
 			}
-			
-			if( closeOnEnd ) stream.close();
 		} else {
-			enqueue(arg);
+			String urn;
+			if( arg.startsWith("urn:") ) {
+				urn = arg;
+			} else {
+				ByteBlob blob;
+				try {
+					blob = rez.getBlob(arg);
+				} catch( IOException e ) {
+					failCount.incrementAndGet();
+					if( reportFailures ) {
+						System.err.println("Error finding "+arg+": "+e.getMessage());
+					}
+					return;
+				}
+				urn = digestor.digest(blob.openInputStream());
+			}
+			enqueue(urn);
 		}
 	}
 	
@@ -530,6 +556,8 @@ public class Downloader
 			scanMode == BlobReferenceScanMode.NEVER ? EmptyAddableSet.<String>getInstance() :
 			new SLFStringSet(new File(primaryRepoDir, "cache/ccouch3-downloader/fully-cached-"+scanMode.name().toLowerCase()+".slf2"));
 		
+		final BlobResolver argBlobResolver = CCouch3Command.getCommandLineFileResolver(new Repository[]{localRepo});
+		
 		Downloader downloader = new Downloader( new RepositorySet(remoteRepoUrls, connectionsPerRemote), localRepo, fullyCachedTreeUrns );
 		downloader.scanMode = scanMode;
 		downloader.reportDownloads = reportDownloads;
@@ -540,8 +568,13 @@ public class Downloader
 		downloader.setRememberAttempts(rememberAttempts);
 		
 		downloader.start();
-		for( String urnArg : urnArgs ) downloader.enqueueArg( urnArg, System.in );
-		downloader.join();
+		try {
+			for( String urnArg : urnArgs ) {
+				downloader.enqueueArg( urnArg, argBlobResolver );
+			}
+		} finally {
+			downloader.join();
+		}
 		
 		int failures = downloader.failCount.intValue();
 		if( failures > 0 ) {
