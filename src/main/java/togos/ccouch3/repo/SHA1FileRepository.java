@@ -26,6 +26,11 @@ public class SHA1FileRepository implements Repository
 	
 	Random r = new Random();
 	
+	/**
+	 * @param dataDir repository directory
+	 * @param storeSector name of sector within which new data should be saved; if null, this object
+	 *   acts read-only and will not allow data to be stored.
+	 */
 	public SHA1FileRepository( File dataDir, String storeSector ) {
 		this.dataDir = dataDir;
 		this.storeSector = storeSector;
@@ -92,6 +97,10 @@ public class SHA1FileRepository implements Repository
 	}
 	
 	public void put(String urn, InputStream is) throws StoreException {
+		if( storeSector == null ) {
+			throw new StoreException("Repository is read-only");
+		}
+		
 		try {
 			if( !contains(urn) ) {
 				Matcher m = SHA1EXTRACTOR.matcher(urn); 

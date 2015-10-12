@@ -1,14 +1,58 @@
 package togos.ccouch3;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.Iterator;
 
+import togos.ccouch3.repo.Repository;
+import togos.ccouch3.repo.SHA1FileRepository;
 
 public class CCouch3Command
 {
+	//// Default repository resolution
+	
+	public static File resolveRepoDir(String path) {
+		if( path.startsWith("~/") ) {
+			return new File(System.getProperty("user.home"), path.substring(2));
+		} else {
+			return new File(path);
+		}
+	}
+	
+	public static File getDefaultRepositoryDir() {
+		String home = System.getProperty("user.home");
+		if( home != null ) {
+			return new File(home, ".ccouch");
+		}
+		return new File(".ccouch");
+	}
+	
+	public static Repository getDefaultRepository(String storeSector) {
+		return new SHA1FileRepository(getDefaultRepositoryDir(), storeSector);
+	}
+	
+	public static Repository getDefaultRepository() {
+		return getDefaultRepository(null);
+	}
+	
+	public static Repository[] getDefaultRepositories() {
+		return new Repository[] { getDefaultRepository() };
+	}
+	
+	public static LiberalFileResolver getCommandLineFileResolver(Repository[] repos) {
+		return new LiberalFileResolver(repos);
+	}
+	
+	public static LiberalFileResolver getCommandLineFileResolver() {
+		return getCommandLineFileResolver(getDefaultRepositories());
+	}
+	
+	////
+	
 	public static boolean isHelpArgument( String arg ) {
-		return "-?".equals(arg) || "-h".equals(arg) ||
-				"--help".equals(arg) || "-help".equals(arg) || "-halp".equals(arg);
+		return
+			"-?".equals(arg) || "-h".equals(arg) ||
+			"--help".equals(arg) || "-help".equals(arg) || "-halp".equals(arg);
 	}
 	
 	public static String USAGE =

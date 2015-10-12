@@ -1,6 +1,7 @@
 package togos.ccouch3;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -51,39 +52,20 @@ public class Copy
 			return 1;
 		}
 		
-		Filesystem fs = new LocalFilesystem("");
-		// TODO: Unify repository initialization somewhere
-		Collection<Repository> repos = new ArrayList<Repository>();
-		for( String repoPath : repoPaths ) {
-			repos.add(new SHA1FileRepository(new File(repoPath, "data"), null));
+		Repository[] repos = new Repository[repoPaths.size()];
+		for( int i=0; i<repoPaths.size(); ++i ) {
+			repos[i] = new SHA1FileRepository(new File(repoPaths.get(i), "data"), null);
 		}
+		BlobResolver resolver = CCouch3Command.getCommandLineFileResolver(repos);
+		Filesystem destFs = new LocalFilesystem("");
 		
 		try {
-			ByteBlob from = null;
-			if( "-".equals(fromName) ) {
-				from = new ByteBlob() {
-					@Override public long getSize() { return -1; }
-					@Override public InputStream openInputStream() throws IOException {
-						return System.in;
-					}
-					@Override public ByteBlob slice(long offset, long length) {
-						throw new UnsupportedOperationException();
-					}
-					@Override public void writeTo(OutputStream os) throws IOException {
-						BlobUtil.pipe(System.in, os);
-					}
-				};
-			} else if( fromName.startsWith("urn:") ) {
-				findBlob: for( Repository repo : repos ) {
-					from = repo.getBlob(fromName);
-					if( from != null ) break findBlob;
-				}
-			} else {
-				from = fs.getBlob(fromName);
-			}
-			
-			if( from == null ) {
+			ByteBlob from;
+			try {
+				from = resolver.getBlob(fromName);
+			} catch( FileNotFoundException e ) {
 				System.err.println("Couldn't find input file '"+fromName+'"');
+				return 1;
 			}
 			
 			if( "-".equals(toName) ) {
@@ -94,11 +76,9 @@ public class Copy
 					is.close();
 				}
 				return 0;
+			} else {
+				destFs.putBlob(toName, from, -1);
 			}
-			
-			Filesystem toFs = fs;
-			String toPath = toName;
-			toFs.putBlob(toPath, from, -1);
 		} catch( IOException e ) {
 			e.printStackTrace();
 			return 1;

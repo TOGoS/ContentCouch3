@@ -464,7 +464,7 @@ public class Downloader
 	public static int main( Iterator<String> args )
 		throws IOException, InterruptedException
 	{
-		String localRepoPath = "~/.ccouch";
+		String primaryRepoPath = null;
 		String cacheSector = "remote";
 		int connectionsPerRemote = 2;
 		BlobReferenceScanMode scanMode = BlobReferenceScanMode.NEVER;
@@ -496,7 +496,7 @@ public class Downloader
 				reportFailures = false;
 				summarizeWhenCompletedWithFailures = false;
 			} else if( "-repo".equals(arg) ) {
-				localRepoPath = args.next();
+				primaryRepoPath = args.next();
 			} else if( "-remote-repo".equals(arg) ) {
 				remoteRepoUrls.add(RepoURLDefuzzer.defuzzRemoteRepoPrefix(args.next()));
 			} else if( "-connections-per-remote".equals(arg) ) {
@@ -520,18 +520,15 @@ public class Downloader
 			return 1;
 		}
 		
-		final File localRepoDir;
-		if( localRepoPath.startsWith("~/") ) {
-			localRepoDir = new File(System.getProperty("user.home"), localRepoPath.substring(2));
-		} else {
-			localRepoDir = new File(localRepoPath);
-		}
+		final File primaryRepoDir = primaryRepoPath == null ?
+			CCouch3Command.getDefaultRepositoryDir() :
+			CCouch3Command.resolveRepoDir(primaryRepoPath);
 		
-		final SHA1FileRepository localRepo = new SHA1FileRepository(new File(localRepoDir, "data"), cacheSector);
+		final SHA1FileRepository localRepo = new SHA1FileRepository(new File(primaryRepoDir, "data"), cacheSector);
 		
 		final AddableSet<String> fullyCachedTreeUrns =
 			scanMode == BlobReferenceScanMode.NEVER ? EmptyAddableSet.<String>getInstance() :
-			new SLFStringSet(new File(localRepoDir, "cache/ccouch3-downloader/fully-cached-"+scanMode.name().toLowerCase()+".slf2"));
+			new SLFStringSet(new File(primaryRepoDir, "cache/ccouch3-downloader/fully-cached-"+scanMode.name().toLowerCase()+".slf2"));
 		
 		Downloader downloader = new Downloader( new RepositorySet(remoteRepoUrls, connectionsPerRemote), localRepo, fullyCachedTreeUrns );
 		downloader.scanMode = scanMode;

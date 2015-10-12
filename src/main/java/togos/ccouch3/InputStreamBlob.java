@@ -9,6 +9,14 @@ import togos.blob.util.BlobUtil;
 
 public class InputStreamBlob implements ByteBlob
 {
+	protected static InputStreamBlob stdinBlob;
+	public static synchronized InputStreamBlob getStdinBlob() throws IOException {
+		if( stdinBlob == null ) {
+			stdinBlob = new InputStreamBlob(System.in);
+		}
+		return stdinBlob;
+	}
+	
 	protected final InputStream is;
 	public InputStreamBlob(InputStream is) {
 		this.is = is;

@@ -567,7 +567,7 @@ public class FlowUploader implements FlowUploaderSettings
 			File f;
 			try {
 				f = localUrnBlobResolver.getFile(urn);
-			} catch( FileNotFoundException e ) {
+			} catch( IOException e ) {
 				System.err.println(e.getMessage());
 				indexedBlobByUrn(urn, false);
 				return false;
@@ -718,7 +718,7 @@ public class FlowUploader implements FlowUploaderSettings
 			
 			localFileResolver = new FileResolver() {
 				@Override
-				public File getFile(String name) throws FileNotFoundException {
+				public File getFile(String name) throws IOException {
 					if( name.startsWith("urn:") ) {
 						return localRepo.getFile(name);
 					}

@@ -85,7 +85,7 @@ public class M3UAnnotator
 		
 		if( m3uPaths.size() == 0 ) m3uPaths.add("-");
 		
-		final BlobResolver argumentResolver = new CommandLineBlobResolver();
+		final BlobResolver argumentResolver = CCouch3Command.getCommandLineFileResolver();
 		final BlobResolver entryResolver = new BlobResolver() {
 			@Override
 			public ByteBlob getBlob(String name) throws IOException {
