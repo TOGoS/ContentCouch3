@@ -94,6 +94,11 @@ public class Downloader
 		}
 	}
 	
+	/**
+	 * A queue that can be added to in either an immediate (via add)
+	 * or blocking (via put) manner.
+	 * Also you can take random items from it.
+	 */
 	static class BQ<Item> {
 		private final ArrayList<Item> items = new ArrayList<Item>();
 		private final int capacity;
@@ -121,10 +126,18 @@ public class Downloader
 			return i;
 		}
 	}
-		
-	final ActiveJobSet<String> enqueuedUrns = new ActiveJobSet<String>();
 	
-	private final BQ<String> urnQueue = new BQ<String>(32);
+	/**
+	 * The set of all jobs that we want to do or are currently doing.
+	 * When this becomes empty, we're done.
+	 * I think that makes this a superset of urnQueue?
+	 *   (Should have documented how this works when I wrote it; duh.)
+	 */
+	private final ActiveJobSet<String> enqueuedAndInProgressUrns = new ActiveJobSet<String>();
+	/**
+	 * Queue of jobs to be run.
+	 */
+	private final BQ<String> enqueuedUrns = new BQ<String>(32);
 	
 	final RepositorySet remoteRepoSet;
 	final Repository localRepo;
@@ -354,7 +367,7 @@ public class Downloader
 			} catch( InterruptedException e ) {
 				Thread.currentThread().interrupt();
 			} finally {
-				enqueuedUrns.remove(urn);
+				enqueuedAndInProgressUrns.remove(urn);
 				if( !success ) {
 					failCount.incrementAndGet();
 					if( reportFailures ) {
@@ -368,7 +381,7 @@ public class Downloader
 			while(!interrupted()) {
 				String urn;
 				try {
-					urn = urnQueue.takeRandom();
+					urn = enqueuedUrns.takeRandom();
 				} catch( InterruptedException e ) {
 					Thread.currentThread().interrupt();
 					continue;
@@ -389,22 +402,28 @@ public class Downloader
 		started = true;
 	}
 	
-	protected boolean prequeue( String urn ) {
+	/**
+	 * Checks if the specified URN is already
+	 * enqueued, in progress, or completed.
+	 * If not, marks it as enqueued and returns true to indicate 'go ahead and enqueue'.
+	 * Otherwise returns false, indicating that there's nothing further to do.
+	 */
+	private boolean prequeue( String urn ) {
 		assert urn.startsWith("urn:");
 		assert !stopped;
 		
 		if( isFullyCached(urn) ) return false;
 		if( alreadyPushed(urn) ) return false;
 		
-		return enqueuedUrns.add(urn);
+		return enqueuedAndInProgressUrns.add(urn);
 	}
 	
 	public void enqueue( String urn ) throws InterruptedException {
-		if( prequeue(urn) ) urnQueue.put(urn);
+		if( prequeue(urn) ) enqueuedUrns.put(urn);
 	}
 	
 	public void enqueueImmediately( String urn ) {
-		if( prequeue(urn) ) urnQueue.add(urn);
+		if( prequeue(urn) ) enqueuedUrns.add(urn);
 	}
 	
 	public void enqueueArg( String arg, BlobResolver rez )
@@ -459,7 +478,7 @@ public class Downloader
 		assert started;
 		assert !stopped;
 		
-		enqueuedUrns.waitUntilEmpty();
+		enqueuedAndInProgressUrns.waitUntilEmpty();
 		
 		for( DownloadThread dt : downloadThreads ) dt.interrupt();
 		for( DownloadThread dt : downloadThreads ) dt.join();
