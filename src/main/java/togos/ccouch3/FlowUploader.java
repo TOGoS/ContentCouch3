@@ -271,7 +271,9 @@ public class FlowUploader implements FlowUploaderSettings
 			}
 		}
 		
+		/** Used to find blobs refernced by other blobs. */
 		protected final FileResolver localUrnBlobResolver;
+		/** Used to find the files mentioned on the command-line. */
 		protected final FileResolver localFileResolver;
 		protected final BlobReferenceScanMode scanMode;
 		protected final DirectorySerializer dirSer;
@@ -714,16 +716,13 @@ public class FlowUploader implements FlowUploaderSettings
 	protected synchronized FileResolver getLocalFileResolver() {
 		if( localFileResolver == null ) {
 			final Repository localRepo = getLocalRepository();
-			
-			localFileResolver = new FileResolver() {
-				@Override
-				public File getFile(String name) throws IOException {
-					if( name.startsWith("urn:") ) {
-						return localRepo.getFile(name);
-					}
-					return new File(name);
-				}
-			};
+			// Ack, the hack!:
+			// TODO: Refactor to be less dumb,
+			// allow secondary (read-only)t repositories
+			localFileResolver = CCouch3Command.getCommandLineFileResolver(
+				new Repository[]{ localRepo },
+				new File[] { headDir.getParentFile() }
+			);
 		}
 		return localFileResolver;
 	}

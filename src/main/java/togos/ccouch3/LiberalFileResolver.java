@@ -16,10 +16,12 @@ import togos.ccouch3.repo.Repository;
  */
 public class LiberalFileResolver implements FileResolver, BlobResolver
 {
-	Repository[] repos;
+	protected Repository[] repos;
+	protected CCouchHeadResolver headResolver;
 	
-	public LiberalFileResolver( Repository[] repos ) {
-		
+	public LiberalFileResolver( Repository[] repos, CCouchHeadResolver headResolver ) {
+		this.repos = repos;
+		this.headResolver = headResolver;
 	}
 	
 	@Override
@@ -36,7 +38,7 @@ public class LiberalFileResolver implements FileResolver, BlobResolver
 		}
 		
 		if( name.startsWith("x-ccouch-head:") ) {
-			throw new IOException("x-ccouch-head: URIs not supported, but should be, soon!");
+			return headResolver.getBlob(name);
 		}
 		
 		// TODO: Allow opening HTTP URLs and stuff maybe?

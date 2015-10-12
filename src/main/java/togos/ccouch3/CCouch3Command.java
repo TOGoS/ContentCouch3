@@ -28,7 +28,7 @@ public class CCouch3Command
 	}
 	
 	public static Repository getDefaultRepository(String storeSector) {
-		return new SHA1FileRepository(getDefaultRepositoryDir(), storeSector);
+		return new SHA1FileRepository(new File(getDefaultRepositoryDir(),"data"), storeSector);
 	}
 	
 	public static Repository getDefaultRepository() {
@@ -39,14 +39,27 @@ public class CCouch3Command
 		return new Repository[] { getDefaultRepository() };
 	}
 	
-	public static LiberalFileResolver getCommandLineFileResolver(Repository[] repos) {
-		return new LiberalFileResolver(repos);
+	public static LiberalFileResolver getCommandLineFileResolver(Repository[] repos, File[] repoDirs) {
+		File[] headRoots = new File[repoDirs.length];
+		for( int i=0; i<repoDirs.length; ++i ) {
+			headRoots[i] = new File(repoDirs[i], "heads");
+		}
+		return new LiberalFileResolver(repos, new CCouchHeadResolver(headRoots));
 	}
 	
+	public static LiberalFileResolver getCommandLineFileResolver(File[] repoDirs) {
+		Repository[] repos = new Repository[repoDirs.length];
+		for( int i=0; i<repoDirs.length; ++i ) {
+			repos[i] = new SHA1FileRepository(new File(repoDirs[i],"data"),null);
+		}
+		return getCommandLineFileResolver(repos, repoDirs);
+	}
+
 	public static LiberalFileResolver getCommandLineFileResolver() {
-		return getCommandLineFileResolver(getDefaultRepositories());
+		File[] repoDirs = new File[] { getDefaultRepositoryDir() };
+		return getCommandLineFileResolver(repoDirs);
 	}
-	
+
 	////
 	
 	public static boolean isHelpArgument( String arg ) {

@@ -575,7 +575,7 @@ public class Downloader
 			scanMode == BlobReferenceScanMode.NEVER ? EmptyAddableSet.<String>getInstance() :
 			new SLFStringSet(new File(primaryRepoDir, "cache/ccouch3-downloader/fully-cached-"+scanMode.name().toLowerCase()+".slf2"));
 		
-		final BlobResolver argBlobResolver = CCouch3Command.getCommandLineFileResolver(new Repository[]{localRepo});
+		final BlobResolver argBlobResolver = CCouch3Command.getCommandLineFileResolver(new File[]{primaryRepoDir});
 		
 		Downloader downloader = new Downloader( new RepositorySet(remoteRepoUrls, connectionsPerRemote), localRepo, fullyCachedTreeUrns );
 		downloader.scanMode = scanMode;

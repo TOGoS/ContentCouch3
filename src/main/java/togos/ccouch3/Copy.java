@@ -48,12 +48,11 @@ public class Copy
 			System.err.println("Error: You must specify both source and destination.");
 			return 1;
 		}
-		
-		Repository[] repos = new Repository[repoPaths.size()];
+		File[] repoDirs = new File[repoPaths.size()];
 		for( int i=0; i<repoPaths.size(); ++i ) {
-			repos[i] = new SHA1FileRepository(new File(repoPaths.get(i), "data"), null);
+			repoDirs[i] = CCouch3Command.resolveRepoDir(repoPaths.get(i));
 		}
-		BlobResolver resolver = CCouch3Command.getCommandLineFileResolver(repos);
+		BlobResolver resolver = CCouch3Command.getCommandLineFileResolver(repoDirs);
 		Filesystem destFs = new LocalFilesystem("");
 		
 		try {
@@ -61,7 +60,7 @@ public class Copy
 			try {
 				from = resolver.getBlob(fromName);
 			} catch( FileNotFoundException e ) {
-				System.err.println("Couldn't find input file '"+fromName+'"');
+				System.err.println("Couldn't find input file '"+fromName+"': "+e.getMessage());
 				return 1;
 			}
 			
