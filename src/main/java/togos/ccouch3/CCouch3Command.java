@@ -78,6 +78,7 @@ public class CCouch3Command
 		"  backup            ; back up files locally\n" +
 		"  command-server    ; run a command server\n" +
 		"  web-server        ; run a web server\n" +
+		"  store-stream      ; store files or pipe contents\n"+
 		"  <subcommand> -?   ; get help on a specific command";
 	
 	public static int main( Iterator<String> argi ) throws Exception {
@@ -95,6 +96,8 @@ public class CCouch3Command
 			return Copy.main(argi);
 		} else if( "backup".equals(cmd) ) {
 			return UpBacker.backupMain(argi);
+		} else if( "store-stream".equals(cmd) ) {
+			return StoreStream.main(argi);
 		} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
 			return FlowUploader.identifyMain(argi);
 		} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {

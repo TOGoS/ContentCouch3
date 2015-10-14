@@ -19,6 +19,11 @@ public interface Repository extends FileResolver
 	 * even if there is an exception.
 	 */
 	public void put( String urn, InputStream is ) throws StoreException;
+	/**
+	 * Stores the thing and returns its URN.
+	 * Will always close is before returning.
+	 */
+	public String put( InputStream is ) throws StoreException;
 	
 	public ByteChunk getChunk( String urn, int maxSize );
 	

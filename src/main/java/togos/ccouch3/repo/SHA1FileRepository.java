@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Random;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -96,20 +97,30 @@ public class SHA1FileRepository implements Repository
 		return f.openInputStream();
 	}
 	
-	public void put(String urn, InputStream is) throws StoreException {
+	public String _put(String urn, InputStream is) throws StoreException {
 		if( storeSector == null ) {
 			throw new StoreException("Repository is read-only");
 		}
 		
 		try {
-			if( !contains(urn) ) {
-				Matcher m = SHA1EXTRACTOR.matcher(urn); 
-				if( !m.find() ) {
-					throw new UnsupportedSchemeException("Unsupported URN Scheme: "+urn);
+			if( urn != null && contains(urn) ) {
+				return urn;
+			} else {
+				String tempFileName1;
+				String expectedSha1Base32;
+				if( urn == null ) {
+					tempFileName1 = UUID.randomUUID().toString();
+					expectedSha1Base32 = null;
+				} else {
+					Matcher m = SHA1EXTRACTOR.matcher(urn); 
+					if( !m.find() ) {
+						throw new UnsupportedSchemeException("Unsupported URN Scheme: "+urn);
+					}
+					expectedSha1Base32 = m.group(1);
+					tempFileName1 = expectedSha1Base32;
 				}
-				String sha1Base32 = m.group(1);
 				
-				File tempFile = new File(dataDir + "/" + storeSector + "/." + sha1Base32 + "-" + r.nextInt(Integer.MAX_VALUE) + ".temp" );
+				File tempFile = new File(dataDir + "/" + storeSector + "/." + tempFileName1 + "-" + r.nextInt(Integer.MAX_VALUE) + ".temp" );
 				try {
 					FileUtil.mkParentDirs( tempFile );
 					FileOutputStream fos = new FileOutputStream( tempFile );
@@ -128,14 +139,19 @@ public class SHA1FileRepository implements Repository
 					fos.close();
 					byte[] digest = digestor.digest();
 					String calculatedSha1Base32 = Base32.encode(digest);
-					if( !calculatedSha1Base32.equals(sha1Base32) ) {
+					if( expectedSha1Base32 != null && !calculatedSha1Base32.equals(expectedSha1Base32) ) {
 						throw new HashMismatchException( "Given and calculated hashes do not match" );
 					}
-					File finalFile = new File(dataDir + "/" + storeSector + "/" + sha1Base32.substring(0,2) + "/" + sha1Base32);
+					File finalFile = new File(dataDir + "/" + storeSector + "/" + calculatedSha1Base32.substring(0,2) + "/" + expectedSha1Base32);
 					FileUtil.mkParentDirs( finalFile );
+					if( finalFile.exists() ) {
+						tempFile.delete();
+						return "urn:sha1:"+calculatedSha1Base32;
+					}
 					if( !tempFile.renameTo(finalFile) ) {
 						throw new StoreException( "Failed to move temp file to final location" );
 					}
+					return "urn:sha1:"+calculatedSha1Base32;
 				} finally {
 					if( tempFile.exists() )	tempFile.delete();
 				}
@@ -149,6 +165,13 @@ public class SHA1FileRepository implements Repository
 			}
 		}
 	};
+	
+	@Override public void put(String urn, InputStream is) throws StoreException {
+		_put(urn, is);
+	}
+	@Override public String put(InputStream is) throws StoreException {
+		return _put(null, is);
+	}
 	
 	public String toString() {
 		return getClass().getName()+"( dataDir @ '"+dataDir+"' )";
