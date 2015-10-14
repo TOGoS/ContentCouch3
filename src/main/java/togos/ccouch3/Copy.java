@@ -48,6 +48,8 @@ public class Copy
 			System.err.println("Error: You must specify both source and destination.");
 			return 1;
 		}
+		// TODO: Clean this up.  Consolidate in CCouch3Command or something.
+		repoPaths.add(CCouch3Command.getDefaultRepositoryDir().getPath());
 		File[] repoDirs = new File[repoPaths.size()];
 		for( int i=0; i<repoPaths.size(); ++i ) {
 			repoDirs[i] = CCouch3Command.resolveRepoDir(repoPaths.get(i));
