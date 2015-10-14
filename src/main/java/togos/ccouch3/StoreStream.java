@@ -23,6 +23,8 @@ public class StoreStream
 				inputPaths.add(arg);
 			} else if( "-v".equals(arg) ) {
 				verbose = true;
+			} else if( "-sector".equals(arg) ) {
+				storeSector = argi.next();
 			} else if( "--".equals(arg) ) {
 				noMoreOptions = true;
 			} else {
