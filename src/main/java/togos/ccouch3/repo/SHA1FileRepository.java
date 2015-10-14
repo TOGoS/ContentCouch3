@@ -142,7 +142,7 @@ public class SHA1FileRepository implements Repository
 					if( expectedSha1Base32 != null && !calculatedSha1Base32.equals(expectedSha1Base32) ) {
 						throw new HashMismatchException( "Given and calculated hashes do not match" );
 					}
-					File finalFile = new File(dataDir + "/" + storeSector + "/" + calculatedSha1Base32.substring(0,2) + "/" + expectedSha1Base32);
+					File finalFile = new File(dataDir + "/" + storeSector + "/" + calculatedSha1Base32.substring(0,2) + "/" + calculatedSha1Base32);
 					FileUtil.mkParentDirs( finalFile );
 					if( finalFile.exists() ) {
 						tempFile.delete();
