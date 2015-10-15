@@ -39,7 +39,7 @@ CCouch3.jar.urn: CCouch3.jar
 	java -ea -jar CCouch3.jar id "$<" >"$@"
 
 .ccouch-repos.lst: | .ccouch-repos.lst.example
-	cp "$<" "$@"
+	cp "$|" "$@"
 
 ext-lib/JUnit.jar: ext-lib/JUnit.jar.urn ${fetch_deps} | CCouch3.jar
 	${fetch} urn:bitprint:TEJJ6FSEFBCPNJFBDLRC7O7OICYU252P.XZMJNNSDGM456CHQCJI22DUDWYK6ZASNPLJ26GA -o "$@"
