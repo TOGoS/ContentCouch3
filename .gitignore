@@ -1,4 +1,6 @@
 .*-src.lst
+*.temp
+.ccouch-repos.lst
 .classpath
 .project
 .settings

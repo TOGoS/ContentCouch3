@@ -12,9 +12,12 @@ temporary_files = \
 	ccouch3.jar \
 	CCouch3.jar.urn \
 	ext-lib/JUnit.jar \
+	fetch-jar \
 	java-bin \
 	java-src.lst \
 	target
+fetch_deps = .ccouch-repos.lst
+fetch = java -jar TJFetcher.jar -repo @.ccouch-repos.lst
 
 default: CCouch3.jar.urn
 
@@ -32,13 +35,19 @@ CCouch3.jar: $(shell find src/main)
 	${javac} -sourcepath src/main/java -d target/main @.java-main-src.lst
 	jar -ce togos.ccouch3.CCouch3Command -C target/main . >CCouch3.jar
 
-ext-lib/JUnit.jar: ext-lib/JUnit.jar.urn | CCouch3.jar
-	#${ccouch3} cache -remote-repo @build-resource-repos.lst -sector build `cat "$<"`
-	#${ccouch3} copy -repo ~/.ccouch `cat "$<"` "$@"
-	wget http://zappie1.nuke24.net/uri-res/raw/urn:bitprint:TEJJ6FSEFBCPNJFBDLRC7O7OICYU252P.XZMJNNSDGM456CHQCJI22DUDWYK6ZASNPLJ26GA/JUnit.jar -O "$@"
-
 CCouch3.jar.urn: CCouch3.jar
 	java -ea -jar CCouch3.jar id "$<" >"$@"
+
+.ccouch-repos.lst: | .ccouch-repos.lst.example
+	cp "$<" "$@"
+
+ext-lib/JUnit.jar: ext-lib/JUnit.jar.urn ${fetch_deps} | CCouch3.jar
+	${fetch} urn:bitprint:TEJJ6FSEFBCPNJFBDLRC7O7OICYU252P.XZMJNNSDGM456CHQCJI22DUDWYK6ZASNPLJ26GA -o "$@"
+
+fetch-jar: ${fetch_deps}
+	rm CCouch3.jar
+	git checkout CCouch3.jar.urn
+	${fetch} $(shell cat CCouch3.jar.urn) -o CCouch3.jar
 
 clean:
 	rm -rf ${temporary_files}
