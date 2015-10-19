@@ -57,6 +57,7 @@ public class M3UAnnotator
 	}
 	
 	public static int main(Iterator<String> argi) {
+		RepoConfig repoConfig = new RepoConfig();
 		PathTransform pathTransform = PathTransform.NONE;
 		String defaultN2rPrefix = null;
 		boolean tidyFilenames = false;
@@ -87,6 +88,7 @@ public class M3UAnnotator
 					System.err.println("Unrecognized path transform: "+transformSpec);
 					return 1;
 				}
+			} else if( repoConfig.parseCommandLineArg(arg, argi)) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.print(USAGE);
 				return 0;
@@ -97,9 +99,10 @@ public class M3UAnnotator
 			}
 		}
 		
+		repoConfig.fix();
 		if( m3uPaths.size() == 0 ) m3uPaths.add("-");
 		
-		final BlobResolver argumentResolver = CCouch3Command.getCommandLineFileResolver();
+		final BlobResolver argumentResolver = CCouch3Command.getCommandLineFileResolver(repoConfig);
 		final BlobResolver entryResolver = new BlobResolver() {
 			@Override
 			public ByteBlob getBlob(String name) throws IOException {

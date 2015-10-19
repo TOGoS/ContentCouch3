@@ -32,7 +32,6 @@ import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.repo.StoreException;
 import togos.ccouch3.util.AddableSet;
 import togos.ccouch3.util.EmptyAddableSet;
-import togos.ccouch3.util.RepoURLDefuzzer;
 import togos.ccouch3.util.SLFStringSet;
 
 public class Downloader
@@ -48,8 +47,8 @@ public class Downloader
 		}
 		
 		private final List<RemoteRepository> repositories;
-		public RepositorySet( Collection<String> repositoryUrls, int copies ) {
-			this.repositories = new ArrayList<RemoteRepository>(copies*repositoryUrls.size());
+		public RepositorySet( String[] repositoryUrls, int copies ) {
+			this.repositories = new ArrayList<RemoteRepository>(copies*repositoryUrls.length);
 			for( int i=0; i<copies; ++i ) {
 				for( String url : repositoryUrls ) {
 					repositories.add(new RemoteRepository(url));
@@ -509,12 +508,10 @@ public class Downloader
 	public static int main( Iterator<String> args )
 		throws IOException, InterruptedException
 	{
-		String primaryRepoPath = null;
-		String cacheSector = "remote";
 		int connectionsPerRemote = 2;
 		BlobReferenceScanMode scanMode = BlobReferenceScanMode.NEVER;
 		List<String> urnArgs = new ArrayList<String>();
-		List<String> remoteRepoUrls = new ArrayList<String>();
+		RepoConfig repoConfig = new RepoConfig();
 		boolean reportDownloads = false;
 		boolean reportUnrecursableBlobs = false;
 		boolean reportDownloadFailures = false;
@@ -540,14 +537,9 @@ public class Downloader
 				reportErrors = false;
 				reportFailures = false;
 				summarizeWhenCompletedWithFailures = false;
-			} else if( "-repo".equals(arg) ) {
-				primaryRepoPath = args.next();
-			} else if( "-remote-repo".equals(arg) ) {
-				remoteRepoUrls.add(RepoURLDefuzzer.defuzzRemoteRepoPrefix(args.next()));
+			} else if( repoConfig.parseCommandLineArg(arg, args) ) {
 			} else if( "-connections-per-remote".equals(arg) ) {
 				connectionsPerRemote = Integer.parseInt(args.next());
-			} else if( "-sector".equals(arg) ) {
-				cacheSector = args.next();
 			} else if( "-remember-missing".equals(arg) || "-remember-attempts".equals(arg) ) {
 				rememberAttempts = true;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
@@ -560,16 +552,9 @@ public class Downloader
 			}
 		}
 		
-		if( remoteRepoUrls.size() == 0 ) {
-			System.err.println("Error: No remote repositories configured");
-			return 1;
-		}
-		
-		final File primaryRepoDir = primaryRepoPath == null ?
-			CCouch3Command.getDefaultRepositoryDir() :
-			CCouch3Command.resolveRepoDir(primaryRepoPath);
-		
-		final SHA1FileRepository localRepo = new SHA1FileRepository(new File(primaryRepoDir, "data"), cacheSector);
+		repoConfig.fix();
+		final File primaryRepoDir = repoConfig.getPrimaryRepoDir();
+		final SHA1FileRepository localRepo = repoConfig.getPrimaryRepository();
 		
 		final AddableSet<String> fullyCachedTreeUrns =
 			scanMode == BlobReferenceScanMode.NEVER ? EmptyAddableSet.<String>getInstance() :
@@ -577,7 +562,7 @@ public class Downloader
 		
 		final BlobResolver argBlobResolver = CCouch3Command.getCommandLineFileResolver(new File[]{primaryRepoDir});
 		
-		Downloader downloader = new Downloader( new RepositorySet(remoteRepoUrls, connectionsPerRemote), localRepo, fullyCachedTreeUrns );
+		Downloader downloader = new Downloader( new RepositorySet(repoConfig.getRemoteRepoUrls(), connectionsPerRemote), localRepo, fullyCachedTreeUrns );
 		downloader.scanMode = scanMode;
 		downloader.reportDownloads = reportDownloads;
 		downloader.reportUnrecursableBlobs = reportUnrecursableBlobs;

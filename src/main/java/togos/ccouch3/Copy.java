@@ -1,15 +1,11 @@
 package togos.ccouch3;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.Iterator;
 
 import togos.blob.ByteBlob;
-import togos.ccouch3.repo.Repository;
-import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.util.StreamUtil;
 
 public class Copy
@@ -20,12 +16,11 @@ public class Copy
 	public static int main(Iterator<String> argi) {
 		String fromName = null;
 		String toName = null;
-		ArrayList<String> repoPaths = new ArrayList<String>();
+		RepoConfig repoConfig = new RepoConfig();
 		
 		while( argi.hasNext() ) {
 			String arg = argi.next();
-			if( "-repo".equals(arg) ) {
-				repoPaths.add(0, argi.next());
+			if( repoConfig.parseCommandLineArg(arg, argi) ) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println(USAGE);
 				return 0;
@@ -48,13 +43,9 @@ public class Copy
 			System.err.println("Error: You must specify both source and destination.");
 			return 1;
 		}
-		// TODO: Clean this up.  Consolidate in CCouch3Command or something.
-		repoPaths.add(CCouch3Command.getDefaultRepositoryDir().getPath());
-		File[] repoDirs = new File[repoPaths.size()];
-		for( int i=0; i<repoPaths.size(); ++i ) {
-			repoDirs[i] = CCouch3Command.resolveRepoDir(repoPaths.get(i));
-		}
-		BlobResolver resolver = CCouch3Command.getCommandLineFileResolver(repoDirs);
+		
+		repoConfig.fix();
+		BlobResolver resolver = CCouch3Command.getCommandLineFileResolver(repoConfig);
 		Filesystem destFs = new LocalFilesystem("");
 		
 		try {

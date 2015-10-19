@@ -9,36 +9,6 @@ import togos.ccouch3.repo.SHA1FileRepository;
 
 public class CCouch3Command
 {
-	//// Default repository resolution
-	
-	public static File resolveRepoDir(String path) {
-		if( path.startsWith("~/") ) {
-			return new File(System.getProperty("user.home"), path.substring(2));
-		} else {
-			return new File(path);
-		}
-	}
-	
-	public static File getDefaultRepositoryDir() {
-		String home = System.getProperty("user.home");
-		if( home != null ) {
-			return new File(home, ".ccouch");
-		}
-		return new File(".ccouch");
-	}
-	
-	public static Repository getDefaultRepository(String storeSector) {
-		return new SHA1FileRepository(new File(getDefaultRepositoryDir(),"data"), storeSector);
-	}
-	
-	public static Repository getDefaultRepository() {
-		return getDefaultRepository(null);
-	}
-	
-	public static Repository[] getDefaultRepositories() {
-		return new Repository[] { getDefaultRepository() };
-	}
-	
 	public static LiberalFileResolver getCommandLineFileResolver(Repository[] repos, File[] repoDirs) {
 		File[] headRoots = new File[repoDirs.length];
 		for( int i=0; i<repoDirs.length; ++i ) {
@@ -55,9 +25,8 @@ public class CCouch3Command
 		return getCommandLineFileResolver(repos, repoDirs);
 	}
 
-	public static LiberalFileResolver getCommandLineFileResolver() {
-		File[] repoDirs = new File[] { getDefaultRepositoryDir() };
-		return getCommandLineFileResolver(repoDirs);
+	public static LiberalFileResolver getCommandLineFileResolver( RepoConfig config ) {
+		return getCommandLineFileResolver(config.getRepoDirs());
 	}
 
 	////
