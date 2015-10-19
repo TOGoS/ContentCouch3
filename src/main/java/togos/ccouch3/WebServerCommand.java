@@ -117,16 +117,17 @@ public class WebServerCommand
 		}
 		
 		protected HTTPResponse handleMounted(HTTPRequest req) {
+			String reqPath = urlDecodeString(req.path.split("\\?",1)[0]);
 			ArrayList<File> matchingFiles = new ArrayList<File>();
 			boolean matchingMountsFound = false;
 			for( Mount mount : mounts ) {
 				String subPath;
-				if( req.path.equals(mount.webPath) ) {
+				if( reqPath.equals(mount.webPath) ) {
 					subPath = "";
-				} else if( req.path.startsWith(mount.webPath+"/") ) {
-					subPath = req.path.substring(mount.webPath.length()+1);
-				} else if( mount.webPath.endsWith("/") && req.path.startsWith(mount.webPath) ) {
-					subPath = req.path.substring(mount.webPath.length());
+				} else if( reqPath.startsWith(mount.webPath+"/") ) {
+					subPath = reqPath.substring(mount.webPath.length()+1);
+				} else if( mount.webPath.endsWith("/") && reqPath.startsWith(mount.webPath) ) {
+					subPath = reqPath.substring(mount.webPath.length());
 				} else {
 					subPath = null;
 				}
