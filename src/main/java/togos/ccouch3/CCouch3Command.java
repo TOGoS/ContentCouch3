@@ -43,6 +43,7 @@ public class CCouch3Command
 		"  identify          ; identify files/directories\n" +
 		"  upload            ; upload files to a remote repository\n" +
 		"  cache             ; download and cache files from remote repositories\n" +
+		"  cat               ; output blobs to standard output\n" +
 		"  copy              ; copy files\n" +
 		"  backup            ; back up files locally\n" +
 		"  command-server    ; run a command server\n" +
@@ -61,6 +62,8 @@ public class CCouch3Command
 			return FlowUploader.uploadMain(argi);
 		} else if( "cache".equals(cmd) ) {
 			return Downloader.main(argi);
+		} else if( "cat".equals(cmd) ) {
+			return Cat.main(argi);
 		} else if( "copy".equals(cmd) ) {
 			return Copy.main(argi);
 		} else if( "backup".equals(cmd) ) {

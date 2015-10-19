@@ -3,11 +3,15 @@ package togos.ccouch3;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URLEncoder;
 
 import togos.blob.ByteBlob;
 import togos.blob.file.FileBlob;
+import togos.blob.util.SimpleByteChunk;
 import togos.ccouch3.repo.FileResolver;
 import togos.ccouch3.repo.Repository;
+import togos.ccouch3.util.Base64;
+import togos.ccouch3.util.URIUtil;
 
 /**
  * Lets you read all sorts of things.
@@ -39,6 +43,21 @@ public class LiberalFileResolver implements FileResolver, BlobResolver
 		
 		if( name.startsWith("x-ccouch-head:") ) {
 			return headResolver.getBlob(name);
+		}
+		
+		if( name.startsWith("data:") ) {
+			int commaIdx = name.indexOf(",");
+			if( commaIdx == -1 ) throw new FileNotFoundException("Malformed data: URI doesn't contain a comma: "+name);
+			String[] meta = name.substring(5, commaIdx).split(";");
+			boolean isBase64Encoded = false;
+			for( String m : meta ) {
+				if( "base64".equals(m) ) isBase64Encoded = true;
+			}
+			String encoded = name.substring(commaIdx+1);
+			byte[] data = isBase64Encoded ?
+				Base64.decode(encoded) :
+				URIUtil.uriDecodeBytes(encoded);
+			return new SimpleByteChunk(data);
 		}
 		
 		// TODO: Allow opening HTTP URLs and stuff maybe?
