@@ -77,6 +77,7 @@ public class OutChecker
 		if( run == Run.ACTUAL ) {
 			filesystem.mkdir(path);
 		}
+		if( run == Run.DRY && md == null ) return;
 		for( DirectoryEntry e : dir ) {
 			checkOut( e.getUrn(), e.getLastModificationTime(), path+"/"+e.name, onDirCollision, onFileCollision, run );
 		}
