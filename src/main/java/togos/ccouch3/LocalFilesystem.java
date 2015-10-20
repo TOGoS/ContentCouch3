@@ -86,4 +86,9 @@ public class LocalFilesystem implements Filesystem
 			is.close();
 		}
 	}
+	
+	@Override public void mkdir(String path) throws IOException {
+		File dir = new File(fullPath(path));
+		if( !dir.exists() ) dir.mkdirs();
+	}
 }

@@ -2,10 +2,12 @@ package togos.ccouch3;
 
 import java.io.File;
 
+import togos.ccouch3.Filesystem.FileMetadata;
+
 //TODO: I don't think it makes that much sense for a
 //directory entry to *be* the file it points to.
 //Maybe change that.
-public class DirectoryEntry extends FileInfo implements Comparable<File>
+public class DirectoryEntry extends FileInfo implements Comparable<File>, FileMetadata
 {
 	private static final long serialVersionUID = 1L;
 	

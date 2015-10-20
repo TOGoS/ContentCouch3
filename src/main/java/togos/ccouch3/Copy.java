@@ -1,11 +1,13 @@
 package togos.ccouch3;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
 
 import togos.blob.ByteBlob;
+import togos.ccouch3.OutChecker.OnDirCollision;
+import togos.ccouch3.OutChecker.OnFileCollision;
+import togos.ccouch3.OutChecker.Run;
 import togos.ccouch3.util.StreamUtil;
 
 public class Copy
@@ -16,11 +18,15 @@ public class Copy
 	public static int main(Iterator<String> argi) {
 		String fromName = null;
 		String toName = null;
+		OnDirCollision onDirCollision = OnDirCollision.ABORT;
+		OnFileCollision onFileCollision = OnFileCollision.KEEP;
 		RepoConfig repoConfig = new RepoConfig();
 		
 		while( argi.hasNext() ) {
 			String arg = argi.next();
 			if( repoConfig.parseCommandLineArg(arg, argi) ) {
+			} else if( "-merge".equals(arg) ) {
+				onDirCollision = OnDirCollision.MERGE;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println(USAGE);
 				return 0;
@@ -45,30 +51,44 @@ public class Copy
 		}
 		
 		repoConfig.fix();
-		BlobResolver resolver = CCouch3Command.getCommandLineFileResolver(repoConfig);
-		Filesystem destFs = new LocalFilesystem("");
+		BlobResolver blobResolver = CCouch3Command.getCommandLineFileResolver(repoConfig);
+		ObjectResolver resolver = new ObjectResolver(blobResolver);
 		
+		Object from;
 		try {
-			ByteBlob from;
-			try {
-				from = resolver.getBlob(fromName);
-			} catch( FileNotFoundException e ) {
-				System.err.println("Couldn't find input file '"+fromName+"': "+e.getMessage());
+			from = resolver.get(fromName);
+		} catch( Exception e ) {
+			System.err.println("Couldn't find input object '"+fromName+"': "+e.getMessage());
+			return 1;
+		}
+		
+		if( "-".equals(toName) ) {
+			if( !(from instanceof ByteBlob) ) {
+				System.err.println(fromName+" is not a byte blob; can't copy it to standard output");
 				return 1;
 			}
-			
-			if( "-".equals(toName) ) {
-				InputStream is = from.openInputStream();
+			try {
+				InputStream is = ((ByteBlob)from).openInputStream();
 				try {
 					StreamUtil.copy(is, System.out);
+				} catch( IOException e ) {
+					System.err.println(e.getMessage());
+					return 1;
 				} finally {
-					is.close();
+					StreamUtil.close(is);
 				}
-				return 0;
-			} else {
-				destFs.putBlob(toName, from, -1);
+			} catch( IOException e ) {
+				System.err.println(e.getMessage());
+				return 1;
 			}
-		} catch( IOException e ) {
+			return 0;
+		}
+		
+		OutChecker oc = new OutChecker(resolver, new LocalFilesystem(""));
+		try {
+			oc.checkOut(fromName, -1, toName, onDirCollision, onFileCollision, Run.DRY);
+			oc.checkOut(fromName, -1, toName, onDirCollision, onFileCollision, Run.ACTUAL);
+		} catch( Exception e ) {
 			e.printStackTrace();
 			return 1;
 		}

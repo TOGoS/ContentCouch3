@@ -13,7 +13,6 @@ import java.util.Set;
 
 import togos.blob.ByteBlob;
 import togos.ccouch3.path.LinkType;
-import togos.ccouch3.path.ObjectType;
 import togos.ccouch3.path.Path;
 import togos.ccouch3.path.PathLink;
 import togos.ccouch3.rdf.CCouchNamespace;
@@ -152,7 +151,7 @@ public class TreeVerifier
 								continue;
 							}
 							
-							ObjectType targetType = ObjectType.UNKNOWN; // TODO: should guess based on entry.target type
+							FSObjectType targetType = FSObjectType.UNKNOWN; // TODO: should guess based on entry.target type
 							walk( new Path(new PathLink(path, name, LinkType.DIRECTORY_ENTRY, targetType), targetUri) );
 						}
 					}
@@ -174,7 +173,7 @@ public class TreeVerifier
 							logPathError("Commit target is not a simple reference: "+target, path);
 							anyErrors = true;
 						} else {
-							walk( new Path(new PathLink(path, "target", LinkType.COMMIT_TARGET, ObjectType.UNKNOWN), target.getSubjectUri()) );
+							walk( new Path(new PathLink(path, "target", LinkType.COMMIT_TARGET, FSObjectType.UNKNOWN), target.getSubjectUri()) );
 						}
 					}
 				} else if( CCouchNamespace.PARENT.equals(propKey) ) {
@@ -184,7 +183,7 @@ public class TreeVerifier
 							anyErrors = true;
 						} else {
 							if( followCommitAncestry ) {
-								walk( new Path(new PathLink(path, "parent", LinkType.COMMIT_PARENT, ObjectType.COMMIT), parent.getSubjectUri()) );
+								walk( new Path(new PathLink(path, "parent", LinkType.COMMIT_PARENT, FSObjectType.COMMIT), parent.getSubjectUri()) );
 							}
 						}
 					}

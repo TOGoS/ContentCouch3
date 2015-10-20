@@ -1,13 +1,15 @@
 package togos.ccouch3.path;
 
+import togos.ccouch3.FSObjectType;
+
 public class PathLink
 {
 	public final Path origin;
 	public final String linkName;
-	public final ObjectType expectedTargetType;
+	public final FSObjectType expectedTargetType;
 	public final LinkType linkType;
 	
-	public PathLink( Path origin, String linkName, LinkType linkType, ObjectType targetType ) {
+	public PathLink( Path origin, String linkName, LinkType linkType, FSObjectType targetType ) {
 		this.origin = origin;
 		this.linkName = linkName;
 		this.linkType = linkType;

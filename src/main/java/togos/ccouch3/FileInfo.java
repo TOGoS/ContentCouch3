@@ -6,8 +6,9 @@ import java.io.InputStream;
 
 import togos.blob.ByteBlob;
 import togos.blob.file.FileBlob;
+import togos.ccouch3.Filesystem.FileMetadata;
 
-public class FileInfo extends FileBlob implements BlobInfo
+public class FileInfo extends FileBlob implements BlobInfo, FileMetadata
 {
 	private static final long serialVersionUID = 1L;
 	
@@ -29,6 +30,7 @@ public class FileInfo extends FileBlob implements BlobInfo
 	}
 	
 	@Override public String getUrn() { return urn; }
+	/** May return -1 to indicate unknown */
 	@Override public long getSize() { return size; }
 	
 	public InputStream openInputStream() throws FileNotFoundException {
@@ -39,6 +41,8 @@ public class FileInfo extends FileBlob implements BlobInfo
 		throw new UnsupportedOperationException();
 	}
 	
-	public FSObjectType getFsObjectType() { return fsObjectType; }
-	public long getLastModificationTime() { return mtime; }
+	@Override public FSObjectType getFsObjectType() { return fsObjectType; }
+	/** May return -1 to indicate unknown */
+	@Override public long getLastModificationTime() { return mtime; }
+	@Override public String[] getObviousUrns() { return new String[] { urn }; };
 }

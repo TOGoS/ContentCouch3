@@ -26,4 +26,10 @@ public interface Filesystem
 	 * If the file cannot be written at all, an IOException must be thrown.
 	 * */
 	public void putBlob(String path, ByteBlob data, long mtime) throws IOException;
+	/**
+	 * putBlob will make any missing parent directories,
+	 * but in case you want to make some without putting a blob,
+	 * call this.
+	 */
+	public void mkdir(String path) throws IOException;
 }
