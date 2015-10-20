@@ -13,6 +13,15 @@ import togos.ccouch3.util.XMLUtil;
 
 public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 {
+	protected final boolean everIncludeMtime;
+	public NewStyleRDFDirectorySerializer(boolean everIncludeMtime) {
+		this.everIncludeMtime = everIncludeMtime;
+	}
+	
+	public NewStyleRDFDirectorySerializer() {
+		this(true);
+	}
+	
 	@Override
 	public void serialize(Collection<DirectoryEntry> entries, OutputStream os) throws IOException {
 		ArrayList<DirectoryEntry> sortedEntries = new ArrayList<DirectoryEntry>( entries );
@@ -41,7 +50,7 @@ public class NewStyleRDFDirectorySerializer implements DirectorySerializer
 				case BLOB:
 					tag = "Blob";
 					showSize = f.getSize() != -1;
-					showMtime = f.getLastModificationTime() != -1;
+					showMtime = everIncludeMtime && f.getLastModificationTime() != -1;
 					break;
 				case DIRECTORY:
 					tag = "Directory";

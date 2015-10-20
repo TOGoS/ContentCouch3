@@ -598,8 +598,8 @@ public class FlowUploader implements FlowUploaderSettings
 		public boolean showProgress = false;
 		public boolean reportPathUrnMapping = false;
 		public boolean reportUrn = false;
+		public boolean includeFileMtimes = true;
 		public StreamURNifier digestor = BitprintDigest.STREAM_URNIFIER;
-		public DirectorySerializer dirSer = new NewStyleRDFDirectorySerializer();
 		public File primaryRepoDir;
 		public File cacheDir;
 		public File dataDir;
@@ -652,7 +652,7 @@ public class FlowUploader implements FlowUploaderSettings
 		this.reportPathUrnMapping = config.reportPathUrnMapping;
 		this.reportUrn = config.reportUrn;
 		this.digestor = config.digestor;
-		this.dirSer = config.dirSer;
+		this.dirSer = new NewStyleRDFDirectorySerializer(config.includeFileMtimes);
 		this.primaryRepoDir = config.primaryRepoDir;
 		this.cacheDir = config.cacheDir;
 		this.dataDir = config.dataDir;
@@ -1227,6 +1227,8 @@ public class FlowUploader implements FlowUploaderSettings
 			} else if( "-recurse".equals(a) ) {
 				// A bit of a misnomer...
 				config.scanMode = BlobReferenceScanMode.TEXT;
+			} else if( "-omit-file-mtimes".equals(a) ) {
+				config.includeFileMtimes = false;
 			} else if( "-skip-files-with-read-errors".equals(a) ) {
 				config.howToHandleFileReadErrors = Actions.SKIP_THE_FILE;
 			} else if( !a.startsWith("-") ) {
