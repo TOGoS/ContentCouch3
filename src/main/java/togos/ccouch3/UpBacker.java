@@ -28,7 +28,9 @@ public class UpBacker
 			"  -sector <name> ; indicate section of repo in which to store data\n" +
 			"  -show-progress ; note progress on stderr as program runs\n" +
 			"  -show-report   ; report to stderr after each root is completed\n" +
-			"  -?             ; show help and exit";
+			"  -omit-file-mtimes ; do not include file modification times in serialized\n"+
+			"                 ; directory data\n"+
+			"  -?             ; show help and exit\n";
 		
 		enum Mode {
 			RUN, USAGE_ERROR, HELP
@@ -77,14 +79,15 @@ public class UpBacker
 	public boolean shouldReportResults;
 	
 	protected final StreamURNifier digestor = BitprintDigest.STREAM_URNIFIER;
-	protected final NewStyleRDFDirectorySerializer directorySerializer = new NewStyleRDFDirectorySerializer();
+	protected final NewStyleRDFDirectorySerializer directorySerializer;
 	protected final File incomingLogFile;
 	protected FileOutputStream incomingLogStream;
 	
-	public UpBacker( File repoDir, String sector ) {
+	public UpBacker( File repoDir, String sector, boolean includeFileMtimes ) {
 		this.repo = new SHA1FileRepository( new File(repoDir, "data"), sector );
 		this.headDir = new File(repoDir, "heads");
 		this.incomingLogFile = new File(repoDir, "log/incoming.log");
+		this.directorySerializer = new NewStyleRDFDirectorySerializer(includeFileMtimes);
 	}
 	
 	class StoreResult {
@@ -282,6 +285,7 @@ public class UpBacker
 		String repoName = null; // Someday may be used for making heads and stuff
 		String storeSector = "local";
 		boolean showReport = false, showProgress = false;
+		boolean includeFileMtimes = true;
 		
 		while( argi.hasNext() ) {
 			String arg = argi.next();
@@ -296,6 +300,8 @@ public class UpBacker
 				storeSector = argi.next();
 			} else if( "-show-progress".equals(arg) ) {
 				showProgress = true;
+			} else if( "-omit-file-mtimes".equals(arg) ) {
+				includeFileMtimes = false;
 			} else if( "-show-report".equals(arg) || "-v".equals(arg) ) {
 				showReport = true;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
@@ -309,7 +315,7 @@ public class UpBacker
 			return new BackupCmd(BackupCmd.Mode.USAGE_ERROR, "No -repo specified");
 		}
 		
-		UpBacker upBacker = new UpBacker( new File(repoPath), storeSector );
+		UpBacker upBacker = new UpBacker( new File(repoPath), storeSector, includeFileMtimes );
 		upBacker.shouldReportResults = showReport;
 		upBacker.shouldShowProgress = showProgress;
 		

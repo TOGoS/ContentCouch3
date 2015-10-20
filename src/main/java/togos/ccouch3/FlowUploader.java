@@ -1317,6 +1317,8 @@ public class FlowUploader implements FlowUploaderSettings
 		"  -local-repo:<name> <path> ; Path to a named local repository; this is needed\n" +
 		"                 ; when creating a named commit with '-n'\n" +
 		"  -no-cache      ; Do not cache file hashes or upload records.\n" +
+		"  -omit-file-mtimes ; do not include file modification times in serialized\n"+
+		"                 ; directory data\n"+
 		"  -http-server:<name> <url> ; PUT files to a N2R server.\n" +
 		"  -flaky-http-server:<name> <url> ; Same, but retry a few times on server errors.\n" +
 		"  -command-server:<name> <cmd> <arg> <arg> ... ';' ; Add a command to pipe\n" +
@@ -1371,6 +1373,8 @@ public class FlowUploader implements FlowUploaderSettings
 		"Options:\n" +
 		"  -repo <path> ; Path to local ccouch repository to store cache in.\n" +
 		"  -no-cache    ; Do not cache file hashes or upload records.\n" +
+		"  -omit-file-mtimes ; do not include file modification times in\n"+
+		"               ; serialized directory data\n"+
 		"\n" +
 		"Example usage:\n" +
 		"  ccouch3 id something.txt some-directory/ somethingelse.zip";
