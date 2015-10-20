@@ -2,11 +2,13 @@ package togos.ccouch3.rdf;
 
 import java.io.IOException;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 
 import togos.blob.ByteBlob;
+import togos.ccouch3.Commit;
 import togos.ccouch3.Directory;
 import togos.ccouch3.DirectoryEntry;
 import togos.ccouch3.FSObjectType;
@@ -37,6 +39,17 @@ public class RDFInterpreter
 					", but found a "+n.simpleValue.getClass().getSimpleName(), n.sourceUri);
 			}
 		}
+	}
+	
+	protected <T> T getSimpleValue(Map.Entry<String,Set<RDFNode>> prop, Class<T> expectedClass, String sourceUri)
+		throws RDFStructureException
+	{
+		for( RDFNode n : prop.getValue() ) {
+			if( expectedClass.isInstance(n.simpleValue) ) {
+				return expectedClass.cast(n.simpleValue);
+			}
+		}
+		throw new RDFStructureException("No "+expectedClass+" value for "+prop.getKey(), sourceUri);
 	}
 	
 	protected void ensureSingleValue(Map.Entry<String,Set<RDFNode>> prop, String sourceUri)
@@ -104,6 +117,11 @@ public class RDFInterpreter
 		} else if( CCouchNamespace.COMMIT.equals(typeUri) ) {
 			int targetCount = 0;
 			String targetUri = null;
+			ArrayList<String> parentCommitUris = new ArrayList<String>();
+			ArrayList<String> tags = new ArrayList<String>();
+			String authorName = null;
+			String description = null;
+			long creationTime = -1;
 			for( Map.Entry<String,Set<RDFNode>> prop : node.properties.entrySet() ) {
 				String propKey = prop.getKey();
 				if( RDFNamespace.RDF_TYPE.equals(propKey) ) {
@@ -124,11 +142,16 @@ public class RDFInterpreter
 						// todo: stuff
 					}
 				} else if( DCNamespace.DC_CREATOR.equals(propKey) ) {
-					ensureSimpleValues(prop, String.class);
+					authorName = getSimpleValue(prop, String.class, node.sourceUri);
 				} else if( DCNamespace.DC_CREATED.equals(propKey) ) {
-					ensureSimpleValue(prop, String.class, node.sourceUri);
+					String dateStr = getSimpleValue(prop, String.class, node.sourceUri);
+					try {
+						creationTime = DateUtil.parseDate(dateStr).getTime();
+					} catch( ParseException e ) {
+						System.err.println("Warning: malformed date '"+dateStr+"' in "+node.sourceUri);
+					}
 				} else if( DCNamespace.DC_DESCRIPTION.equals(propKey) ) {
-					ensureSimpleValue(prop, String.class, node.sourceUri);
+					description = getSimpleValue(prop, String.class, node.sourceUri);
 				} else {
 					throw new RDFStructureException("Don't know what to do with Commit property: "+prop.getKey(), node.sourceUri);
 				}
@@ -136,8 +159,14 @@ public class RDFInterpreter
 			if( targetCount != 1 ) {
 				throw new RDFStructureException("Commit should have exactly 1 target, but this one has "+targetCount+".", node.sourceUri);
 			}
-			throw new UnsupportedOperationException("Haha j/k I don't parse commits yet");
-			// todo: stuff
+			return new Commit(
+				targetUri,
+				parentCommitUris.toArray(new String[parentCommitUris.size()]),
+				tags.toArray(new String[tags.size()]),
+				authorName,
+				description,
+				creationTime
+			);
 		} else {
 			throw new RDFStructureException("Don't know what to do with a "+typeUri, node.sourceUri);
 		}
