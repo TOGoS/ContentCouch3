@@ -77,10 +77,10 @@ public class RepoConfig
 		if( "-repo".equals(arg) ) {
 			primaryRepo = new RepoSpec(name, RepoType.FILESYSTEM, resolveRepoDir(moreArgs.next()));
 			return true;
-		} else if( arg.startsWith("-local-repo:") ) {
+		} else if( "-local-repo".equals(arg) ) {
 			localRepos.add(new RepoSpec(arg.substring("-repo:".length()), RepoType.FILESYSTEM, resolveRepoDir(moreArgs.next())));
 			return true;
-		} else if( arg.startsWith("-remote-repo:") ) {
+		} else if( "-remote-repo".equals(arg) ) {
 			localRepos.add(new RepoSpec(arg.substring("-repo:".length()), RepoType.HTTP_N2R, defuzzRemoteRepoPrefix(moreArgs.next())));
 			return true;
 		} else if( "-sector".equals(arg) ) {
