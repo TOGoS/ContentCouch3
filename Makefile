@@ -45,7 +45,7 @@ ext-lib/JUnit.jar: ext-lib/JUnit.jar.urn ${fetch_deps} | CCouch3.jar
 	${fetch} urn:bitprint:TEJJ6FSEFBCPNJFBDLRC7O7OICYU252P.XZMJNNSDGM456CHQCJI22DUDWYK6ZASNPLJ26GA -o "$@"
 
 fetch-jar: ${fetch_deps}
-	rm CCouch3.jar
+	rm -f CCouch3.jar
 	git checkout CCouch3.jar.urn
 	${fetch} $(shell cat CCouch3.jar.urn) -o CCouch3.jar
 
