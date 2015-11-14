@@ -66,6 +66,8 @@ public class CCouch3Command
 			return Cat.main(argi);
 		} else if( "copy".equals(cmd) ) {
 			return Copy.main(argi);
+		} else if( "config".equals(cmd) ) {
+			return ConfigDump.main(argi);
 		} else if( "backup".equals(cmd) ) {
 			return UpBacker.backupMain(argi);
 		} else if( "store-stream".equals(cmd) ) {
