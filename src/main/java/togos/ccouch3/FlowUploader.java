@@ -4,6 +4,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -842,7 +843,14 @@ public class FlowUploader implements FlowUploaderSettings
 			public boolean handleMessage( Object m ) throws Exception {
 				if( m instanceof UploadTask ) {
 					UploadTask ut = (UploadTask)m;
-					IndexResult indexResult = indexer.index(ut.path, indexedObjectSinks);
+					IndexResult indexResult;
+					try {
+						indexResult = indexer.index(ut.path, indexedObjectSinks);
+					} catch( FileNotFoundException e ) {
+						System.err.println("Error: "+e.getMessage()+"; noting this failure, I shall carry on.");
+						success = false;
+						return true;
+					}
 					synchronized(this) {
 						success &= indexResult.fullyStored;
 					}
