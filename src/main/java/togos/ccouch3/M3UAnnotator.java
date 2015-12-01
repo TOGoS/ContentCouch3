@@ -6,9 +6,11 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.regex.Pattern;
 
 import togos.blob.ByteBlob;
 import togos.blob.file.FileBlob;
@@ -54,6 +56,17 @@ public class M3UAnnotator
 	protected static String basename( String path ) {
 		int idx = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
 		return idx == -1 ? path : path.substring(idx+1);
+	}
+	
+	protected static final Pattern URI_PATTERN = Pattern.compile(
+		"^" +
+		"[A-Za-z][A-Za-z0-9\\+\\.\\-]+" + // The 'scheme part'
+		":" +
+		"([A-Za-z0-9\\.\\-_~:/\\?#\\[\\]@!\\$&'\\(\\)\\*\\+,;=]|%[A-Fa-f0-9]{2})+"+ // Scheme-specific stuff
+		"$");
+	
+	protected static final boolean isUri( String filenameOrUri ) {
+		return URI_PATTERN.matcher(filenameOrUri).matches();
 	}
 	
 	public static int main(Iterator<String> argi) {
@@ -181,6 +194,7 @@ public class M3UAnnotator
 									break;
 								}
 								String name = basename(t);
+								if( isUri(t) ) name = URLDecoder.decode(name, "UTF-8");
 								if( tidyFilenames ) {
 									name = name.replace(" (", "-");
 									name = name.replace(") ", "-");
