@@ -20,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import togos.blob.ByteBlob;
 import togos.blob.util.BlobUtil;
 import togos.ccouch3.BlobReferenceScanner.ScanCallback;
 import togos.ccouch3.FlowUploader.Indexer.IndexedObjectSink;
@@ -201,14 +202,33 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	static class IndexResult {
-		public final FileInfo fileInfo;
+		public final String inputName;
+		public final ByteBlob blob;
+		public final String urn;
 		public final boolean anyNewData;
 		public final boolean fullyStored;
-		
-		public IndexResult( FileInfo fi, boolean anyNewData, boolean fullyStored ) {
-			this.fileInfo = fi;
+		public IndexResult( String inputName, ByteBlob blob, String urn, boolean anyNewData, boolean fullyStored ) {
+			this.inputName = inputName;
+			this.blob = blob;
+			this.urn = urn;
 			this.anyNewData = anyNewData;
 			this.fullyStored = fullyStored;
+		}
+		public FSObjectType getFsObjectType() {
+			return FSObjectType.BLOB;
+		}
+	}
+	
+	static class FileIndexResult extends IndexResult {
+		public final FileInfo fileInfo;
+		
+		public FileIndexResult( FileInfo fi, boolean anyNewData, boolean fullyStored ) {
+			super(fi.getPath(), fi, fi.getUrn(), anyNewData, fullyStored);
+			this.fileInfo = fi;
+		}
+		
+		public FSObjectType getFsObjectType() {
+			return fileInfo.getFsObjectType();
 		}
 	}
 	
@@ -325,7 +345,7 @@ public class FlowUploader implements FlowUploaderSettings
 			for( File c : dirEntries ) {
 				if( FileUtil.shouldIgnore(ignores, c) ) continue;
 				
-				IndexResult indexResult;
+				FileIndexResult indexResult;
 				try {
 					indexResult = index(c, destinations, ignores);
 					allEntriesFullyStored &= indexResult.fullyStored;
@@ -412,7 +432,57 @@ public class FlowUploader implements FlowUploaderSettings
 		// once the file is found, the original URN gets ignored and
 		// the URN has to be re-calculated!
 		
-		protected IndexResult index( File file, Collection<IndexedObjectSink> destinations, final Glob ignores ) throws Exception {
+		protected IndexResult index( final String name, final ByteBlob blob, Collection<IndexedObjectSink> destinations ) throws Exception {
+			InputStream is = blob.openInputStream();
+			final String urn;
+			try {
+				urn = digestor.digest(is);
+			} finally {
+				is.close();
+			}
+			
+			BlobInfo bi = new BlobInfo() {
+				public String getUrn() {
+					return urn;
+				}
+				@Override public long getSize() {
+					return blob.getSize();
+				}
+				@Override public InputStream openInputStream() throws IOException {
+					return blob.openInputStream();
+				}
+				@Override public ByteBlob slice(long offset, long length) {
+					return blob.slice(offset, length);
+				}
+				@Override public void writeTo(OutputStream os) throws IOException {
+					blob.writeTo(os);
+				}
+			};
+			
+			// Copy-pasta from index( File, ... )
+			
+			destinations = getNeedySinks(urn, destinations);
+			if( destinations.size() == 0 ) {
+				if( debug ) System.err.println("Indexer: "+urn+" already uploaded"); 
+				return new IndexResult( name, bi, urn, false, true );
+			}
+			
+			if( debug ) System.err.println("Indexer: Some destinations don't yet have "+urn);
+			
+			for( IndexedObjectSink d : destinations ) d.give(bi);
+			
+			boolean fullyUploaded = scanBlobReferences( bi, destinations );
+			
+			if( fullyUploaded ) {
+				for( IndexedObjectSink d : destinations ) {
+					d.give( new FullyStoredMarker(urn) );
+				}
+			}
+			
+			return new IndexResult(name, bi, urn, true, fullyUploaded);
+		}
+		
+		protected FileIndexResult index( File file, Collection<IndexedObjectSink> destinations, final Glob ignores ) throws Exception {
 			if( debug ) System.err.println("Indexer: "+file+"...");
 			String cachedUrn = hashCache.getFileUrn( file );
 			if( debug ) {
@@ -425,7 +495,7 @@ public class FlowUploader implements FlowUploaderSettings
 			if( cachedUrn != null && (destinations = getNeedySinks(cachedUrn, destinations)).size() == 0 ) {
 				if( debug ) System.err.println("Indexer: "+cachedUrn+" already uploaded everywhere!");
 				// Then we don't need to recurse into subdirectories!
-				return new IndexResult(
+				return new FileIndexResult(
 					new FileInfo(
 						file.getCanonicalPath(),
 						cachedUrn,
@@ -468,7 +538,7 @@ public class FlowUploader implements FlowUploaderSettings
 				destinations = getNeedySinks(fi.getUrn(), destinations);
 				if( destinations.size() == 0 ) {
 					if( debug ) System.err.println("Indexer: "+file+": already uploaded: "+fileUrn); 
-					return new IndexResult( fi, false, true );
+					return new FileIndexResult( fi, false, true );
 				}
 				
 				if( debug ) System.err.println("Indexer: Some destinations don't yet have "+fi.getUrn());
@@ -506,7 +576,7 @@ public class FlowUploader implements FlowUploaderSettings
 				
 				if( destinations.size() == 0 ) {
 					if( debug ) System.err.println("Indexer: "+file+": already uploaded: "+treeUrn); 
-					return new IndexResult( fi, false, true );
+					return new FileIndexResult( fi, false, true );
 				}
 				
 				SmallBlobInfo blobInfo = new SmallBlobInfo( rdfBlobUrn, serialized );
@@ -523,7 +593,7 @@ public class FlowUploader implements FlowUploaderSettings
 				throw new RuntimeException("Don't know how to index "+file);
 			}
 			if( debug ) System.err.println("Indexer: "+file+": done: "+fi.getUrn());
-			return new IndexResult( fi, true, fullyUploaded );
+			return new FileIndexResult( fi, true, fullyUploaded );
 		}
 		
 		// This is to prevent tight loops where the same blob is
@@ -584,9 +654,32 @@ public class FlowUploader implements FlowUploaderSettings
 			}
 		}
 		
+		// TODO: Should probably just make a ThingResolver class to do this.
+		protected Object get( String name ) throws IOException {
+			try {
+				if( localFileResolver instanceof BlobResolver ) {
+					ByteBlob b = ((BlobResolver)localFileResolver).getBlob(name);
+					if( b != null ) return b;
+				}
+			} catch( FileNotFoundException e ) {
+			}
+			try {
+				File f = localFileResolver.getFile(name);
+				if( f != null ) return f;
+			} catch( FileNotFoundException e ) {
+			}
+			throw new FileNotFoundException(name);
+		}
+		
 		protected IndexResult index( String path, Collection<IndexedObjectSink> destinations ) throws Exception {
-			File f = localFileResolver.getFile(path);
-			return index( f, destinations, FileUtil.DEFAULT_IGNORES);
+			Object thing = get(path);
+			if( thing instanceof File ) {
+				return index( (File)thing, destinations, FileUtil.DEFAULT_IGNORES);
+			} else if( thing instanceof ByteBlob ) {
+				return index( path, (ByteBlob)thing, destinations );
+			} else {
+				throw new FileNotFoundException("Resolving '"+path+"' gave me a "+thing.getClass()+", which I don't know what to do with");
+			}
 		}
 	}
 	
@@ -745,12 +838,12 @@ public class FlowUploader implements FlowUploaderSettings
 		return hman;
 	}
 	
-	protected void report( FileInfo fileInfo ) {
+	protected void report( IndexResult indexResult ) {
 		if( reportUrn ) {
-			System.out.println(fileInfo.getUrn());
+			System.out.println(indexResult.urn);
 		}
 		if( reportPathUrnMapping ) {
-			System.out.println(fileInfo.getPath()+"\t"+fileInfo.getUrn());
+			System.out.println(indexResult.inputName+"\t"+indexResult.urn);
 		}
 	}
 	
@@ -758,7 +851,7 @@ public class FlowUploader implements FlowUploaderSettings
 		final Indexer indexer = new Indexer( getLocalRepository(), getLocalFileResolver(), BlobReferenceScanMode.NEVER, dirSer, digestor, getHashCache(), howToHandleFileReadErrors, debug );
 		for( UploadTask ut : tasks ) {
 			IndexResult indexResult = indexer.index(ut.path, Collections.<IndexedObjectSink>emptyList());
-			report( indexResult.fileInfo );
+			report( indexResult );
 		}
 	}
 	
@@ -855,20 +948,20 @@ public class FlowUploader implements FlowUploaderSettings
 						success &= indexResult.fullyStored;
 					}
 					long timestamp = System.currentTimeMillis();
-					report( indexResult.fileInfo );
+					report( indexResult );
 					
 					if( indexResult.anyNewData ) {
 						// If any new data was uploaded, send the name -> URN mapping to the server
 						// to be logged.  We want to NOT do this if we are only indexing and not
 						// sending!  In this case anyNewData will also be false.
-						String message = LogUtil.formatStorageLogEntry(new Date(), indexResult.fileInfo.getFsObjectType(), ut.name, indexResult.fileInfo.getUrn());
+						String message = LogUtil.formatStorageLogEntry(new Date(), indexResult.getFsObjectType(), ut.name, indexResult.urn);
 						LogMessage lm = new LogMessage(BlobUtil.bytes(message));
 						for( IndexedObjectSink d : indexedObjectSinks ) d.give( lm );
 					}
 					
 					if( ut.commitConfig != null ) {
 						CommitManager.CommitSaveResult csr = getCommitManager().saveCommit(
-							new File(ut.path), indexResult.fileInfo.getUrn(), timestamp, ut.commitConfig );
+							new File(ut.path), indexResult.urn, timestamp, ut.commitConfig );
 						
 						SmallBlobInfo commitBlobInfo = new SmallBlobInfo( csr.latestCommitDataUrn, csr.latestCommitData );
 						for( IndexedObjectSink d : indexedObjectSinks ) {
