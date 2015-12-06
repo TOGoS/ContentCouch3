@@ -30,7 +30,7 @@ default: CCouch3.jar.urn
 
 CCouch3.jar: $(shell find src/main)
 	rm -rf target/main
-	find src/main ext-lib/*/src/main -name *.java >.java-main-src.lst
+	find src/main ext-lib/*/src/main -name '*.java' >.java-main-src.lst
 	mkdir -p target/main
 	${javac} -sourcepath src/main/java -d target/main @.java-main-src.lst
 	jar -ce togos.ccouch3.CCouch3Command -C target/main . >CCouch3.jar
