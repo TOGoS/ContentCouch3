@@ -1332,7 +1332,7 @@ public class FlowUploader implements FlowUploaderSettings
 				config.includeFileMtimes = false;
 			} else if( "-skip-files-with-read-errors".equals(a) ) {
 				config.howToHandleFileReadErrors = Actions.SKIP_THE_FILE;
-			} else if( !a.startsWith("-") ) {
+			} else if( !a.startsWith("-") || "-".equals(a) ) {
 				CommitConfig commitConfig;
 				if( commitAuthor == null && commitMessage == null && commitName == null ) {
 					commitConfig = null;
