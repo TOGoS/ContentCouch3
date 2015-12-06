@@ -3,7 +3,8 @@ package togos.ccouch3;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.URLEncoder;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 import togos.blob.ByteBlob;
 import togos.blob.file.FileBlob;
@@ -60,7 +61,12 @@ public class LiberalFileResolver implements FileResolver, BlobResolver
 			return new SimpleByteChunk(data);
 		}
 		
-		// TODO: Allow opening HTTP URLs and stuff maybe?
+		try {
+			URL url = new URL(name);
+			return new URLBlob(url);
+		} catch( MalformedURLException e ) {
+			// Well it wasn't that, then!
+		}
 		
 		FileBlob f = new FileBlob(name);
 		if( f.exists() ) return f;
