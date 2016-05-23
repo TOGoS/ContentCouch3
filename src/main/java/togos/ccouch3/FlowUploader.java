@@ -1299,7 +1299,7 @@ public class FlowUploader implements FlowUploaderSettings
 			} else if( "-server-name".equals(a) ) {
 				serverName = args.next();
 			} else if( a.startsWith("-http-server:") || a.startsWith("-flaky-http-server:") ) {
-				final String sn = a.substring(a.indexOf(":"));
+				final String sn = a.substring(a.indexOf(":")+1);
 				HTTPUploadClientSpec hucs = new HTTPUploadClientSpec(sn, RepoURLDefuzzer.defuzzRemoteRepoPrefix(args.next()));
 				if( a.startsWith("-flaky") ) {
 					hucs.maxUploadAttempts = 4;
