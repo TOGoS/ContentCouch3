@@ -82,7 +82,18 @@ class HTTPUploadClient implements UploadClient
 		} else if( status == 404 ) {
 			return false;
 		} else {
-			throw new RuntimeException("HEAD received unexpectd response code "+status+"; "+urlCon.getResponseMessage());
+			byte[] errorText = null;
+			try {
+				errorText = StreamUtil.slurp(urlCon.getErrorStream());
+			} catch( Exception e ) { }
+			
+			throw new ServerError(
+				"HEAD received unexpected response code "+status+"; "+urlCon.getResponseMessage(),
+				status,
+				errorText,
+				urlCon.getRequestMethod(),
+				url.toString()
+			);
 		}
 	}
 	
@@ -258,17 +269,25 @@ class HTTPUploadClient implements UploadClient
 						putAttemptedAndFailed = true;
 					}
 				}
-				if( existsOnServer(bi.getUrn()) ) {
-					return false;
-				} else {
-					if( putAttemptedAndFailed ) {
-						System.err.println("Okay, that failed PUT actually was a failure, since the file's not on the server.");
-						anyFailures = true;
-						// No point passing this on.
+				
+				try {
+					if( existsOnServer(bi.getUrn()) ) {
 						return false;
 					}
-					return true;
+				} catch( IOException e ) {
+					anyFailures = true;
+					System.err.println("Failed to determine if "+bi.getUrn()+" exists on "+serverUrl+" due to error: "+e.getMessage());
+					return false;
 				}
+				
+				if( putAttemptedAndFailed ) {
+					System.err.println("Okay, that failed PUT actually was a failure, since the file's not on the server.");
+					anyFailures = true;
+					// No point passing this on.
+					return false;
+				}
+				
+				return true;
 			} else if( m instanceof FullyStoredMarker ) {
 				// These are only 'guaranteed' (assuming the server's behaving) to be true if no errors occur.
 				// So if errors have occurred, don't forward these!
