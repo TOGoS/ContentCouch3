@@ -37,7 +37,7 @@ public class SHA1FileRepository implements Repository
 		this.storeSector = storeSector;
 	}
 	
-	Pattern SHA1EXTRACTOR = Pattern.compile("^urn:(?:sha1|bitprint):([A-Z0-9]{32})");
+	Pattern SHA1EXTRACTOR = Pattern.compile("^urn:(?:sha1|bitprint):([A-Z2-7]{32})");
 	
 	@Override public FileBlob getBlob( String urn ) {
 		Matcher m = SHA1EXTRACTOR.matcher(urn);

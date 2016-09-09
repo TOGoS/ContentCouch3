@@ -2,6 +2,8 @@ package togos.ccouch3.hash;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.bitpedia.util.Base32;
 import org.bitpedia.util.TigerTree;
@@ -16,7 +18,7 @@ public class BitprintDigest extends MessageDigest
 	
 	public static final HashFormatter FORMATTER = new HashFormatter() {
 		@Override public String format(byte[] hash) {
-			return "urn:bitprint:" + BitprintDigest.format(hash);
+			return BitprintDigest.formatUrn(hash);
 		}
 	};
 	
@@ -32,6 +34,18 @@ public class BitprintDigest extends MessageDigest
 		return Base32.encode(sha1Hash) + "." + Base32.encode(tigerTreeHash);
 	}
 	
+	public static final Pattern URN_PATTERN = Pattern.compile("urn:bitprint:([A-Z2-7]{32})\\.([A-Z2-7]{39})");
+	
+	public static String formatUrn( byte[] hash ) {
+		return "urn:bitprint:"+format(hash);
+	}
+	
+	public static byte[] urnToBytes( String urn ) {
+		Matcher m = URN_PATTERN.matcher(urn);
+		if( !m.matches() ) throw new RuntimeException("Invalid Bitprint URN: "+urn);
+		return joinHashes(Base32.decode(m.group(1)), Base32.decode(m.group(2)));
+	}
+	
 	MessageDigest sha1;
 	TigerTree tt;
 	
@@ -45,7 +59,7 @@ public class BitprintDigest extends MessageDigest
 		tt   = new TigerTree();
 	}
 	
-	protected byte[] joinHashes( byte[] sha1Hash, byte[] tigerTreeHash ) {
+	protected static byte[] joinHashes( byte[] sha1Hash, byte[] tigerTreeHash ) {
 		byte[] hash = new byte[44];
 		System.arraycopy( sha1Hash, 0, hash, 0, 20);
 		System.arraycopy( tigerTreeHash, 0, hash, 20, 24);
