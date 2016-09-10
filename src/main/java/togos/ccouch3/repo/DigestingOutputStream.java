@@ -7,6 +7,7 @@ import java.security.MessageDigest;
 public class DigestingOutputStream extends OutputStream
 {
 	protected final MessageDigest digest;
+	protected long length = 0;
 	protected final OutputStream backingOutputStream;
 	
 	public DigestingOutputStream( MessageDigest digest, OutputStream backingOutputStream ) {
@@ -17,11 +18,13 @@ public class DigestingOutputStream extends OutputStream
 	@Override public void write(int b) throws IOException {
 		digest.update((byte)b);
 		backingOutputStream.write(b);
+		++length;
 	}
 	
 	@Override public void write(byte[] b, int off, int len) throws IOException {
 		digest.update(b, off, len);
 		backingOutputStream.write(b, off, len);
+		length += len;
 	}
 	
 	@Override public void write(byte[] b) throws IOException {
@@ -33,6 +36,9 @@ public class DigestingOutputStream extends OutputStream
 	}
 	public byte[] digest() {
 		return digest.digest();
+	}
+	public long getNumberOfBytesWritten() {
+		return length;
 	}
 	
 	@Override public void close() throws IOException {

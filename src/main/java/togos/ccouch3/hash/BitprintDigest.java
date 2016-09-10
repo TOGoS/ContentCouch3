@@ -8,8 +8,12 @@ import java.util.regex.Pattern;
 import org.bitpedia.util.Base32;
 import org.bitpedia.util.TigerTree;
 
+import togos.ccouch3.repo.UnsupportedSchemeException;
+
 public class BitprintDigest extends MessageDigest
 {
+	public static final int HASH_SIZE = 44;
+	
 	public static final MessageDigestFactory FACTORY = new MessageDigestFactory() {
 		@Override public MessageDigest createMessageDigest() {
 			return new BitprintDigest();
@@ -40,9 +44,9 @@ public class BitprintDigest extends MessageDigest
 		return "urn:bitprint:"+format(hash);
 	}
 	
-	public static byte[] urnToBytes( String urn ) {
+	public static byte[] urnToBytes( String urn ) throws UnsupportedSchemeException {
 		Matcher m = URN_PATTERN.matcher(urn);
-		if( !m.matches() ) throw new RuntimeException("Invalid Bitprint URN: "+urn);
+		if( !m.matches() ) throw new UnsupportedSchemeException("Invalid Bitprint URN: "+urn);
 		return joinHashes(Base32.decode(m.group(1)), Base32.decode(m.group(2)));
 	}
 	
