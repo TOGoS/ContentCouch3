@@ -37,11 +37,13 @@ public class FileUtil
 		return false;
 	}
 	
-	public static void mkParentDirs( File f ) {
+	public static void mkParentDirs( File f ) throws IOException {
 		File p = f.getParentFile();
 		if( p == null ) return;
 		if( p.exists() ) return;
-		p.mkdirs();
+		if( !p.mkdirs() ) {
+			throw new IOException("Failed to mkdirs("+p+")");
+		}
 	}
 	
 	public static void deltree( File f ) {

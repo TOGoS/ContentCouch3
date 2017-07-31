@@ -149,7 +149,7 @@ public class SHA1FileRepository implements Repository
 						return "urn:sha1:"+calculatedSha1Base32;
 					}
 					if( !tempFile.renameTo(finalFile) ) {
-						throw new StoreException( "Failed to move temp file to final location" );
+						throw new StoreException( "Failed to move "+tempFile+" to "+finalFile+" (renameTo returned false)" );
 					}
 					return "urn:sha1:"+calculatedSha1Base32;
 				} finally {
