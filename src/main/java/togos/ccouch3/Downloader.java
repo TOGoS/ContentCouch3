@@ -151,6 +151,10 @@ public class Downloader
 	public StreamURNifier digestor = BitprintDigest.STREAM_URNIFIER;
 	
 	/**
+	 * User is doing something odd.
+	 */
+	public boolean reportWarnings = true;
+	/**
 	 * Errors other than 404s
 	 */
 	public boolean reportErrors = true;
@@ -167,6 +171,10 @@ public class Downloader
 	 */
 	public boolean reportDownloads = false;
 	public boolean reportUnrecursableBlobs = false;
+	/**
+	 * Random diagnostic info that my be useful for debugging
+	 */
+	public boolean beChatty = false;
 	
 	public BlobReferenceScanMode scanMode;
 	// AS7Q5NVWLNDPLRL3A7RYHPXY3QSMPQVI.3LPFRNN2WLY3WMKEHJ2Y3VYKEYMREOGZARVS4YY
@@ -303,11 +311,11 @@ public class Downloader
 				urlC.connect();
 				InputStream is = urlC.getInputStream();
 				if( reportDownloads ) {
-					System.err.println("Downloading "+fullUrl+" ("+urlC.getContentLength()+" bytes)");
+					System.err.println(this.getName()+" downloading "+fullUrl+" ("+urlC.getContentLength()+" bytes)");
 				}
 				localRepo.put(urn, is);
 				if( reportDownloads ) {
-					System.err.println("Completed download of "+fullUrl);
+					System.err.println(this.getName()+" completed download of "+fullUrl);
 				}
 				return true;
 			} catch( FileNotFoundException e ) {
@@ -380,7 +388,9 @@ public class Downloader
 			while(!interrupted()) {
 				String urn;
 				try {
+					if( beChatty ) System.err.println(this.getName()+" waiting for a job...");
 					urn = enqueuedUrns.takeRandom();
+					if( beChatty ) System.err.println(this.getName()+" going to try downloading "+urn);
 				} catch( InterruptedException e ) {
 					Thread.currentThread().interrupt();
 					continue;
@@ -411,18 +421,44 @@ public class Downloader
 		assert urn.startsWith("urn:");
 		assert !stopped;
 		
-		if( isFullyCached(urn) ) return false;
-		if( alreadyPushed(urn) ) return false;
+		if( isFullyCached(urn) ) {
+			if( beChatty ) System.err.println(urn+" already cached; not queing again");
+			return false;
+		}
+		if( alreadyPushed(urn) ) {
+			if( beChatty ) System.err.println(urn+" already queued; not queing again");
+			return false;
+		}
 		
-		return enqueuedAndInProgressUrns.add(urn);
+		if( downloadThreads.size() == 0 ) {
+			failCount.incrementAndGet();
+			if( reportFailures ) {
+				System.err.println("No download threads; can't enqueue "+urn);
+			}
+			return false;
+		}
+
+		boolean added = enqueuedAndInProgressUrns.add(urn);
+		if( beChatty ) {
+			if( added ) System.err.println(urn+" added to set of queued or active jobs");
+			else System.err.println(urn+" already in set of queued or active jobs; not re-queued");
+		}
+		return added;
 	}
 	
 	public void enqueue( String urn ) throws InterruptedException {
-		if( prequeue(urn) ) enqueuedUrns.put(urn);
+		if( prequeue(urn) ) {
+			if( beChatty ) System.err.println("Adding "+urn+" to job queue...");
+			enqueuedUrns.put(urn);
+			if( beChatty ) System.err.println("Added");
+		}
 	}
 	
 	public void enqueueImmediately( String urn ) {
-		if( prequeue(urn) ) enqueuedUrns.add(urn);
+		if( prequeue(urn) ) {
+			if( beChatty ) System.err.println("Adding (nonblocking) "+urn+" queue");
+			enqueuedUrns.add(urn);
+		}
 	}
 	
 	public void enqueueArg( String arg, BlobResolver rez )
@@ -431,6 +467,7 @@ public class Downloader
 		if( arg.startsWith("@") && arg.length() > 1 ) {
 			final String listUrn = arg.substring(1);
 			final ByteBlob listBlob;
+			if( beChatty ) System.err.println("Opening list: "+listUrn);
 			try {
 				listBlob = rez.getBlob(listUrn);
 			} catch( IOException e ) {
@@ -442,13 +479,17 @@ public class Downloader
 			}
 			final BufferedReader listReader = new BufferedReader(new InputStreamReader(listBlob.openInputStream()));
 			try {
+				if( beChatty ) System.err.println("Reading list from "+listUrn+"...");
 				String line;
+				int lineCount = 0;
 				while( (line = listReader.readLine()) != null ) {
 					line = line.trim();
 					if( line.startsWith("#") || line.isEmpty() ) continue;
 					
+					++lineCount;
 					enqueue(line);
 				}
+				if( beChatty ) System.err.println("Read "+lineCount+" non-blank/comment lines from "+listUrn);
 			} finally {
 				listReader.close();
 			}
@@ -492,6 +533,7 @@ public class Downloader
 		"  -repo <path>       ; path to local repository\n" +
 		"  -remote-repo <url> ; URL of remote repository (slightly fuzzy; see notes)\n" +
 		"  -recurse           ; recursively scan cached blobs for new URNs to cache\n" +
+		"  -v                 ; be somewhat noisy\n" +
 		"  -debug             ; be very noisy\n" +
 		"  -silent            ; say nothing, ever\n" +
 		"  -sector <name>     ; sector within local repo to store data in\n" +
@@ -515,8 +557,10 @@ public class Downloader
 		boolean reportDownloads = false;
 		boolean reportUnrecursableBlobs = false;
 		boolean reportDownloadFailures = false;
+		boolean reportWarnings = true;
 		boolean reportErrors = true;
 		boolean reportFailures = true;
+		boolean beChatty = false;
 		boolean summarizeWhenCompletedWithFailures = true;
 		// This is a very reasonable thing to do, but is
 		// false by default because the set may take up a lot of memory.
@@ -528,15 +572,27 @@ public class Downloader
 				urnArgs.add(arg);
 			} else if( "-recurse".equals(arg) ) {
 				scanMode = BlobReferenceScanMode.TEXT;
-			} else if( "-debug".equals(arg) ) {
-				reportDownloads = true;
-				reportUnrecursableBlobs = true;
-				reportDownloadFailures = true;
 			} else if( "-silent".equals(arg) ) {
+				reportWarnings = false;
 				reportDownloads = false;
 				reportErrors = false;
 				reportFailures = false;
 				summarizeWhenCompletedWithFailures = false;
+				beChatty = false;
+			} else if( "-v".equals(arg) ) {
+				reportWarnings = true;
+				reportErrors = true;
+				reportFailures = true;
+				reportUnrecursableBlobs = true;
+				reportDownloadFailures = true;
+			} else if( "-debug".equals(arg) ) {
+				reportWarnings = true;
+				reportErrors = true;
+				reportFailures = true;
+				reportDownloads = true;
+				reportUnrecursableBlobs = true;
+				reportDownloadFailures = true;
+				beChatty = true;
 			} else if( repoConfig.parseCommandLineArg(arg, args) ) {
 			} else if( "-connections-per-remote".equals(arg) ) {
 				connectionsPerRemote = Integer.parseInt(args.next());
@@ -562,13 +618,19 @@ public class Downloader
 		
 		final BlobResolver argBlobResolver = CCouch3Command.getCommandLineFileResolver(new File[]{primaryRepoDir});
 		
+		if( repoConfig.getRemoteRepoUrls().length == 0 && reportWarnings ) {
+			System.err.println("Warning: No remote reposisories listed; no downloads will succeed");
+		}
+		
 		Downloader downloader = new Downloader( new RepositorySet(repoConfig.getRemoteRepoUrls(), connectionsPerRemote), localRepo, fullyCachedTreeUrns );
 		downloader.scanMode = scanMode;
 		downloader.reportDownloads = reportDownloads;
 		downloader.reportUnrecursableBlobs = reportUnrecursableBlobs;
 		downloader.reportDownloadFailures = reportDownloadFailures;
+		downloader.reportWarnings = reportWarnings;
 		downloader.reportErrors = reportErrors;
 		downloader.reportFailures = reportFailures;
+		downloader.beChatty = beChatty;
 		downloader.setRememberAttempts(rememberAttempts);
 		
 		downloader.start();

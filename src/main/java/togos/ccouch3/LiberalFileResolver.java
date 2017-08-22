@@ -32,7 +32,7 @@ public class LiberalFileResolver implements FileResolver, BlobResolver
 	@Override
 	public ByteBlob getBlob(String name) throws IOException {
 		if( "-".equals(name) ) {
-			return new InputStreamBlob(System.in);
+			return InputStreamBlob.getStdinBlob();
 		}
 		
 		if( name.startsWith("urn:") ) {
