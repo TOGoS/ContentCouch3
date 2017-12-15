@@ -45,16 +45,20 @@ public class CCouch3Command
 		"  cache             ; download and cache files from remote repositories\n" +
 		"  cat               ; output blobs to standard output\n" +
 		"  copy              ; copy files\n" +
-		"  backup            ; back up files locally\n" +
+		"  backup            ; back up files locally (simplified implementation)\n" +
 		"  command-server    ; run a command server\n" +
 		"  web-server        ; run a web server\n" +
 		"  store-stream      ; store files or pipe contents\n"+
-		"  <subcommand> -?   ; get help on a specific command";
+		"  <subcommand> -?   ; get help on a specific command\n"+
+		"\n"+
+		"'backup' exists primarily because its implementation is simpler\n"+
+		"and easier to debug than that of 'upload';\n"+
+		"Otherwise they serve similar purposes.\n";
 	
 	public static int main( Iterator<String> argi ) throws Exception {
 		if( !argi.hasNext() ) {
 			System.err.println("Error: no subcommand given.");
-			System.err.println(USAGE);
+			System.err.print(USAGE);
 			return 1;
 		}
 		String cmd = argi.next();
@@ -85,11 +89,11 @@ public class CCouch3Command
 		} else if( "annotate-m3u".equals(cmd) ) {
 			return M3UAnnotator.main(argi);
 		} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
-			System.out.println(USAGE);
+			System.out.print(USAGE);
 			return 0;
 		} else {
 			System.err.println("Error: Unrecognized command: "+cmd);
-			System.err.println(USAGE);
+			System.err.print(USAGE);
 			return 1;
 		}
 	}

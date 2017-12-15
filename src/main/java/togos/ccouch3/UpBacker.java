@@ -24,10 +24,19 @@ public class UpBacker
 	static class BackupCmd {
 		public static final String USAGE =
 			"Usage: ccouch3 backup -repo <repo-path> [options] <file1> <file2> ...\n" +
+			"\n" +
+			"Backs up files locally by explicitly copying them.\n" +
+			"To keep maintenance costs low the implementation of this command\n" +
+			"favors robustness and simplicity over efficiency.\n" +
+			"Compare with 'upload'.\n" +
+			"\n" +
 			"Options:\n" +
 			"  -sector <name> ; indicate section of repo in which to store data\n" +
 			"  -show-progress ; note progress on stderr as program runs\n" +
 			"  -show-report   ; report to stderr after each root is completed\n" +
+			"  -files-only    ; only store file contents, no directories\n" +
+			"  -dirs-only     ; only store directory listings (including file references),\n" +
+			"                 ; but no file contents\n" +
 			"  -omit-file-mtimes ; do not include file modification times in serialized\n"+
 			"                 ; directory data\n"+
 			"  -?             ; show help and exit\n";
@@ -64,7 +73,7 @@ public class UpBacker
 				System.err.println("Run with -? for help.");
 				return 1;
 			case HELP:
-				System.out.println(USAGE);
+				System.out.print(USAGE);
 				return 0;
 			default:
 				throw new RuntimeException("Invalid mode: "+mode);
@@ -75,6 +84,8 @@ public class UpBacker
 	public final Repository repo;
 	public final File headDir;
 	
+	public boolean shouldStoreFileContents = true;
+	public boolean shouldStoreDirectoryListings = true;
 	public boolean shouldShowProgress;
 	public boolean shouldReportResults;
 	
@@ -202,7 +213,7 @@ public class UpBacker
 				directorySerializer.serialize(entries, dser);
 				byte[] data = dser.toByteArray();
 				String dirRdfUrn = digestor.digest(new ByteArrayInputStream(data));
-				if( !repo.contains(dirRdfUrn) ) {
+				if( this.shouldStoreDirectoryListings && !repo.contains(dirRdfUrn) ) {
 					try {
 						repo.put(dirRdfUrn, new ByteArrayInputStream(data));
 						++storedCount;
@@ -242,7 +253,7 @@ public class UpBacker
 		long mtime = f.lastModified();
 		int storedCount = 0;
 		
-		if( !repo.contains(fileUrn) ) {
+		if( this.shouldStoreFileContents && !repo.contains(fileUrn) ) {
 			try {
 				FileInputStream fis = new FileInputStream( f );
 				repo.put(fileUrn, fis);
@@ -286,6 +297,8 @@ public class UpBacker
 		String storeSector = "local";
 		boolean showReport = false, showProgress = false;
 		boolean includeFileMtimes = true;
+		boolean shouldStoreFileContents = true;
+		boolean shouldStoreDirectoryListings = true;
 		
 		while( argi.hasNext() ) {
 			String arg = argi.next();
@@ -298,6 +311,12 @@ public class UpBacker
 				repoPath = argi.next();
 			} else if( "-sector".equals(arg) ) {
 				storeSector = argi.next();
+			} else if( "-files-only".equals(arg) ) {
+				shouldStoreFileContents = true;
+				shouldStoreDirectoryListings = false;
+			} else if( "-dirs-only".equals(arg) ) {
+				shouldStoreFileContents = false;
+				shouldStoreDirectoryListings = true;
 			} else if( "-show-progress".equals(arg) ) {
 				showProgress = true;
 			} else if( "-omit-file-mtimes".equals(arg) ) {
@@ -316,6 +335,8 @@ public class UpBacker
 		}
 		
 		UpBacker upBacker = new UpBacker( new File(repoPath), storeSector, includeFileMtimes );
+		upBacker.shouldStoreFileContents = shouldStoreFileContents;
+		upBacker.shouldStoreDirectoryListings = shouldStoreDirectoryListings;
 		upBacker.shouldReportResults = showReport;
 		upBacker.shouldShowProgress = showProgress;
 		
