@@ -38,6 +38,9 @@ CCouch3.jar: $(shell find src/main)
 CCouch3.jar.urn: CCouch3.jar
 	java -ea -jar CCouch3.jar id "$<" >"$@"
 
+publish-jar: CCouch3.jar CCouch3.jar.urn
+	publish CCouch3.jar
+
 .ccouch-repos.lst: | .ccouch-repos.lst.example
 	cp "$|" "$@"
 
