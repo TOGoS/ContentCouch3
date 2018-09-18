@@ -16,6 +16,7 @@ import togos.blob.ByteBlob;
 import togos.blob.file.FileBlob;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.StreamURNifier;
+import togos.ccouch3.repo.Repository;
 import togos.ccouch3.util.RepoURLDefuzzer;
 
 public class M3UAnnotator
@@ -35,6 +36,7 @@ public class M3UAnnotator
 		"  none - paths are left as they are\n"+
 		"  raw:<server> - URLs of the form <server>/uri-res/raw/<urn>/<filename>\n"+
 		"  N2R:<server> - URLs of the form <server>/uri-res/N2R?<urn>\n"+
+		"  local-repo   - Paths to files in the local repository\n"+
 		"\n"+
 		"Default mode of operation is to emit a #URN:<urn> line for each\n"+
 		"file referenced from the M3U.\n"+
@@ -48,7 +50,8 @@ public class M3UAnnotator
 	enum PathTransform {
 		NONE,
 		RAW,
-		N2R
+		N2R,
+		LOCAL_REPO
 	}
 	
 	protected static final String URN_LINE_PREFIX = "#URN:";
@@ -97,6 +100,8 @@ public class M3UAnnotator
 				} else if( transformSpec.startsWith("N2R:") ) {
 					pathTransform = PathTransform.N2R;
 					defaultN2rPrefix = RepoURLDefuzzer.defuzzRemoteRepoPrefix(transformSpec.substring(4));
+				} else if( transformSpec.startsWith("local-repo") ) {
+					pathTransform = PathTransform.LOCAL_REPO;
 				} else {
 					System.err.println("Unrecognized path transform: "+transformSpec);
 					return 1;
@@ -164,6 +169,8 @@ public class M3UAnnotator
 		}
 		final Identifier identifier = new Identifier();
 		
+		final Repository[] localRepos = repoConfig.getLocalRepositories();
+		
 		try {
 			for( String p : m3uPaths ) {
 				String providedUrn = null;
@@ -184,6 +191,7 @@ public class M3UAnnotator
 								}
 							}
 							String path;
+						resolvePath:
 							switch( pathTransform ) {
 							case NONE:
 								path = line;
@@ -212,6 +220,29 @@ public class M3UAnnotator
 								}
 								path = defaultN2rPrefix+urn;
 								break;
+							case LOCAL_REPO:
+								for( Repository r : localRepos ) {
+									try {
+										File f = r.getFile(urn);
+										if( f != null ) {
+											path = f.getPath();
+											break resolvePath;
+										}
+									} catch( IOException e ) {
+									}
+								}
+								path = line;
+								if( new File(path).exists() ) {
+									path = line;
+									break resolvePath;
+								}
+								{
+									String msg = path + " does not exist on the local file system";
+									if( urn != null ) msg += " and "+urn+" not found in any local repository";
+									System.err.println(msg);
+									++missingFileCount;
+								}
+								break;
 							default:
 								throw new RuntimeException("Unrecognized path transform enum value: "+pathTransform);
 							}
@@ -238,8 +269,7 @@ public class M3UAnnotator
 		}
 		if( missingFileCount > 0 ) {
 			System.err.println(missingFileCount+" file(s) couln't be found.");
-			System.err.println("No annotations were added and no path transformations");
-			System.err.println("were done for them.");
+			System.err.println("Entries for missing files were passed through with no transformations.");
 			if( strict ) return 1;
 		}
 		return 0;
