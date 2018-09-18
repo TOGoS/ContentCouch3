@@ -110,7 +110,7 @@ public class RepoConfig
 		File[] dirs = getRepoDirs();
 		Repository[] repos = new Repository[dirs.length];
 		for( int i=0; i<dirs.length; ++i ) {
-			repos[i] = new SHA1FileRepository(dirs[i],
+			repos[i] = new SHA1FileRepository(new File(dirs[i], "data"),
 				// Only give it a storeSector if it's the primary repository
 				primaryRepo != null && dirs[i].getPath().equals(primaryRepo.location) ?
 					storeSector : null);
