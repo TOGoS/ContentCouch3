@@ -49,6 +49,7 @@ public class CCouch3Command
 		"  command-server    ; run a command server\n" +
 		"  web-server        ; run a web server\n" +
 		"  store-stream      ; store files or pipe contents\n"+
+		"  annotate-m3u      ; add #URN lines to an M3U file\n"+
 		"  <subcommand> -?   ; get help on a specific command\n"+
 		"\n"+
 		"'backup' exists primarily because its implementation is simpler\n"+
