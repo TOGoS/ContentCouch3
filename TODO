@@ -1,6 +1,9 @@
 - "-upload-queue-size 99999" option to upload
   so that slow servers don't prevent indexer from finishing or fast
   servers from being uploaded to
+- ```upload -recurse``` doesn't seem to work; e.g.
+  was trying to upload wedding pix with ```ccouch3 upload -recurse -http-server:piccouch piccouch.appspot.com -command-server:zappie1 ssh tog@zappie1.nuke24.net 'ccouch3 cmd-server -sector '\''pictures'\''' ';' -command-server:fs.marvin ssh tog@fs.marvin.nuke24.net 'ccouch3 cmd-server -sector '\''pictures'\''' ';' urn:bitprint:6W4PVKPFENWMOKGXCTD5I7WVTFE7NDIG.BTJTX7P4CC4UXLEZH3CL6K5PAW37NLUICWYMZUY```
+  but it wasn't recursing!
 - support x-ccouch-head URIs as command-line arguments
   to 'id', 'upload', 'download' (and any others where they are applicable)
 
