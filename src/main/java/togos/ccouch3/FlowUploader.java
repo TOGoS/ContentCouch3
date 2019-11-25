@@ -1411,10 +1411,10 @@ public class FlowUploader implements FlowUploaderSettings
 		"  -n <name>      ; Give a name for the next commit\n" +
 		"  -a <author>    ; Give an author name for the next commit\n" +
 		"  -m <message>   ; Give a description for the next commit\n" +
-		"  -recurse       ; Recursively scan blobs for URN references and upload\n" +
+		"  -recurse[:<mode>] ; Recursively scan blobs for URN references and upload\n" +
 		"                 ; their targets, too (this is a bit of a misnomer, since\n" +
 		"                 ; directories are always recursively uploaded)\n" +
-		"  -recurse:<mode> ; Recurse using specific mode (mode '?' for help).\n" +
+		"  -recurse:?     ; Dump recursion mode options.\n" +
 		"  -local-repo <path> ; Path to local ccouch repository to store cache in.\n" +
 		"  -local-repo:<name> <path> ; Path to a named local repository; this is needed\n" +
 		"                 ; when creating a named commit with '-n'\n" +

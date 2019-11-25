@@ -532,8 +532,8 @@ public class Downloader
 		"Options:\n" +
 		"  -repo <path>       ; path to local repository\n" +
 		"  -remote-repo <url> ; URL of remote repository (slightly fuzzy; see notes)\n" +
-		"  -recurse           ; recursively scan cached blobs for new URNs to cache\n" +
-		"  -recurse-rdf-urns  ; recursively scan cached blobs for new RDF object URNs to cache\n" +
+		"  -recurse[:<mode>]  ; recursively scan cached blobs for new URNs to cache\n" +
+		"  -recurse:?         ; dump recursion mode options\n" +
 		"  -v                 ; be somewhat noisy\n" +
 		"  -debug             ; be very noisy\n" +
 		"  -silent            ; say nothing, ever\n" +
