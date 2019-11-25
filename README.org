@@ -1,0 +1,10 @@
+#+TITLE: ContentCouch3
+
+A re-implementation of parts of [[https://github.com/TOGoS/ContentCouch/][ContentCouch]] with newer technologies, such as static typing.
+
+Initially a collection of tools to fill gaps in ContentCouch functionality.
+Hope is that it can eventually replace it completely.
+
+Build with ~make~.  The JDK and basic shell commands should be the only prerequisite.
+Depended-on libraries are either downloaded automatically using ~TJFetcher.jar~
+or included (in ~ext-lib~) and maintained as Git subtrees.

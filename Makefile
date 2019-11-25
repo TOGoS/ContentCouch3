@@ -19,12 +19,8 @@ temporary_files = \
 fetch_deps = .ccouch-repos.lst
 fetch = java -jar TJFetcher.jar -repo @.ccouch-repos.lst
 
+.PHONY: default
 default: CCouch3.jar.urn
-
-.PHONY: \
-	clean \
-	default \
-	update-libraries
 
 .DELETE_ON_ERROR:
 
@@ -38,6 +34,7 @@ CCouch3.jar: $(shell find src/main)
 CCouch3.jar.urn: CCouch3.jar
 	java -ea -jar CCouch3.jar id "$<" >"$@"
 
+.PHONY: publish-jar
 publish-jar: CCouch3.jar CCouch3.jar.urn
 	publish CCouch3.jar
 
@@ -47,21 +44,26 @@ publish-jar: CCouch3.jar CCouch3.jar.urn
 ext-lib/JUnit.jar: ext-lib/JUnit.jar.urn ${fetch_deps} | CCouch3.jar
 	${fetch} urn:bitprint:TEJJ6FSEFBCPNJFBDLRC7O7OICYU252P.XZMJNNSDGM456CHQCJI22DUDWYK6ZASNPLJ26GA -o "$@"
 
+.PHONY: fetch-jar
 fetch-jar: ${fetch_deps}
 	rm -f CCouch3.jar
 	git checkout CCouch3.jar.urn
 	${fetch} $(shell cat CCouch3.jar.urn) -o CCouch3.jar
 
+.PHONY: clean
 clean:
 	rm -rf ${temporary_files}
 
+.PHONY: update-libraries
 update-libraries:
 	${git_exe} subtree pull --prefix=ext-lib/ByteBlob https://github.com/TOGoS/ByteBlob.git master
 
 unit_test_dependencies := ext-lib/JUnit.jar
 
+.PHONY: test-dependencies
 test-dependencies: ${unit_test_dependencies}
 
+.PHONY: run-unit-tests
 run-unit-tests: ${unit_test_dependencies}
 	rm -rf target/test
 	find src/main src/test ext-lib/*/src/main -name *.java >.java-test-src.lst
