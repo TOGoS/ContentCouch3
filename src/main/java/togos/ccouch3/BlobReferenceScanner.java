@@ -20,13 +20,36 @@ public class BlobReferenceScanner
 	}
 
 	static final Pattern SHA1_OR_BITPRINT_PATTERN = Pattern.compile(
-			"urn:(sha1:[A-Z0-9]{32}|bitprint:[A-Z0-9]{32}\\.[A-Z0-9]{39})",
+			"(urn:(?:sha1:[A-Z0-9]{32}|bitprint:[A-Z0-9]{32}\\.[A-Z0-9]{39}))",
 			Pattern.CASE_INSENSITIVE);
-	
+	static final Pattern RDF_SUBJECT_SHA1_OR_BITPRINT_PATTERN = Pattern.compile(
+			"(?:parse-rdf:|rdf-subject:)"+SHA1_OR_BITPRINT_PATTERN.pattern()+"|"+
+			SHA1_OR_BITPRINT_PATTERN.pattern()+"#",
+			Pattern.CASE_INSENSITIVE);
+
 	public Pattern urnPattern = SHA1_OR_BITPRINT_PATTERN;
 	public boolean reportUnrecursableBlobs = false;
 	public boolean reportErrors = true;
-	
+
+	protected static Pattern patternForScanMode(BlobReferenceScanMode mode) {
+		switch( mode ) {
+		case NEVER: throw new RuntimeException("Not scanning; no pattern applies");
+		case SCAN_TEXT_FOR_URNS: return SHA1_OR_BITPRINT_PATTERN;
+		case SCAN_TEXT_FOR_RDF_OBJECT_URNS: return RDF_SUBJECT_SHA1_OR_BITPRINT_PATTERN;
+		default: throw new RuntimeException("Bad blob reference scan mode: "+mode);
+		}
+	};
+
+	/**
+	 * @param urnPattern Pattern to search for; group(1) will be passed to forEach.
+	 */
+	protected BlobReferenceScanner(Pattern urnPattern) {
+		this.urnPattern = urnPattern;
+	}
+	public BlobReferenceScanner(BlobReferenceScanMode scanMode) {
+		this(patternForScanMode(scanMode));
+	}
+
 	/**
 	 * Scan the provided InputStream for URNs, calling forEach for each one found.
 	 * It will return true only if the blob identified by 'urn' is successfully found
@@ -46,11 +69,14 @@ public class BlobReferenceScanner
 			while( (line = br.readLine()) != null ) {
 				matcher.reset(line);
 				while( matcher.find() ) {
-					if( !forEach.handle(matcher.group()) ) {
-						success = false;
-						if( shortCircuit ) {
-							br.close(); // Probably redundant, but makes Eclipse happier.
-							return false;
+					for( int g=1; g<=matcher.groupCount(); ++g ) {
+						String urn = matcher.group(g);
+						if( urn == null ) continue;
+						if (!forEach.handle(matcher.group(g))) {
+							success = false;
+							if (shortCircuit) {
+								return false;
+							}
 						}
 					}
 				}
@@ -78,9 +104,37 @@ public class BlobReferenceScanner
 		}
 		return success;
 	}
+
+	public static String USAGE =
+			"Usage: ccouch3 extract-urns [-mode {scan-text-for-urns|scan-text-for-rdf-object-urns}]";
 	
 	public static int main(Iterator<String> argi) {
-		BlobReferenceScanner brs = new BlobReferenceScanner();
+		BlobReferenceScanMode scanMode = BlobReferenceScanMode.SCAN_TEXT_FOR_URNS;
+		while( argi.hasNext() ) {
+			String arg = argi.next();
+			if( "-mode".equals(arg) ) {
+				String scanModeStr = argi.next();
+				if( scanModeStr == null ) {
+					System.err.println("Error: -mode requires an argument");
+					return 1;
+				}
+				String scanModeName = scanModeStr.replaceAll("-", "_" ).toUpperCase();
+				try {
+					scanMode = BlobReferenceScanMode.valueOf(scanModeName);
+				} catch( IllegalArgumentException e ) {
+					System.err.println("Error: invalid -mode: '"+scanModeStr+"'");
+					BlobReferenceScanMode.dumpModes(System.err);
+					return 1;
+				}
+			} else if( CCouch3Command.isHelpArgument(arg) ) {
+				System.out.println(USAGE);
+				return 0;
+			} else {
+				System.err.println("Error: Unrecognized argument: '"+arg+"'");
+				return 1;
+			}
+		}
+		BlobReferenceScanner brs = new BlobReferenceScanner(scanMode);
 		String inputStreamName = "stdin";
 		InputStream is = System.in;
 		brs.scanTextForUrns(inputStreamName, is, new ScanCallback() {

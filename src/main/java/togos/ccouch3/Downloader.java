@@ -198,7 +198,7 @@ public class Downloader
 	BlobReferenceScanner brs = null;
 	protected BlobReferenceScanner getBlobReferenceScanner() {
 		if( brs == null ) {
-			brs = new BlobReferenceScanner();
+			brs = new BlobReferenceScanner(scanMode);
 			brs.reportUnrecursableBlobs = reportUnrecursableBlobs;
 			brs.reportErrors = reportErrors;
 		}
@@ -533,6 +533,7 @@ public class Downloader
 		"  -repo <path>       ; path to local repository\n" +
 		"  -remote-repo <url> ; URL of remote repository (slightly fuzzy; see notes)\n" +
 		"  -recurse           ; recursively scan cached blobs for new URNs to cache\n" +
+		"  -recurse-rdf-urns  ; recursively scan cached blobs for new RDF object URNs to cache\n" +
 		"  -v                 ; be somewhat noisy\n" +
 		"  -debug             ; be very noisy\n" +
 		"  -silent            ; say nothing, ever\n" +
@@ -568,10 +569,12 @@ public class Downloader
 		
 		while( args.hasNext() ) {
 			String arg = args.next();
+			BlobReferenceScanMode parsedScanMode;
+
 			if( !arg.startsWith("-") ) {
 				urnArgs.add(arg);
-			} else if( "-recurse".equals(arg) ) {
-				scanMode = BlobReferenceScanMode.TEXT;
+			} else if( (parsedScanMode = BlobReferenceScanMode.parseRecurseArg(arg)) != null ) {
+				scanMode = parsedScanMode;
 			} else if( "-silent".equals(arg) ) {
 				reportWarnings = false;
 				reportDownloads = false;
@@ -614,7 +617,7 @@ public class Downloader
 		
 		final AddableSet<String> fullyCachedTreeUrns =
 			scanMode == BlobReferenceScanMode.NEVER ? EmptyAddableSet.<String>getInstance() :
-			new SLFStringSet(new File(primaryRepoDir, "cache/ccouch3-downloader/fully-cached-"+scanMode.name().toLowerCase()+".slf2"));
+			new SLFStringSet(new File(primaryRepoDir, "cache/ccouch3-downloader/fully-cached-"+scanMode.cacheDbName.toLowerCase()+".slf2"));
 		
 		final BlobResolver argBlobResolver = CCouch3Command.getCommandLineFileResolver(new File[]{primaryRepoDir});
 		

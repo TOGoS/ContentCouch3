@@ -367,7 +367,7 @@ public class FlowUploader implements FlowUploaderSettings
 		BlobReferenceScanner brs = null;
 		protected BlobReferenceScanner getBlobReferenceScanner() {
 			if( brs == null ) {
-				brs = new BlobReferenceScanner();
+				brs = new BlobReferenceScanner(scanMode);
 				brs.reportErrors = true; // Yeah always, we don't have a -quiet option
 				brs.reportUnrecursableBlobs = debug;
 			}
@@ -382,7 +382,7 @@ public class FlowUploader implements FlowUploaderSettings
 			switch( scanMode ) {
 			case NEVER:
 				return true;
-			case TEXT:
+			case SCAN_TEXT_FOR_URNS:
 				try {
 					return getBlobReferenceScanner().scanTextForUrns(blob.getUrn(), blob.openInputStream(), new ScanCallback() {
 						@Override public boolean handle(String urn) {
@@ -790,7 +790,7 @@ public class FlowUploader implements FlowUploaderSettings
 		AddableSet<String> uc = uploadCaches.get(serverName);
 		if( uc == null ) {
 			uploadCaches.put( serverName, uc = new SLFStringSet(new File(cacheDir,
-				"uploaded-to-"+serverName+(scanMode == BlobReferenceScanMode.NEVER ? "" : "-rs-"+scanMode.name().toLowerCase())+".slf2")) );
+				"uploaded-to-"+serverName+(scanMode == BlobReferenceScanMode.NEVER ? "" : "-rs-"+scanMode.cacheDbName.toLowerCase())+".slf2")) );
 			// 'rs' = 'recursively scanned'
 		}
 		return uc;
@@ -1256,6 +1256,7 @@ public class FlowUploader implements FlowUploaderSettings
 		
 		for( ; args.hasNext(); ) {
 			String a = args.next();
+			BlobReferenceScanMode parsedScanMode;
 			
 			// Verbosity options
 			if( "-v".equals(a) ) {
@@ -1323,11 +1324,10 @@ public class FlowUploader implements FlowUploaderSettings
 				}
 			} else if( "-server-command".equals(a) ) {
 				serverCommand = readSubCommandArguments(args);
-			
+
 			// Options about what to upload
-			} else if( "-recurse".equals(a) ) {
-				// A bit of a misnomer...
-				config.scanMode = BlobReferenceScanMode.TEXT;
+			} else if( (parsedScanMode = BlobReferenceScanMode.parseRecurseArg(a)) != null ) {
+				config.scanMode = parsedScanMode;
 			} else if( "-omit-file-mtimes".equals(a) ) {
 				config.includeFileMtimes = false;
 			} else if( "-skip-files-with-read-errors".equals(a) ) {
@@ -1414,6 +1414,7 @@ public class FlowUploader implements FlowUploaderSettings
 		"  -recurse       ; Recursively scan blobs for URN references and upload\n" +
 		"                 ; their targets, too (this is a bit of a misnomer, since\n" +
 		"                 ; directories are always recursively uploaded)\n" +
+		"  -recurse:<mode> ; Recurse using specific mode (mode '?' for help).\n" +
 		"  -local-repo <path> ; Path to local ccouch repository to store cache in.\n" +
 		"  -local-repo:<name> <path> ; Path to a named local repository; this is needed\n" +
 		"                 ; when creating a named commit with '-n'\n" +
