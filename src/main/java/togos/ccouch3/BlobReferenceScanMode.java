@@ -1,7 +1,6 @@
 package togos.ccouch3;
 
 import java.io.PrintStream;
-import java.sql.Blob;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
