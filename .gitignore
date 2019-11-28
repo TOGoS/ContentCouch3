@@ -9,3 +9,4 @@ ext-lib/JUnit.jar
 java-src.lst
 target
 temp
+/java-bin/

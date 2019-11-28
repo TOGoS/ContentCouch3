@@ -48,7 +48,7 @@ ext-lib/JUnit.jar: ext-lib/JUnit.jar.urn ${fetch_deps} | CCouch3.jar
 fetch-jar: ${fetch_deps}
 	rm -f CCouch3.jar
 	git checkout CCouch3.jar.urn
-	${fetch} $(shell cat CCouch3.jar.urn) -o CCouch3.jar
+	${fetch} @CCouch3.jar.urn -o CCouch3.jar
 
 .PHONY: clean
 clean:
