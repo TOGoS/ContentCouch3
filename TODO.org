@@ -2,7 +2,7 @@
 
 * Bugs
 
-** ```upload -recurse``` doesn't seem to work
+** ~upload -recurse~ doesn't seem to work
 
 e.g. was trying to upload wedding pix with
 #+BEGIN_SRC sh
@@ -13,6 +13,13 @@ ccouch3 upload -recurse -http-server:piccouch piccouch.appspot.com \
 #+END_SRC
 
 but it wasn't recursing!
+
+[2020-01-04T22:18:42-06:00] I've been having a similar problem again.
+When I pass ~-no-cache~ it seems to work properly.
+And when I run it for the first time after removing the remote blob presence cache file
+(~uploaded-to-X-rs-text.slf2~) it seems to work properly.
+Things seem to go haywire when I kill the process before it's done.
+Then when I try to run it again, it just says it's done before it's done anything.
 
 ** ccouch3-cache has some issues
 
