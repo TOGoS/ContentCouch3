@@ -43,13 +43,16 @@ public class CmdServer
 	 *   error <command-name> <request-id> ...
 	 *   
 	 * Commands:
-	 * 
+	 *
+	 * - Print stuff back to the client:
 	 *   echo ...
 	 *   -> ok echo ...
-	 * 
+	 *
+	 * - Head (think HTTP 'HEAD'): Does the specified blob exist on the server?
 	 *   head <reqid> <urn>
 	 *   -> ok head <reqid> <urn> {found|missing}
 	 *
+	 * - Upload blobs to the server:
 	 *   put <reqid> <urn> chunk <length>
 	 *   chunk <length>
 	 *   <length bytes of chunk data>
@@ -60,7 +63,18 @@ public class CmdServer
 	 *   -> ok put <reqid> <urn> accepted
 	 *   or
 	 *   -> error put <reqid> <urn> rejected <reason>
-	 *   
+	 *
+	 * - Link a named CCouch head to a blob:
+	 *   put <reqid> ccouch-head:<headname> by-urn <hashurn>
+	 *   -> ok put <reqid> ccouch-head:<headname> accepted
+	 *   or
+	 *   -> error put <reqid> could-not-load-by-urn <hashurn>
+	 *   or
+	 *   -> error put <reqid> destination-is-a-directory <headname>
+	 *   or
+	 *   -> error put <reqid> destination-exists-and-is-different <headname>
+	 *
+	 * - Disconnect politely (unceremonious disconnects are also fine):
 	 *   bye [<reqid>]
 	 *   -> ok bye <reqid or "null">
 	 *      server closes connection
