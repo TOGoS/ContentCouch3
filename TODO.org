@@ -36,6 +36,9 @@ Different numbers of resources failing to cache each time; sometimes
 
 * Features
 
+- [ ] ~checkout~, ~checkin~ commands
+  - Should read/write ~.ccouch-uri~ files, respectively
+  - Note that there is already a 'copy' command that might do similar things
 - [ ] ~purge~ command [2019-11-25]
 - [ ] Allow ~x-rdf-subject:~ URNs to be passed to ~-cache~ and Do The Right Thing
   (i.e. cache the referenced blob) [2019-11-25]
