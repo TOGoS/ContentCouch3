@@ -42,13 +42,25 @@ public class WebServerCommand
 		}
 	}
 	
-	public WebServerCommand() { }
-	
 	static final int DEFAULT_PORT = 14567;
 	
 	public final ArrayList<Repository> repositories = new ArrayList<Repository>();
 	public final ArrayList<Mount> mounts = new ArrayList<Mount>();
 	public int port = DEFAULT_PORT;
+	Map<String,String> filenameExtensionMimeTypes = new HashMap<String,String>();
+	String defaultMimeType = "text/plain";
+	
+	public WebServerCommand() {
+		filenameExtensionMimeTypes.put("png", "image/png");
+		filenameExtensionMimeTypes.put("jpg", "image/jpeg");
+		filenameExtensionMimeTypes.put("jpeg", "image/jpeg");
+		filenameExtensionMimeTypes.put("svg", "image/svg");
+		filenameExtensionMimeTypes.put("html", "text/html");
+		filenameExtensionMimeTypes.put("txt", "text/plain");
+		filenameExtensionMimeTypes.put("json", "application/json");
+		// TODO: Allow loading from mime.types-like file
+		// Probably add MIME type guessing (based on filename and/or magic) to togos.tinywebserver
+	}
 	
 	protected static String urlEncodeString(String text) {
 		try {
@@ -66,6 +78,15 @@ public class WebServerCommand
 		}
 	}
 	
+	final Pattern filenameExtensionPattern = Pattern.compile("^.*\\.([^\\./]+)$");
+	String guessContentTypeFromFilename(String filename) {
+		Matcher m = filenameExtensionPattern.matcher(filename);
+		if (!m.matches()) return null;
+		String ext = m.group(1).toLowerCase();
+		String mimeType = filenameExtensionMimeTypes.get(ext);
+		return mimeType;
+	}
+	
 	class RequestHandler implements HTTPRequestHandler
 	{
 		final Pattern rawPattern = Pattern.compile("^/uri-res/raw/([^/]+)(?:/([^/]+))?$"); 
@@ -74,7 +95,7 @@ public class WebServerCommand
 		protected HTTPResponse handleUriRes(HTTPRequest req) {
 			Matcher m;
 			String urn;
-			String filenameHint;
+			String filenameHint = null;
 			if( (m = rawPattern.matcher(req.path)).matches() ) {
 				urn = urlDecodeString(m.group(1));
 				filenameHint = m.group(2);
@@ -83,6 +104,11 @@ public class WebServerCommand
 			} else {
 				return null;
 			}
+			
+			String contentType = null;
+			if (filenameHint != null) contentType = guessContentTypeFromFilename(filenameHint);
+			if (contentType == null) contentType = defaultMimeType;
+			if (contentType == null) contentType = "application/octet-stream"; // Our code below requires *something*
 			
 			for( Repository r : repositories ) {
 				ByteBlob b;
@@ -93,7 +119,7 @@ public class WebServerCommand
 				}
 				if( b != null ) {
 					return new HTTPResponse("HTTP/1.0", 200, "Okay",
-						WebServer.mkHeaders("content-type","text/plain"),
+						WebServer.mkHeaders("content-type",contentType),
 						b
 					);
 				}
