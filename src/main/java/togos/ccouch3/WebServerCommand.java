@@ -137,7 +137,7 @@ public class WebServerCommand
 		
 		protected HTTPResponse fileResponse(File f) {
 			return new HTTPResponse("HTTP/1.0", 200, "Okay",
-				WebServer.mkHeaders("content-type", "text/plain", "content-length", String.valueOf(f.length())),
+				WebServer.mkHeaders("content-type", guessContentTypeFromFilename(f.getName()), "content-length", String.valueOf(f.length())),
 				new FileBlob(f)
 			);
 		}
