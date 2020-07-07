@@ -9,6 +9,29 @@ import togos.ccouch3.repo.SHA1FileRepository;
 
 public class CCouch3Command
 {
+	static class GeneralOptions {
+		static final int VERBOSITY_SILENT = 0;
+		static final int VERBOSITY_ERRORS = 100;
+		static final int VERBOSITY_WARNINGS = 200;
+		static final int VERBOSITY_USAGE_WARNINGS = 300;
+		static final int VERBOSITY_DEFAULT = VERBOSITY_USAGE_WARNINGS;
+		static final int VERBOSITY_VERBOSE = 400;
+		static final int VERBOSITY_VERY_VERBOSE = 500;
+		
+		RepoConfig repoConfig = new RepoConfig();
+		int verbosityLevel;
+		
+		public boolean parseCommandLineArg( String arg, Iterator<String> argi ) {
+			if( repoConfig.parseCommandLineArg(arg, argi) ) return true;
+			
+			if( "-q".equals(arg) ) { verbosityLevel = VERBOSITY_ERRORS; return true; }
+			if( "-v".equals(arg) ) { verbosityLevel = VERBOSITY_VERBOSE; return true; }
+			if( "-vv".equals(arg) ) { verbosityLevel = VERBOSITY_VERY_VERBOSE; return true; }
+			
+			return false;
+		}
+	}
+	
 	public static LiberalFileResolver getCommandLineFileResolver(Repository[] repos, File[] repoDirs) {
 		File[] headRoots = new File[repoDirs.length];
 		for( int i=0; i<repoDirs.length; ++i ) {
@@ -58,46 +81,50 @@ public class CCouch3Command
 		"Otherwise they serve similar purposes.\n";
 	
 	public static int main( Iterator<String> argi ) throws Exception {
-		if( !argi.hasNext() ) {
-			System.err.println("Error: no subcommand given.");
-			System.err.print(USAGE);
-			return 1;
+		GeneralOptions generalOptions = new GeneralOptions();
+		while( argi.hasNext() ) {
+			String cmd = argi.next();
+			// TODO: Update commands to take general options
+			if( generalOptions.parseCommandLineArg(cmd, argi) ) {
+			} else if( "upload".equals(cmd) ) {
+				return FlowUploader.uploadMain(argi);
+			} else if( "cache".equals(cmd) ) {
+				return Downloader.main(argi);
+			} else if( "cat".equals(cmd) ) {
+				return Cat.main(argi);
+			} else if( "copy".equals(cmd) ) {
+				return Copy.main(argi);
+			} else if( "config".equals(cmd) ) {
+				return ConfigDump.main(argi);
+			} else if( "backup".equals(cmd) ) {
+				return UpBacker.backupMain(argi);
+			} else if( "store-stream".equals(cmd) ) {
+				return StoreStream.main(argi);
+			} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
+				return FlowUploader.identifyMain(argi);
+			} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {
+				return CmdServer.main(argi);
+			} else if( "web-server".equals(cmd) || "ws".equals(cmd) || "webserv".equals(cmd) ) {
+				return WebServerCommand.main(argi);
+			} else if( "verify-tree".equals(cmd) ) {
+				return TreeVerifier.main(argi);
+			} else if( "extract-urns".equals(cmd) ) {
+				return BlobReferenceScanner.main(argi);
+			} else if( "annotate-m3u".equals(cmd) ) {
+				return M3UAnnotator.main(argi);
+			} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
+				System.out.print(USAGE);
+				return 0;
+			} else {
+				System.err.println("Error: Unrecognized command: "+cmd);
+				System.err.print(USAGE);
+				return 1;
+			}
 		}
-		String cmd = argi.next();
-		if( "upload".equals(cmd) ) {
-			return FlowUploader.uploadMain(argi);
-		} else if( "cache".equals(cmd) ) {
-			return Downloader.main(argi);
-		} else if( "cat".equals(cmd) ) {
-			return Cat.main(argi);
-		} else if( "copy".equals(cmd) ) {
-			return Copy.main(argi);
-		} else if( "config".equals(cmd) ) {
-			return ConfigDump.main(argi);
-		} else if( "backup".equals(cmd) ) {
-			return UpBacker.backupMain(argi);
-		} else if( "store-stream".equals(cmd) ) {
-			return StoreStream.main(argi);
-		} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
-			return FlowUploader.identifyMain(argi);
-		} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {
-			return CmdServer.main(argi);
-		} else if( "web-server".equals(cmd) || "ws".equals(cmd) || "webserv".equals(cmd) ) {
-			return WebServerCommand.main(argi);
-		} else if( "verify-tree".equals(cmd) ) {
-			return TreeVerifier.main(argi);
-		} else if( "extract-urns".equals(cmd) ) {
-			return BlobReferenceScanner.main(argi);
-		} else if( "annotate-m3u".equals(cmd) ) {
-			return M3UAnnotator.main(argi);
-		} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
-			System.out.print(USAGE);
-			return 0;
-		} else {
-			System.err.println("Error: Unrecognized command: "+cmd);
-			System.err.print(USAGE);
-			return 1;
-		}
+		
+		System.err.println("Error: no subcommand given.");
+		System.err.print(USAGE);
+		return 1;
 	}
 	
 	public static void main( String[] args ) throws Exception {
