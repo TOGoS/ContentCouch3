@@ -65,26 +65,52 @@ public class RepoConfig
 	
 	//// end crap to be replaced
 	
-	public boolean parseCommandLineArg( String arg, Iterator<String> moreArgs ) {
+	static String optArg(String opt, String explicit, Iterator<String> rest) {
+		if( explicit != null ) return explicit;
+		
+		if( !rest.hasNext() ) {
+			throw new RuntimeException(opt+" requires an argument but wasn't given one");
+		}
+		
+		return rest.next();
+	}
+	
+	public boolean parseCommandLineArg( String rawOpt, Iterator<String> moreArgs ) {
+		String opt;
+		String explicitArgument = null;
+		if( rawOpt.startsWith("--") ) {
+			final int equalIndex = rawOpt.indexOf("=");
+			if( equalIndex != -1 ) {
+				explicitArgument = rawOpt.substring(equalIndex + 1);
+				rawOpt = rawOpt.substring(0, equalIndex);
+			}
+			opt = rawOpt.substring(2);
+		} else if( rawOpt.startsWith("-") ) {
+			opt = rawOpt.substring(1);
+		} else {
+			return false;
+		}
+		
 		final String name;
-		final int colonIdx = arg.indexOf(':');
+		final int colonIdx = opt.indexOf(':');
 		if( colonIdx != -1 ) {
-			name = arg.substring(colonIdx+1);
-			arg = arg.substring(0, colonIdx);
+			name = opt.substring(colonIdx+1);
+			opt = opt.substring(0, colonIdx);
 		} else {
 			name = null;
 		}
-		if( "-repo".equals(arg) ) {
-			primaryRepo = new RepoSpec(name, RepoType.FILESYSTEM, resolveRepoDir(moreArgs.next()));
+		
+		if( "repo".equals(opt) ) {
+			primaryRepo = new RepoSpec(name, RepoType.FILESYSTEM, resolveRepoDir(optArg(rawOpt, explicitArgument, moreArgs)));
 			return true;
-		} else if( "-local-repo".equals(arg) ) {
-			localRepos.add(new RepoSpec(arg.substring("-repo:".length()), RepoType.FILESYSTEM, resolveRepoDir(moreArgs.next())));
+		} else if( "local-repo".equals(opt) ) {
+			localRepos.add(new RepoSpec(opt.substring("-repo:".length()), RepoType.FILESYSTEM, resolveRepoDir(optArg(rawOpt, explicitArgument, moreArgs))));
 			return true;
-		} else if( "-remote-repo".equals(arg) ) {
-			localRepos.add(new RepoSpec(arg.substring("-repo:".length()), RepoType.HTTP_N2R, defuzzRemoteRepoPrefix(moreArgs.next())));
+		} else if( "remote-repo".equals(opt) ) {
+			localRepos.add(new RepoSpec(opt.substring("-repo:".length()), RepoType.HTTP_N2R, defuzzRemoteRepoPrefix(optArg(rawOpt, explicitArgument, moreArgs))));
 			return true;
-		} else if( "-sector".equals(arg) ) {
-			storeSector = moreArgs.next();
+		} else if( "sector".equals(opt) ) {
+			storeSector = optArg(rawOpt, explicitArgument, moreArgs);
 			return true;
 		}
 		
