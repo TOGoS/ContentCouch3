@@ -55,12 +55,19 @@ public class RepoConfig
 		}
 	}
 	
-	protected static File getDefaultRepositoryDir() {
-		String home = System.getProperty("user.home");
-		if( home != null ) {
-			return new File(home, ".ccouch");
-		}
-		return new File(".ccouch");
+	protected static String getNonEmptyEnv(String name) {
+		String v = System.getenv(name);
+		if( v.length() == 0 ) return null;
+		return v;
+	}
+	
+	protected static RepoSpec getEnvSpecifiedRepository() {
+		// 2020-07-07 I have decided that using a default (based on user.home) is PROBLEMATIC
+		// after on at least a couple occasions running out of disk space
+		// when ccouch cached things to the default location, when I didn't mean for it to!
+		String dir = getNonEmptyEnv("ccouch_repo_dir");
+		if( dir == null ) return null;
+		return new RepoSpec( getNonEmptyEnv("ccouch_repo_name"), RepoType.FILESYSTEM, dir );
 	}
 	
 	//// end crap to be replaced
@@ -120,9 +127,12 @@ public class RepoConfig
 	/** Add in default repositor[ies] and load pointed-to ones */
 	public void fix() {
 		if( primaryRepo == null ) {
-			primaryRepo = new RepoSpec( null, RepoType.FILESYSTEM, getDefaultRepositoryDir().getPath() );
+			primaryRepo = getEnvSpecifiedRepository();
 		}
-		// TODO: read primaryRepo/remote-repos.lst, or whatever it's called
+		// TODO: read primaryRepo/remote-repos.lst, or whatever it's called,
+		// or any other configuration based on reading files in .ccouch,
+		// which maybe actually we don't want to do at all lol
+		// (preferring environment variables instead)
 	}
 	
 	public File getPrimaryRepoDir() {
