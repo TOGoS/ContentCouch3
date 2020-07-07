@@ -44,6 +44,7 @@ public class CCouch3Command
 		"  upload            ; upload files to a remote repository\n" +
 		"  cache             ; download and cache files from remote repositories\n" +
 		"  cat               ; output blobs to standard output\n" +
+		"  config            ; dump configuration to stdout\n" +
 		"  copy              ; copy files\n" +
 		"  backup            ; back up files locally (simplified implementation)\n" +
 		"  command-server    ; run a command server\n" +
