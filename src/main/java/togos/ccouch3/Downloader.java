@@ -305,7 +305,13 @@ public class Downloader
 			throws MalformedURLException
 		{
 			Exception connectionError = null;
-			URL fullUrl = new URL(repoUrl+urn);
+			URL fullUrl;
+			try {
+				fullUrl = new URL(repoUrl + urn);
+			} catch( MalformedURLException e ) {
+				System.err.println("Error creating URL '"+repoUrl + urn+"'");
+				throw e;
+			}
 			try {
 				URLConnection urlC = fullUrl.openConnection();
 				urlC.connect();
