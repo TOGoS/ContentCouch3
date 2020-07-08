@@ -73,8 +73,7 @@ public class RepoConfig
 	
 	protected static String getNonEmptyEnv(String name) {
 		String v = System.getenv(name);
-		if( v.length() == 0 ) return null;
-		return v;
+		return v == null || v.isEmpty() ? null : v;
 	}
 	
 	protected static RepoSpec getEnvSpecifiedRepository() {
