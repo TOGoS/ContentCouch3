@@ -72,8 +72,7 @@ public class M3UAnnotator
 		return URI_PATTERN.matcher(filenameOrUri).matches();
 	}
 	
-	public static int main(CCouchCommandContext gOpts, Iterator<String> argi) {
-		RepoConfig repoConfig = gOpts.repoConfig;
+	public static int main(CCouchContext ctx, Iterator<String> argi) {
 		PathTransform pathTransform = PathTransform.NONE;
 		String defaultN2rPrefix = null;
 		boolean tidyFilenames = false;
@@ -106,7 +105,7 @@ public class M3UAnnotator
 					System.err.println("Unrecognized path transform: "+transformSpec);
 					return 1;
 				}
-			} else if( repoConfig.handleCommandLineOption(arg, argi)) {
+			} else if( ctx.handleCommandLineOption(arg, argi)) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.print(USAGE);
 				return 0;
@@ -117,10 +116,10 @@ public class M3UAnnotator
 			}
 		}
 		
-		repoConfig.fix();
+		ctx.fix();
 		if( m3uPaths.size() == 0 ) m3uPaths.add("-");
 		
-		final BlobResolver argumentResolver = CCouch3Command.getCommandLineFileResolver(repoConfig);
+		final BlobResolver argumentResolver = CCouch3Command.getCommandLineFileResolver(ctx);
 		final BlobResolver entryResolver = new BlobResolver() {
 			@Override
 			public ByteBlob getBlob(String name) throws IOException {
@@ -169,7 +168,7 @@ public class M3UAnnotator
 		}
 		final Identifier identifier = new Identifier();
 		
-		final Repository[] localRepos = repoConfig.getLocalRepositories();
+		final Repository[] localRepos = ctx.getLocalRepositories();
 		
 		try {
 			for( String p : m3uPaths ) {

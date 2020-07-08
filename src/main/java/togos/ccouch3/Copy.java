@@ -15,7 +15,7 @@ public class Copy
 	public static String USAGE =
 		"Usage: ccouch3 copy [-repo <path]* <source> <destination>";
 	
-	public static int main(CCouchCommandContext gOpts, Iterator<String> argi) {
+	public static int main(CCouchContext ctx, Iterator<String> argi) {
 		String fromName = null;
 		String toName = null;
 		OnDirCollision onDirCollision = OnDirCollision.ABORT;
@@ -23,7 +23,7 @@ public class Copy
 		
 		while( argi.hasNext() ) {
 			String arg = argi.next();
-			if( gOpts.repoConfig.handleCommandLineOption(arg, argi) ) {
+			if( ctx.repoConfig.handleCommandLineOption(arg, argi) ) {
 			} else if( "-merge".equals(arg) ) {
 				onDirCollision = OnDirCollision.MERGE;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
@@ -49,8 +49,8 @@ public class Copy
 			return 1;
 		}
 		
-		gOpts.repoConfig.fix();
-		BlobResolver blobResolver = CCouch3Command.getCommandLineFileResolver(gOpts.repoConfig);
+		ctx.repoConfig.fix();
+		BlobResolver blobResolver = CCouch3Command.getCommandLineFileResolver(ctx.repoConfig);
 		ObjectResolver resolver = new ObjectResolver(blobResolver);
 		
 		Object from;

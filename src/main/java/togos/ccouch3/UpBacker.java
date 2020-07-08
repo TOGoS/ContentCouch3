@@ -289,7 +289,7 @@ public class UpBacker
 		return errorCount;
 	}
 	
-	public static BackupCmd fromArgs(CCouchCommandContext gOpts, Iterator<String> argi ) {
+	public static BackupCmd fromArgs(CCouchContext ctx, Iterator<String> argi ) {
 		ArrayList<String> pathsToStore = new ArrayList<String>();
 		String storeSector = "local";
 		boolean showReport = false, showProgress = false;
@@ -301,7 +301,7 @@ public class UpBacker
 			String arg = argi.next();
 			if( !arg.startsWith("-") ) {
 				pathsToStore.add(arg);
-			} else if( gOpts.repoConfig.handleCommandLineOption(arg,  argi) ) {
+			} else if( ctx.handleCommandLineOption(arg,  argi) ) {
 				// Cool cool
 			} else if( "-sector".equals(arg) ) {
 				storeSector = argi.next();
@@ -324,11 +324,11 @@ public class UpBacker
 			}
 		}
 		
-		if( gOpts.repoConfig.primaryRepo == null ) {
+		if( ctx.primaryRepo == null ) {
 			return new BackupCmd(BackupCmd.Mode.USAGE_ERROR, "No -repo specified");
 		}
 		
-		UpBacker upBacker = new UpBacker( gOpts.repoConfig.primaryRepo.getDirectory(), storeSector, includeFileMtimes );
+		UpBacker upBacker = new UpBacker( ctx.primaryRepo.getDirectory(), storeSector, includeFileMtimes );
 		upBacker.shouldStoreFileContents = shouldStoreFileContents;
 		upBacker.shouldStoreDirectoryListings = shouldStoreDirectoryListings;
 		upBacker.shouldReportResults = showReport;
@@ -339,7 +339,7 @@ public class UpBacker
 		return new BackupCmd( upBacker, filesToStore );
 	}
 	
-	public static int backupMain(CCouchCommandContext gOpts, Iterator<String> argi ) {
-		return fromArgs(gOpts, argi).run();
+	public static int backupMain(CCouchContext ctx, Iterator<String> argi ) {
+		return fromArgs(ctx, argi).run();
 	}
 }

@@ -180,10 +180,10 @@ public class CmdServer
 		"  -repo <path>   ; path to repo in which to store blobs, caches, and logs.\n" +
 		"  -sector <name> ; name of sector in which to store incoming data";
 	
-	public static int main(CCouchCommandContext gOpts, Iterator<String> argi ) throws Exception {
+	public static int main(CCouchContext ctx, Iterator<String> argi ) throws Exception {
 		for( ; argi.hasNext(); ) {
 			String arg = argi.next();
-			if( gOpts.repoConfig.handleCommandLineOption(arg,  argi)) {
+			if( ctx.repoConfig.handleCommandLineOption(arg,  argi)) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println( USAGE );
 				return 0;
@@ -193,12 +193,12 @@ public class CmdServer
 				return 1;
 			}
 		}
-		if( gOpts.repoConfig.storeSector == null ) gOpts.repoConfig.storeSector = "cmd-server";
+		if( ctx.repoConfig.storeSector == null ) ctx.repoConfig.storeSector = "cmd-server";
 		
-		gOpts.repoConfig.fix();
+		ctx.repoConfig.fix();
 		
-		Repository repo = gOpts.repoConfig.getPrimaryRepository();
-		File repoDir = gOpts.repoConfig.getPrimaryRepoDir();
+		Repository repo = ctx.repoConfig.getPrimaryRepository();
+		File repoDir = ctx.repoConfig.getPrimaryRepoDir();
 		File incomingLogFile = new File(repoDir, "/log/incoming.log");
 		FileUtil.mkParentDirs(incomingLogFile);
 		FileOutputStream incomingLogStream = new FileOutputStream(incomingLogFile, true);
@@ -209,6 +209,6 @@ public class CmdServer
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(CmdServer.main( new CCouchCommandContext(), Arrays.asList(args).iterator() ));
+		System.exit(CmdServer.main( new CCouchContext(), Arrays.asList(args).iterator() ));
 	}
 }

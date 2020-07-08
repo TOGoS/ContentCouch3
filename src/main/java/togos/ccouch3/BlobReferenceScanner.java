@@ -108,7 +108,7 @@ public class BlobReferenceScanner
 	public static String USAGE =
 			"Usage: ccouch3 extract-urns [-mode {scan-text-for-urns|scan-text-for-rdf-object-urns}]";
 	
-	public static int main(CCouchCommandContext gOpts, Iterator<String> argi) {
+	public static int main(CCouchContext ctx, Iterator<String> argi) {
 		BlobReferenceScanMode scanMode = BlobReferenceScanMode.SCAN_TEXT_FOR_URNS;
 		while( argi.hasNext() ) {
 			String arg = argi.next();

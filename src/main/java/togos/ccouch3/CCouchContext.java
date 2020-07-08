@@ -9,16 +9,22 @@ import java.util.LinkedHashSet;
 
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
+import togos.ccouch3.CCouchContext.RepoSpec.RepoType;
 
-public class RepoConfig
+/**
+ * Context within which all our work is done!
+ * Indicates repositories and maybe other stuff.
+ */
+public class CCouchContext
 implements CommandLineOptionHandler
 {
-	enum RepoType {
-		FILESYSTEM,
-		HTTP_N2R
-	}
-	
+	/** Basic info about a repository */
 	static class RepoSpec {
+		enum RepoType {
+			FILESYSTEM,
+			HTTP_N2R
+		}
+
 		public final String name;
 		public final RepoType type;
 		/** File path or HTTP server prefix */

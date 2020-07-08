@@ -25,8 +25,8 @@ public class CCouch3Command
 		return getCommandLineFileResolver(repos, repoDirs);
 	}
 
-	public static LiberalFileResolver getCommandLineFileResolver( RepoConfig config ) {
-		return getCommandLineFileResolver(config.getRepoDirs());
+	public static LiberalFileResolver getCommandLineFileResolver(CCouchContext ctx) {
+		return getCommandLineFileResolver(ctx.getRepoDirs());
 	}
 
 	////
@@ -58,11 +58,11 @@ public class CCouch3Command
 		"Otherwise they serve similar purposes.\n";
 	
 	public static int main( Iterator<String> argi ) throws Exception {
-		CCouchCommandContext gOpts = new CCouchCommandContext();
+		CCouchContext ctx = new CCouchContext();
 		while( argi.hasNext() ) {
 			String cmd = argi.next();
 			// TODO: Update commands to take general options
-			if( gOpts.handleCommandLineOption(cmd, argi) ) {
+			if( ctx.handleCommandLineOption(cmd, argi) ) {
 			} else if( "upload".equals(cmd) ) {
 				return FlowUploader.uploadMain(argi);
 			} else if( "cache".equals(cmd) ) {
@@ -70,25 +70,25 @@ public class CCouch3Command
 			} else if( "cat".equals(cmd) ) {
 				return Cat.main(argi);
 			} else if( "copy".equals(cmd) ) {
-				return Copy.main(gOpts, argi);
+				return Copy.main(ctx, argi);
 			} else if( "config".equals(cmd) ) {
-				return ConfigDump.main(gOpts, argi);
+				return ConfigDump.main(ctx, argi);
 			} else if( "backup".equals(cmd) ) {
-				return UpBacker.backupMain(gOpts, argi);
+				return UpBacker.backupMain(ctx, argi);
 			} else if( "store-stream".equals(cmd) ) {
-				return StoreStream.main(gOpts, argi);
+				return StoreStream.main(ctx, argi);
 			} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
 				return FlowUploader.identifyMain(argi);
 			} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {
-				return CmdServer.main(gOpts, argi);
+				return CmdServer.main(ctx, argi);
 			} else if( "web-server".equals(cmd) || "ws".equals(cmd) || "webserv".equals(cmd) ) {
 				return WebServerCommand.main(argi);
 			} else if( "verify-tree".equals(cmd) ) {
-				return TreeVerifier.main(gOpts, argi);
+				return TreeVerifier.main(ctx, argi);
 			} else if( "extract-urns".equals(cmd) ) {
-				return BlobReferenceScanner.main(gOpts, argi);
+				return BlobReferenceScanner.main(ctx, argi);
 			} else if( "annotate-m3u".equals(cmd) ) {
-				return M3UAnnotator.main(gOpts, argi);
+				return M3UAnnotator.main(ctx, argi);
 			} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
 				System.out.print(USAGE);
 				return 0;

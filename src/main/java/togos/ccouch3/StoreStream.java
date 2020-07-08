@@ -10,7 +10,7 @@ import togos.ccouch3.repo.Repository;
 
 public class StoreStream
 {
-	public static int main(CCouchCommandContext gOpts, Iterator<String> argi) {
+	public static int main(CCouchContext ctx, Iterator<String> argi) {
 		boolean noMoreOptions = false;
 		boolean verbose = false;
 		ArrayList<String> inputPaths = new ArrayList<String>();
@@ -20,7 +20,7 @@ public class StoreStream
 				inputPaths.add(arg);
 			} else if( "-v".equals(arg) ) {
 				verbose = true;
-			} else if( gOpts.repoConfig.handleCommandLineOption(arg, argi)) {
+			} else if( ctx.handleCommandLineOption(arg, argi)) {
 			} else if( "--".equals(arg) ) {
 				noMoreOptions = true;
 			} else {
@@ -34,12 +34,12 @@ public class StoreStream
 			inputPaths.add("-");
 		}
 		
-		gOpts.repoConfig.fix();
-		Repository repo = gOpts.repoConfig.getPrimaryRepository();
+		ctx.fix();
+		Repository repo = ctx.getPrimaryRepository();
 		
 		final BlobResolver argumentResolver = CCouch3Command.getCommandLineFileResolver(
-			gOpts.repoConfig.getLocalRepositories(),
-			gOpts.repoConfig.getRepoDirs()
+			ctx.getLocalRepositories(),
+			ctx.getRepoDirs()
 		);
 		
 		int errorCount = 0;

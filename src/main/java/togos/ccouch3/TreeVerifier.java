@@ -287,12 +287,12 @@ public class TreeVerifier
 		}
 	}
 	
-	public static int main(CCouchCommandContext gOpts, Iterator<String> argi ) throws Exception {
+	public static int main(CCouchContext ctx, Iterator<String> argi ) throws Exception {
 		ArrayList<String> urns = new ArrayList<String>();
 		OutputMode outputMode = OutputMode.SILENT;
 		for( ; argi.hasNext(); ) {
 			String arg = argi.next();
-			if( gOpts.handleCommandLineOption(arg, argi) ) {
+			if( ctx.handleCommandLineOption(arg, argi) ) {
 			} else if( "-v".equals(arg) ) {
 				outputMode = OutputMode.PATH_TO_URN;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
@@ -306,7 +306,7 @@ public class TreeVerifier
 				return 1;
 			}
 		}
-		Repository repo = gOpts.repoConfig.getPrimaryRepository();
+		Repository repo = ctx.getPrimaryRepository();
 		// We shouldn't be writing anything to it.
 		// If 'wat' sector shows up, something's gone wrong.
 		
@@ -321,6 +321,6 @@ public class TreeVerifier
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(main( new CCouchCommandContext(), Arrays.asList(args).iterator() ));
+		System.exit(main( new CCouchContext(), Arrays.asList(args).iterator() ));
 	}
 }
