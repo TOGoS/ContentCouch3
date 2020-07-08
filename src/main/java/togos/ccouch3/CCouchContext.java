@@ -143,7 +143,14 @@ implements CommandLineOptionHandler
 		return false;
 	}
 	
-	/** Add in default repositor[ies] and load pointed-to ones */
+	/**
+	 * Should be called after all command-line options have been processed.
+	 * Fills in defaults and maybe loads more info about repositories?
+	 *
+	 * This feels hacky.
+	 * Maybe there should be separate config/context classes
+	 * so there is a clearer (and typechecked) point of transformation?
+	 */
 	public void fix() {
 		if( primaryRepo == null ) {
 			primaryRepo = getEnvSpecifiedRepository();
@@ -152,7 +159,7 @@ implements CommandLineOptionHandler
 		// TODO: read primaryRepo/remote-repos.lst, or whatever it's called,
 		// or any other configuration based on reading files in .ccouch,
 		// which maybe actually we don't want to do at all lol
-		// (preferring environment variables instead)
+		// (preferring environment variables instead these days)
 	}
 	
 	public File getPrimaryRepoDir() {
@@ -161,6 +168,11 @@ implements CommandLineOptionHandler
 		}
 		return primaryRepo.getDirectory();
 	}
+	public File getPrimaryRepoDir(File defaultValue) {
+		if( primaryRepo == null ) return defaultValue;
+		return primaryRepo.getDirectory();
+	}
+
 	
 	public Repository[] getLocalRepositories() {
 		File[] dirs = getRepoDirs();

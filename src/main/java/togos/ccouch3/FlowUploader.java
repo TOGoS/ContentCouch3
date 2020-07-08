@@ -704,7 +704,7 @@ public class FlowUploader implements FlowUploaderSettings
 		
 		public static FlowUploaderConfig from(CCouchContext ctx) {
 			FlowUploaderConfig config = new FlowUploaderConfig();
-			config.primaryRepoDir = ctx.getPrimaryRepoDir();
+			config.primaryRepoDir = ctx.getPrimaryRepoDir(null);
 			return config;
 		}
 	}
@@ -1234,6 +1234,7 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	static FlowUploaderCommand fromArgs( CCouchContext ctx, Iterator<String> args, boolean requireServer, boolean alwaysShowUrns ) throws Exception {
+		ctx.fix();
 		FlowUploaderConfig config = FlowUploaderConfig.from(ctx);
 		
 		boolean verbose = false;

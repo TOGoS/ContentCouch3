@@ -49,8 +49,9 @@ public class Copy
 			return 1;
 		}
 		
-		ctx.repoConfig.fix();
-		BlobResolver blobResolver = CCouch3Command.getCommandLineFileResolver(ctx.repoConfig);
+		ctx.fix();
+		
+		BlobResolver blobResolver = CCouch3Command.getCommandLineFileResolver(ctx);
 		ObjectResolver resolver = new ObjectResolver(blobResolver);
 		
 		Object from;
