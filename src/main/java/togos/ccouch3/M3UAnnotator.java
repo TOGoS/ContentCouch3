@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 
 import togos.blob.ByteBlob;
 import togos.blob.file.FileBlob;
+import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;
@@ -72,8 +73,8 @@ public class M3UAnnotator
 		return URI_PATTERN.matcher(filenameOrUri).matches();
 	}
 	
-	public static int main(Iterator<String> argi) {
-		RepoConfig repoConfig = new RepoConfig();
+	public static int main(GeneralOptions gOpts, Iterator<String> argi) {
+		RepoConfig repoConfig = gOpts.repoConfig;
 		PathTransform pathTransform = PathTransform.NONE;
 		String defaultN2rPrefix = null;
 		boolean tidyFilenames = false;

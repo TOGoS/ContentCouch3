@@ -103,15 +103,15 @@ public class CCouch3Command
 			} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
 				return FlowUploader.identifyMain(argi);
 			} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {
-				return CmdServer.main(argi);
+				return CmdServer.main(gOpts, argi);
 			} else if( "web-server".equals(cmd) || "ws".equals(cmd) || "webserv".equals(cmd) ) {
 				return WebServerCommand.main(argi);
 			} else if( "verify-tree".equals(cmd) ) {
-				return TreeVerifier.main(argi);
+				return TreeVerifier.main(gOpts, argi);
 			} else if( "extract-urns".equals(cmd) ) {
-				return BlobReferenceScanner.main(argi);
+				return BlobReferenceScanner.main(gOpts, argi);
 			} else if( "annotate-m3u".equals(cmd) ) {
-				return M3UAnnotator.main(argi);
+				return M3UAnnotator.main(gOpts, argi);
 			} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
 				System.out.print(USAGE);
 				return 0;

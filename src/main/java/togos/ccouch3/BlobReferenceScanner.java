@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.util.Charsets;
 
 public class BlobReferenceScanner
@@ -108,7 +109,7 @@ public class BlobReferenceScanner
 	public static String USAGE =
 			"Usage: ccouch3 extract-urns [-mode {scan-text-for-urns|scan-text-for-rdf-object-urns}]";
 	
-	public static int main(Iterator<String> argi) {
+	public static int main(GeneralOptions gOpts, Iterator<String> argi) {
 		BlobReferenceScanMode scanMode = BlobReferenceScanMode.SCAN_TEXT_FOR_URNS;
 		while( argi.hasNext() ) {
 			String arg = argi.next();

@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 
 import togos.blob.ByteBlob;
+import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.path.LinkType;
 import togos.ccouch3.path.Path;
 import togos.ccouch3.path.PathLink;
@@ -289,16 +290,12 @@ public class TreeVerifier
 		}
 	}
 	
-	public static int main( Iterator<String> argi ) throws Exception {
-		String homeDir = System.getProperty("user.home");
-		if( homeDir == null ) homeDir = ".";
-		String repoDir = homeDir + "/.ccouch";
+	public static int main( GeneralOptions gOpts, Iterator<String> argi ) throws Exception {
 		ArrayList<String> urns = new ArrayList<String>();
 		OutputMode outputMode = OutputMode.SILENT;
 		for( ; argi.hasNext(); ) {
 			String arg = argi.next();
-			if( "-repo".equals(arg) ) {
-				repoDir = argi.next();
+			if( gOpts.parseCommandLineArg(arg, argi) ) {
 			} else if( "-v".equals(arg) ) {
 				outputMode = OutputMode.PATH_TO_URN;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
@@ -312,7 +309,7 @@ public class TreeVerifier
 				return 1;
 			}
 		}
-		Repository repo = new SHA1FileRepository( new File(repoDir + "/data"), "wat");
+		Repository repo = gOpts.repoConfig.getPrimaryRepository();
 		// We shouldn't be writing anything to it.
 		// If 'wat' sector shows up, something's gone wrong.
 		
@@ -327,6 +324,6 @@ public class TreeVerifier
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(main( Arrays.asList(args).iterator() ));
+		System.exit(main( new GeneralOptions(), Arrays.asList(args).iterator() ));
 	}
 }

@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 import togos.blob.ByteChunk;
+import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.cmdstream.CmdReader;
 import togos.ccouch3.cmdstream.CmdWriter;
 import togos.ccouch3.repo.Repository;
@@ -181,17 +182,10 @@ public class CmdServer
 		"  -repo <path>   ; path to repo in which to store blobs, caches, and logs.\n" +
 		"  -sector <name> ; name of sector in which to store incoming data";
 	
-	public static int main( Iterator<String> argi ) throws Exception {
-		String homeDir = System.getProperty("user.home");
-		if( homeDir == null ) homeDir = ".";
-		String repoDir = homeDir + "/.ccouch";
-		String sector = "cmd-server";
+	public static int main( GeneralOptions gOpts, Iterator<String> argi ) throws Exception {
 		for( ; argi.hasNext(); ) {
 			String arg = argi.next();
-			if( "-repo".equals(arg) ) {
-				repoDir = argi.next();
-			} else if( "-sector".equals(arg) ) {
-				sector = argi.next();
+			if( gOpts.repoConfig.parseCommandLineArg(arg,  argi)) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println( USAGE );
 				return 0;
@@ -201,17 +195,22 @@ public class CmdServer
 				return 1;
 			}
 		}
-		Repository repo = new SHA1FileRepository( new File(repoDir + "/data"), sector);
-		File incomingLogFile = new File(repoDir + "/log/incoming.log");
+		if( gOpts.repoConfig.storeSector == null ) gOpts.repoConfig.storeSector = "cmd-server";
+		
+		gOpts.repoConfig.fix();
+		
+		Repository repo = gOpts.repoConfig.getPrimaryRepository();
+		File repoDir = gOpts.repoConfig.getPrimaryRepoDir();
+		File incomingLogFile = new File(repoDir, "/log/incoming.log");
 		FileUtil.mkParentDirs(incomingLogFile);
 		FileOutputStream incomingLogStream = new FileOutputStream(incomingLogFile, true);
-		CmdServer cs = new CmdServer(new CmdReader(System.in), new CmdWriter(System.out), repo, new File(repoDir+"/heads"), incomingLogStream);
+		CmdServer cs = new CmdServer(new CmdReader(System.in), new CmdWriter(System.out), repo, new File(repoDir, "/heads"), incomingLogStream);
 		cs.run();
 		incomingLogStream.close();
 		return 0;
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(CmdServer.main( Arrays.asList(args).iterator() ));
+		System.exit(CmdServer.main( new GeneralOptions(), Arrays.asList(args).iterator() ));
 	}
 }

@@ -49,7 +49,7 @@ public class RepoConfig
 	/** Repository into which to store stuff. */ 
 	public RepoSpec primaryRepo;
 	/** Name of sector into which to store stuff. */
-	public String storeSector = "user";
+	public String storeSector;
 	/**
 	 * List of repositories in addition to the primary one
 	 * that are considered local
@@ -144,6 +144,7 @@ public class RepoConfig
 		if( primaryRepo == null ) {
 			primaryRepo = getEnvSpecifiedRepository();
 		}
+		if( storeSector == null ) storeSector = "user"; // The traditional default.  But maybe there should be no default idk.
 		// TODO: read primaryRepo/remote-repos.lst, or whatever it's called,
 		// or any other configuration based on reading files in .ccouch,
 		// which maybe actually we don't want to do at all lol
@@ -154,7 +155,7 @@ public class RepoConfig
 		if( primaryRepo == null ) {
 			throw new RuntimeException("No primary repository configured");
 		}
-		return new File(primaryRepo.location);
+		return primaryRepo.getDirectory();
 	}
 	
 	public Repository[] getLocalRepositories() {
