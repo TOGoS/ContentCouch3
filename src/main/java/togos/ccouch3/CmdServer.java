@@ -183,7 +183,7 @@ public class CmdServer
 	public static int main(CCouchContext ctx, Iterator<String> argi ) throws Exception {
 		for( ; argi.hasNext(); ) {
 			String arg = argi.next();
-			if( ctx.repoConfig.handleCommandLineOption(arg,  argi)) {
+			if( ctx.handleCommandLineOption(arg,  argi)) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println( USAGE );
 				return 0;
@@ -193,12 +193,12 @@ public class CmdServer
 				return 1;
 			}
 		}
-		if( ctx.repoConfig.storeSector == null ) ctx.repoConfig.storeSector = "cmd-server";
+		if( ctx.storeSector == null ) ctx.storeSector = "cmd-server";
 		
-		ctx.repoConfig.fix();
+		ctx.fix();
 		
-		Repository repo = ctx.repoConfig.getPrimaryRepository();
-		File repoDir = ctx.repoConfig.getPrimaryRepoDir();
+		Repository repo = ctx.getPrimaryRepository();
+		File repoDir = ctx.getPrimaryRepoDir();
 		File incomingLogFile = new File(repoDir, "/log/incoming.log");
 		FileUtil.mkParentDirs(incomingLogFile);
 		FileOutputStream incomingLogStream = new FileOutputStream(incomingLogFile, true);
