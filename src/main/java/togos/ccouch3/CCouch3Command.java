@@ -9,7 +9,7 @@ import togos.ccouch3.repo.SHA1FileRepository;
 
 public class CCouch3Command
 {
-	static class GeneralOptions {
+	public static class GeneralOptions {
 		static final int VERBOSITY_SILENT = 0;
 		static final int VERBOSITY_ERRORS = 100;
 		static final int VERBOSITY_WARNINGS = 200;
@@ -81,11 +81,11 @@ public class CCouch3Command
 		"Otherwise they serve similar purposes.\n";
 	
 	public static int main( Iterator<String> argi ) throws Exception {
-		GeneralOptions generalOptions = new GeneralOptions();
+		GeneralOptions gOpts = new GeneralOptions();
 		while( argi.hasNext() ) {
 			String cmd = argi.next();
 			// TODO: Update commands to take general options
-			if( generalOptions.parseCommandLineArg(cmd, argi) ) {
+			if( gOpts.parseCommandLineArg(cmd, argi) ) {
 			} else if( "upload".equals(cmd) ) {
 				return FlowUploader.uploadMain(argi);
 			} else if( "cache".equals(cmd) ) {
@@ -93,13 +93,13 @@ public class CCouch3Command
 			} else if( "cat".equals(cmd) ) {
 				return Cat.main(argi);
 			} else if( "copy".equals(cmd) ) {
-				return Copy.main(argi);
+				return Copy.main(gOpts, argi);
 			} else if( "config".equals(cmd) ) {
-				return ConfigDump.main(argi);
+				return ConfigDump.main(gOpts, argi);
 			} else if( "backup".equals(cmd) ) {
-				return UpBacker.backupMain(argi);
+				return UpBacker.backupMain(gOpts, argi);
 			} else if( "store-stream".equals(cmd) ) {
-				return StoreStream.main(argi);
+				return StoreStream.main(gOpts, argi);
 			} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
 				return FlowUploader.identifyMain(argi);
 			} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {

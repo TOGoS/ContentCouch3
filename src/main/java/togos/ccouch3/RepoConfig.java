@@ -28,6 +28,22 @@ public class RepoConfig
 			this.type = type;
 			this.location = location;
 		}
+		
+		protected String getDescription() {
+			String desc = "RepoConfig";
+			if( name != null ) desc += " '"+name+"'";
+			if( location != null ) desc += " ("+location+")";
+			return desc;
+		}
+		
+		public File getDirectory() {
+			String name = "Repo";
+			if( this.name != null ) name += " '"+name+"'";
+				
+			if( this.type != RepoType.FILESYSTEM ) throw new RuntimeException(getDescription()+" is not a local filesystem repo");
+			if( this.location == null ) throw new RuntimeException(getDescription()+" has no location specified"); 
+			return new File(location);
+		}
 	}
 	
 	/** Repository into which to store stuff. */ 

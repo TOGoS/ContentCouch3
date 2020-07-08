@@ -11,6 +11,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
+import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;
@@ -289,26 +290,20 @@ public class UpBacker
 		return errorCount;
 	}
 	
-	public static BackupCmd fromArgs( Iterator<String> argi ) {
+	public static BackupCmd fromArgs( GeneralOptions gOpts, Iterator<String> argi ) {
 		ArrayList<String> pathsToStore = new ArrayList<String>();
-		String repoPath = null;
-		@SuppressWarnings("unused")
-		String repoName = null; // Someday may be used for making heads and stuff
 		String storeSector = "local";
 		boolean showReport = false, showProgress = false;
 		boolean includeFileMtimes = true;
 		boolean shouldStoreFileContents = true;
 		boolean shouldStoreDirectoryListings = true;
-		
+				
 		while( argi.hasNext() ) {
 			String arg = argi.next();
 			if( !arg.startsWith("-") ) {
 				pathsToStore.add(arg);
-			} else if( "-repo".equals(arg) ) {
-				repoPath = argi.next();
-			} else if( arg.startsWith("-repo:") ) {
-				repoName = arg.substring(6);
-				repoPath = argi.next();
+			} else if( gOpts.repoConfig.parseCommandLineArg(arg,  argi) ) {
+				// Cool cool
 			} else if( "-sector".equals(arg) ) {
 				storeSector = argi.next();
 			} else if( "-files-only".equals(arg) ) {
@@ -330,11 +325,11 @@ public class UpBacker
 			}
 		}
 		
-		if( repoPath == null ) {
+		if( gOpts.repoConfig.primaryRepo == null ) {
 			return new BackupCmd(BackupCmd.Mode.USAGE_ERROR, "No -repo specified");
 		}
 		
-		UpBacker upBacker = new UpBacker( new File(repoPath), storeSector, includeFileMtimes );
+		UpBacker upBacker = new UpBacker( gOpts.repoConfig.primaryRepo.getDirectory(), storeSector, includeFileMtimes );
 		upBacker.shouldStoreFileContents = shouldStoreFileContents;
 		upBacker.shouldStoreDirectoryListings = shouldStoreDirectoryListings;
 		upBacker.shouldReportResults = showReport;
@@ -345,7 +340,7 @@ public class UpBacker
 		return new BackupCmd( upBacker, filesToStore );
 	}
 	
-	public static int backupMain( Iterator<String> argi ) {
-		return fromArgs(argi).run();
+	public static int backupMain( GeneralOptions gOpts, Iterator<String> argi ) {
+		return fromArgs(gOpts, argi).run();
 	}
 }

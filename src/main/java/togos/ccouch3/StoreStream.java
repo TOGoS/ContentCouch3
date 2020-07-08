@@ -6,14 +6,14 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 import togos.blob.ByteBlob;
+import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.repo.Repository;
 
 public class StoreStream
 {
-	public static int main(Iterator<String> argi) {
+	public static int main(GeneralOptions gOpts, Iterator<String> argi) {
 		boolean noMoreOptions = false;
 		boolean verbose = false;
-		RepoConfig repoConfig = new RepoConfig();
 		ArrayList<String> inputPaths = new ArrayList<String>();
 		while( argi.hasNext() ) {
 			String arg = argi.next();
@@ -21,7 +21,7 @@ public class StoreStream
 				inputPaths.add(arg);
 			} else if( "-v".equals(arg) ) {
 				verbose = true;
-			} else if( repoConfig.parseCommandLineArg(arg, argi)) { 
+			} else if( gOpts.repoConfig.parseCommandLineArg(arg, argi)) { 
 			} else if( "--".equals(arg) ) {
 				noMoreOptions = true;
 			} else {
@@ -30,14 +30,17 @@ public class StoreStream
 			}
 		}
 		
-		if( inputPaths.size() == 0 ) inputPaths.add("-");
+		if( inputPaths.size() == 0 ) {
+			System.err.println("Warning: No inputs given; defaulting to '-'; this behavior may change");
+			inputPaths.add("-");
+		}
 		
-		repoConfig.fix();
-		Repository repo = repoConfig.getPrimaryRepository();
+		gOpts.repoConfig.fix();
+		Repository repo = gOpts.repoConfig.getPrimaryRepository();
 		
 		final BlobResolver argumentResolver = CCouch3Command.getCommandLineFileResolver(
-			repoConfig.getLocalRepositories(),
-			repoConfig.getRepoDirs()
+			gOpts.repoConfig.getLocalRepositories(),
+			gOpts.repoConfig.getRepoDirs()
 		);
 		
 		int errorCount = 0;
