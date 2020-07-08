@@ -6,12 +6,11 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 import togos.blob.ByteBlob;
-import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.repo.Repository;
 
 public class StoreStream
 {
-	public static int main(GeneralOptions gOpts, Iterator<String> argi) {
+	public static int main(CCouchCommandContext gOpts, Iterator<String> argi) {
 		boolean noMoreOptions = false;
 		boolean verbose = false;
 		ArrayList<String> inputPaths = new ArrayList<String>();
@@ -21,7 +20,7 @@ public class StoreStream
 				inputPaths.add(arg);
 			} else if( "-v".equals(arg) ) {
 				verbose = true;
-			} else if( gOpts.repoConfig.parseCommandLineArg(arg, argi)) { 
+			} else if( gOpts.repoConfig.handleCommandLineOption(arg, argi)) {
 			} else if( "--".equals(arg) ) {
 				noMoreOptions = true;
 			} else {

@@ -1,6 +1,5 @@
 package togos.ccouch3;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.text.ParseException;
@@ -12,7 +11,6 @@ import java.util.Map;
 import java.util.Set;
 
 import togos.blob.ByteBlob;
-import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.path.LinkType;
 import togos.ccouch3.path.Path;
 import togos.ccouch3.path.PathLink;
@@ -22,7 +20,6 @@ import togos.ccouch3.rdf.RDFIO;
 import togos.ccouch3.rdf.RDFNamespace;
 import togos.ccouch3.rdf.RDFNode;
 import togos.ccouch3.repo.Repository;
-import togos.ccouch3.repo.SHA1FileRepository;
 
 /**
  * The idea is to debug stored commits and directory trees,
@@ -290,12 +287,12 @@ public class TreeVerifier
 		}
 	}
 	
-	public static int main( GeneralOptions gOpts, Iterator<String> argi ) throws Exception {
+	public static int main(CCouchCommandContext gOpts, Iterator<String> argi ) throws Exception {
 		ArrayList<String> urns = new ArrayList<String>();
 		OutputMode outputMode = OutputMode.SILENT;
 		for( ; argi.hasNext(); ) {
 			String arg = argi.next();
-			if( gOpts.parseCommandLineArg(arg, argi) ) {
+			if( gOpts.handleCommandLineOption(arg, argi) ) {
 			} else if( "-v".equals(arg) ) {
 				outputMode = OutputMode.PATH_TO_URN;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
@@ -324,6 +321,6 @@ public class TreeVerifier
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(main( new GeneralOptions(), Arrays.asList(args).iterator() ));
+		System.exit(main( new CCouchCommandContext(), Arrays.asList(args).iterator() ));
 	}
 }

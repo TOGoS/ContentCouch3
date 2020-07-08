@@ -602,7 +602,7 @@ public class Downloader
 				reportUnrecursableBlobs = true;
 				reportDownloadFailures = true;
 				beChatty = true;
-			} else if( repoConfig.parseCommandLineArg(arg, args) ) {
+			} else if( repoConfig.handleCommandLineOption(arg, args) ) {
 			} else if( "-connections-per-remote".equals(arg) ) {
 				connectionsPerRemote = Integer.parseInt(args.next());
 			} else if( "-remember-missing".equals(arg) || "-remember-attempts".equals(arg) ) {

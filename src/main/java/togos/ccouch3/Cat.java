@@ -18,7 +18,7 @@ public class Cat
 		
 		while( argi.hasNext() ) {
 			String arg = argi.next();
-			if( repoConfig.parseCommandLineArg(arg, argi) ) {
+			if( repoConfig.handleCommandLineOption(arg, argi) ) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println(USAGE);
 				return 0;

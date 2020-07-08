@@ -14,7 +14,6 @@ import java.util.regex.Pattern;
 
 import togos.blob.ByteBlob;
 import togos.blob.file.FileBlob;
-import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;
@@ -73,7 +72,7 @@ public class M3UAnnotator
 		return URI_PATTERN.matcher(filenameOrUri).matches();
 	}
 	
-	public static int main(GeneralOptions gOpts, Iterator<String> argi) {
+	public static int main(CCouchCommandContext gOpts, Iterator<String> argi) {
 		RepoConfig repoConfig = gOpts.repoConfig;
 		PathTransform pathTransform = PathTransform.NONE;
 		String defaultN2rPrefix = null;
@@ -107,7 +106,7 @@ public class M3UAnnotator
 					System.err.println("Unrecognized path transform: "+transformSpec);
 					return 1;
 				}
-			} else if( repoConfig.parseCommandLineArg(arg, argi)) {
+			} else if( repoConfig.handleCommandLineOption(arg, argi)) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.print(USAGE);
 				return 0;

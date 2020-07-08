@@ -9,29 +9,6 @@ import togos.ccouch3.repo.SHA1FileRepository;
 
 public class CCouch3Command
 {
-	public static class GeneralOptions {
-		static final int VERBOSITY_SILENT = 0;
-		static final int VERBOSITY_ERRORS = 100;
-		static final int VERBOSITY_WARNINGS = 200;
-		static final int VERBOSITY_USAGE_WARNINGS = 300;
-		static final int VERBOSITY_DEFAULT = VERBOSITY_USAGE_WARNINGS;
-		static final int VERBOSITY_VERBOSE = 400;
-		static final int VERBOSITY_VERY_VERBOSE = 500;
-		
-		RepoConfig repoConfig = new RepoConfig();
-		int verbosityLevel;
-		
-		public boolean parseCommandLineArg( String arg, Iterator<String> argi ) {
-			if( repoConfig.parseCommandLineArg(arg, argi) ) return true;
-			
-			if( "-q".equals(arg) ) { verbosityLevel = VERBOSITY_ERRORS; return true; }
-			if( "-v".equals(arg) ) { verbosityLevel = VERBOSITY_VERBOSE; return true; }
-			if( "-vv".equals(arg) ) { verbosityLevel = VERBOSITY_VERY_VERBOSE; return true; }
-			
-			return false;
-		}
-	}
-	
 	public static LiberalFileResolver getCommandLineFileResolver(Repository[] repos, File[] repoDirs) {
 		File[] headRoots = new File[repoDirs.length];
 		for( int i=0; i<repoDirs.length; ++i ) {
@@ -81,11 +58,11 @@ public class CCouch3Command
 		"Otherwise they serve similar purposes.\n";
 	
 	public static int main( Iterator<String> argi ) throws Exception {
-		GeneralOptions gOpts = new GeneralOptions();
+		CCouchCommandContext gOpts = new CCouchCommandContext();
 		while( argi.hasNext() ) {
 			String cmd = argi.next();
 			// TODO: Update commands to take general options
-			if( gOpts.parseCommandLineArg(cmd, argi) ) {
+			if( gOpts.handleCommandLineOption(cmd, argi) ) {
 			} else if( "upload".equals(cmd) ) {
 				return FlowUploader.uploadMain(argi);
 			} else if( "cache".equals(cmd) ) {

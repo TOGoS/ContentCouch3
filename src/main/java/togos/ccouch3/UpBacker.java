@@ -11,7 +11,6 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
-import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;
@@ -290,7 +289,7 @@ public class UpBacker
 		return errorCount;
 	}
 	
-	public static BackupCmd fromArgs( GeneralOptions gOpts, Iterator<String> argi ) {
+	public static BackupCmd fromArgs(CCouchCommandContext gOpts, Iterator<String> argi ) {
 		ArrayList<String> pathsToStore = new ArrayList<String>();
 		String storeSector = "local";
 		boolean showReport = false, showProgress = false;
@@ -302,7 +301,7 @@ public class UpBacker
 			String arg = argi.next();
 			if( !arg.startsWith("-") ) {
 				pathsToStore.add(arg);
-			} else if( gOpts.repoConfig.parseCommandLineArg(arg,  argi) ) {
+			} else if( gOpts.repoConfig.handleCommandLineOption(arg,  argi) ) {
 				// Cool cool
 			} else if( "-sector".equals(arg) ) {
 				storeSector = argi.next();
@@ -340,7 +339,7 @@ public class UpBacker
 		return new BackupCmd( upBacker, filesToStore );
 	}
 	
-	public static int backupMain( GeneralOptions gOpts, Iterator<String> argi ) {
+	public static int backupMain(CCouchCommandContext gOpts, Iterator<String> argi ) {
 		return fromArgs(gOpts, argi).run();
 	}
 }

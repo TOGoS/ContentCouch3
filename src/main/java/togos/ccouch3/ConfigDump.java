@@ -3,7 +3,6 @@ package togos.ccouch3;
 import java.io.File;
 import java.util.Iterator;
 
-import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.RepoConfig.RepoSpec;
 
 public class ConfigDump
@@ -13,10 +12,10 @@ public class ConfigDump
 		return rs.location + (rs.name == null ? "" : " ("+rs.name+")");
 	}
 	
-	public static int main(GeneralOptions gOpts, Iterator<String> argi) {
+	public static int main(CCouchCommandContext gOpts, Iterator<String> argi) {
 		while( argi.hasNext() ) {
 			String arg = argi.next();
-			if( gOpts.repoConfig.parseCommandLineArg(arg, argi) ) {
+			if( gOpts.repoConfig.handleCommandLineOption(arg, argi) ) {
 			} else {
 				System.err.println("Unrecognized argument: "+arg);
 				return 1;

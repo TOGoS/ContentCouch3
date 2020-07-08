@@ -11,6 +11,7 @@ import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 
 public class RepoConfig
+implements CommandLineOptionHandler
 {
 	enum RepoType {
 		FILESYSTEM,
@@ -97,7 +98,8 @@ public class RepoConfig
 		return rest.next();
 	}
 	
-	public boolean parseCommandLineArg( String rawOpt, Iterator<String> moreArgs ) {
+	@Override
+	public boolean handleCommandLineOption(String rawOpt, Iterator<String> moreArgs ) {
 		String opt;
 		String explicitArgument = null;
 		if( rawOpt.startsWith("--") ) {

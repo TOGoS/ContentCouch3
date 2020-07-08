@@ -9,11 +9,9 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 import togos.blob.ByteChunk;
-import togos.ccouch3.CCouch3Command.GeneralOptions;
 import togos.ccouch3.cmdstream.CmdReader;
 import togos.ccouch3.cmdstream.CmdWriter;
 import togos.ccouch3.repo.Repository;
-import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.repo.StoreException;
 import togos.ccouch3.util.FileUtil;
 
@@ -182,10 +180,10 @@ public class CmdServer
 		"  -repo <path>   ; path to repo in which to store blobs, caches, and logs.\n" +
 		"  -sector <name> ; name of sector in which to store incoming data";
 	
-	public static int main( GeneralOptions gOpts, Iterator<String> argi ) throws Exception {
+	public static int main(CCouchCommandContext gOpts, Iterator<String> argi ) throws Exception {
 		for( ; argi.hasNext(); ) {
 			String arg = argi.next();
-			if( gOpts.repoConfig.parseCommandLineArg(arg,  argi)) {
+			if( gOpts.repoConfig.handleCommandLineOption(arg,  argi)) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println( USAGE );
 				return 0;
@@ -211,6 +209,6 @@ public class CmdServer
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(CmdServer.main( new GeneralOptions(), Arrays.asList(args).iterator() ));
+		System.exit(CmdServer.main( new CCouchCommandContext(), Arrays.asList(args).iterator() ));
 	}
 }
