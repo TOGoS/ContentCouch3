@@ -9,6 +9,7 @@ import togos.ccouch3.RepoConfig.RepoSpec;
 public class ConfigDump
 {
 	static String repoInfoAsString(RepoSpec rs) {
+		if( rs == null ) return "(unspecified)";
 		return rs.location + (rs.name == null ? "" : " ("+rs.name+")");
 	}
 	
