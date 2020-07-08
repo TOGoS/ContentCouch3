@@ -554,13 +554,12 @@ public class Downloader
 		"  http://hostname/...? -> http://hostname/...?<qs-escaped-urn>\n" +
 		"  http://hostname/.../ -> http://hostname/.../<pathseg-escaped-urn>";
 	
-	public static int main( Iterator<String> args )
+	public static int main( CCouchContext ctx, Iterator<String> args )
 		throws IOException, InterruptedException
 	{
 		int connectionsPerRemote = 2;
 		BlobReferenceScanMode scanMode = BlobReferenceScanMode.NEVER;
 		List<String> urnArgs = new ArrayList<String>();
-		RepoConfig repoConfig = new RepoConfig();
 		boolean reportDownloads = false;
 		boolean reportUnrecursableBlobs = false;
 		boolean reportDownloadFailures = false;
@@ -602,7 +601,7 @@ public class Downloader
 				reportUnrecursableBlobs = true;
 				reportDownloadFailures = true;
 				beChatty = true;
-			} else if( repoConfig.handleCommandLineOption(arg, args) ) {
+			} else if( ctx.handleCommandLineOption(arg, args) ) {
 			} else if( "-connections-per-remote".equals(arg) ) {
 				connectionsPerRemote = Integer.parseInt(args.next());
 			} else if( "-remember-missing".equals(arg) || "-remember-attempts".equals(arg) ) {
@@ -617,9 +616,10 @@ public class Downloader
 			}
 		}
 		
-		repoConfig.fix();
-		final File primaryRepoDir = repoConfig.getPrimaryRepoDir();
-		final SHA1FileRepository localRepo = repoConfig.getPrimaryRepository();
+		ctx.fix();
+		
+		final File primaryRepoDir = ctx.getPrimaryRepoDir();
+		final SHA1FileRepository localRepo = ctx.getPrimaryRepository();
 		
 		final AddableSet<String> fullyCachedTreeUrns =
 			scanMode == BlobReferenceScanMode.NEVER ? EmptyAddableSet.<String>getInstance() :
@@ -627,11 +627,11 @@ public class Downloader
 		
 		final BlobResolver argBlobResolver = CCouch3Command.getCommandLineFileResolver(new File[]{primaryRepoDir});
 		
-		if( repoConfig.getRemoteRepoUrls().length == 0 && reportWarnings ) {
+		if( ctx.getRemoteRepoUrls().length == 0 && reportWarnings ) {
 			System.err.println("Warning: No remote reposisories listed; no downloads will succeed");
 		}
 		
-		Downloader downloader = new Downloader( new RepositorySet(repoConfig.getRemoteRepoUrls(), connectionsPerRemote), localRepo, fullyCachedTreeUrns );
+		Downloader downloader = new Downloader( new RepositorySet(ctx.getRemoteRepoUrls(), connectionsPerRemote), localRepo, fullyCachedTreeUrns );
 		downloader.scanMode = scanMode;
 		downloader.reportDownloads = reportDownloads;
 		downloader.reportUnrecursableBlobs = reportUnrecursableBlobs;
@@ -664,6 +664,6 @@ public class Downloader
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit( main( Arrays.asList(args).iterator()) );
+		System.exit( main(new CCouchContext(), Arrays.asList(args).iterator()) );
 	}
 }

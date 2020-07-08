@@ -12,13 +12,12 @@ public class Cat
 	public static String USAGE =
 		"Usage: ccouch3 cat [-repo <path>]* [<resource-path> ...]";
 	
-	public static int main(Iterator<String> argi) {
-		RepoConfig repoConfig = new RepoConfig();
+	public static int main(CCouchContext ctx, Iterator<String> argi) {
 		ArrayList<String> resourcePaths = new ArrayList<String>();
 		
 		while( argi.hasNext() ) {
 			String arg = argi.next();
-			if( repoConfig.handleCommandLineOption(arg, argi) ) {
+			if( ctx.handleCommandLineOption(arg, argi) ) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println(USAGE);
 				return 0;
@@ -30,8 +29,9 @@ public class Cat
 			}
 		}
 		
-		repoConfig.fix();
-		BlobResolver resolver = CCouch3Command.getCommandLineFileResolver(repoConfig);
+		ctx.fix();
+		
+		BlobResolver resolver = CCouch3Command.getCommandLineFileResolver(ctx);
 		
 		for( String path : resourcePaths ) {
 			ByteBlob from;

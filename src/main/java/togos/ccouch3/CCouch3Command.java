@@ -64,11 +64,11 @@ public class CCouch3Command
 			// TODO: Update commands to take general options
 			if( ctx.handleCommandLineOption(cmd, argi) ) {
 			} else if( "upload".equals(cmd) ) {
-				return FlowUploader.uploadMain(argi);
+				return FlowUploader.uploadMain(ctx, argi);
 			} else if( "cache".equals(cmd) ) {
-				return Downloader.main(argi);
+				return Downloader.main(ctx, argi);
 			} else if( "cat".equals(cmd) ) {
-				return Cat.main(argi);
+				return Cat.main(ctx, argi);
 			} else if( "copy".equals(cmd) ) {
 				return Copy.main(ctx, argi);
 			} else if( "config".equals(cmd) ) {
@@ -78,11 +78,11 @@ public class CCouch3Command
 			} else if( "store-stream".equals(cmd) ) {
 				return StoreStream.main(ctx, argi);
 			} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
-				return FlowUploader.identifyMain(argi);
+				return FlowUploader.identifyMain(ctx, argi);
 			} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {
 				return CmdServer.main(ctx, argi);
 			} else if( "web-server".equals(cmd) || "ws".equals(cmd) || "webserv".equals(cmd) ) {
-				return WebServerCommand.main(argi);
+				return WebServerCommand.main(ctx, argi);
 			} else if( "verify-tree".equals(cmd) ) {
 				return TreeVerifier.main(ctx, argi);
 			} else if( "extract-urns".equals(cmd) ) {

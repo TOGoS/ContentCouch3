@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
@@ -21,7 +22,6 @@ import togos.blob.ByteBlob;
 import togos.blob.file.FileBlob;
 import togos.blob.util.BlobUtil;
 import togos.ccouch3.repo.Repository;
-import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.xml.XML;
 import togos.tinywebserver.WebServer;
 import togos.tinywebserver.WebServer.HTTPRequest;
@@ -44,7 +44,7 @@ public class WebServerCommand
 	
 	static final int DEFAULT_PORT = 14567;
 	
-	public final ArrayList<Repository> repositories = new ArrayList<Repository>();
+	public final List<Repository> repositories = new ArrayList<Repository>();
 	public final ArrayList<Mount> mounts = new ArrayList<Mount>();
 	public int port = DEFAULT_PORT;
 	Map<String,String> filenameExtensionMimeTypes = new HashMap<String,String>();
@@ -258,14 +258,13 @@ public class WebServerCommand
 		"                                  ; next mount or union, and merging directory\n"+
 		"                                  ; listings with them.";
 	
-	public static int main(Iterator<String> argi) {
+	public static int main(CCouchContext ctx, Iterator<String> argi) {
 		WebServerCommand wsc = new WebServerCommand();
 		while( argi.hasNext() ) {
 			String arg = argi.next();
-			if( "-port".equals(arg) ) {
+			if( ctx.handleCommandLineOption(arg, argi) ) {
+			} else if( "-port".equals(arg) ) {
 				wsc.port = Integer.parseInt(argi.next());
-			} else if( "-repo".equals(arg) || arg.startsWith("-repo:") ) {
-				wsc.repositories.add(new SHA1FileRepository(new File(argi.next(), "data"), "bro"));
 			} else if( "-union".equals(arg) ) {
 				String fsPath = argi.next();
 				wsc.addMount("/", fsPath, false);
@@ -287,11 +286,12 @@ public class WebServerCommand
 				return 1;
 			}
 		}
+		wsc.repositories.addAll(Arrays.asList(ctx.getLocalRepositories()));
 		wsc.run();
-		return 1;
+		return 1; // There's currently no way to exit on purpose lol
 	}
 	
 	public static void main(String[] args) {
-		System.exit( main( Arrays.asList(args).iterator()) );
+		System.exit( main( new CCouchContext(), Arrays.asList(args).iterator()) );
 	}
 }

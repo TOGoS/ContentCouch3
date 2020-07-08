@@ -23,7 +23,7 @@ public class Copy
 		
 		while( argi.hasNext() ) {
 			String arg = argi.next();
-			if( ctx.repoConfig.handleCommandLineOption(arg, argi) ) {
+			if( ctx.handleCommandLineOption(arg, argi) ) {
 			} else if( "-merge".equals(arg) ) {
 				onDirCollision = OnDirCollision.MERGE;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {

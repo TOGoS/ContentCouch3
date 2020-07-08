@@ -702,12 +702,9 @@ public class FlowUploader implements FlowUploaderSettings
 		public Collection<UploadClientSpec> uploadClientSpecs = new ArrayList<UploadClientSpec>();
 		public BlobReferenceScanMode scanMode = BlobReferenceScanMode.NEVER;
 		
-		public static FlowUploaderConfig defaults() {
+		public static FlowUploaderConfig from(CCouchContext ctx) {
 			FlowUploaderConfig config = new FlowUploaderConfig();
-			String home = System.getProperty("user.home");
-			if( home != null ) {
-				config.primaryRepoDir = new File(home, ".ccouch");
-			}
+			config.primaryRepoDir = ctx.getPrimaryRepoDir();
 			return config;
 		}
 	}
@@ -1236,8 +1233,8 @@ public class FlowUploader implements FlowUploaderSettings
 		return sc.toArray(new String[sc.size()]);
 	}
 	
-	static FlowUploaderCommand fromArgs( Iterator<String> args, boolean requireServer, boolean alwaysShowUrns ) throws Exception {
-		FlowUploaderConfig config = FlowUploaderConfig.defaults();
+	static FlowUploaderCommand fromArgs( CCouchContext ctx, Iterator<String> args, boolean requireServer, boolean alwaysShowUrns ) throws Exception {
+		FlowUploaderConfig config = FlowUploaderConfig.from(ctx);
 		
 		boolean verbose = false;
 		boolean cacheEnabled = true;
@@ -1452,8 +1449,8 @@ public class FlowUploader implements FlowUploaderSettings
 		"    -a Tom -n archives/tom/pictures -m \"Tom's pictures\" /home/tom/pics/ \\\n" +
 		"    -a Tom -n archives/tom/docs -m \"Tom's documents\" /home/tom/docs/";
 	
-	public static int uploadMain( Iterator<String> args ) throws Exception {
-		FlowUploaderCommand fuc = fromArgs(args, true, false);
+	public static int uploadMain( CCouchContext ctx, Iterator<String> args ) throws Exception {
+		FlowUploaderCommand fuc = fromArgs(ctx, args, true, false);
 		switch( fuc.mode ) {
 		case ERROR:
 			System.err.println( "Error: " + fuc.errorMessage + "\n" );
@@ -1481,8 +1478,8 @@ public class FlowUploader implements FlowUploaderSettings
 		"Example usage:\n" +
 		"  ccouch3 id something.txt some-directory/ somethingelse.zip";
 	
-	public static int identifyMain( Iterator<String> args ) throws Exception {
-		FlowUploaderCommand fuc = fromArgs(args, false, true);
+	public static int identifyMain( CCouchContext ctx, Iterator<String> args ) throws Exception {
+		FlowUploaderCommand fuc = fromArgs(ctx, args, false, true);
 		switch( fuc.mode ) {
 		case ERROR:
 			System.err.println( "Error: " + fuc.errorMessage + "\n" );
@@ -1498,6 +1495,6 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(uploadMain( Arrays.asList(args).iterator() ));
+		System.exit(uploadMain( new CCouchContext(), Arrays.asList(args).iterator() ));
 	}
 }
