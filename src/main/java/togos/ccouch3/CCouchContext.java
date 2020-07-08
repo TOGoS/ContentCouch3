@@ -68,8 +68,6 @@ implements CommandLineOptionHandler
 	 */
 	public final ArrayList<RepoSpec> remoteRepos = new ArrayList<RepoSpec>();
 	
-	//// A bunch of crap; plz replace
-	
 	protected static String resolveRepoDir(String path) {
 		if( path.startsWith("~/") ) {
 			return System.getProperty("user.home") + "/" + path.substring(2);
@@ -91,8 +89,6 @@ implements CommandLineOptionHandler
 		if( dir == null ) return null;
 		return new RepoSpec( getNonEmptyEnv("ccouch_repo_name"), RepoType.FILESYSTEM, dir );
 	}
-	
-	//// end crap to be replaced
 	
 	static String optArg(String opt, String explicit, Iterator<String> rest) {
 		if( explicit != null ) return explicit;
