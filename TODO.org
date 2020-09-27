@@ -4,6 +4,8 @@
 
 ** ~upload -recurse~ doesn't seem to work
 
+[2020-09-27T17:40:39-05:00] This might be due to things being marked as fully uploaded before they are actually fully uploaded.
+
 e.g. was trying to upload wedding pix with
 #+BEGIN_SRC sh
 ccouch3 upload -recurse -http-server:piccouch piccouch.appspot.com \
