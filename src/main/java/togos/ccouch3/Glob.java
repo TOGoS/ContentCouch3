@@ -8,6 +8,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Glob {
+	public static final String VERSION = "1.0.0-2015.08.25";
 	/** For purposes of pattern matching, always use this instead of File.separator */
 	public static final String SEPARATOR = "/";
 	
