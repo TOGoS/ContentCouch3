@@ -277,10 +277,12 @@ public class FlowUploader implements FlowUploaderSettings
 		public static class IndexedObjectSink implements Sink<Object> {
 			public final Sink<Object> indexResultSink;
 			public final AddableSet<String> uploadCache;
+			public final String name;
 			
-			public IndexedObjectSink( AddableSet<String> uc, Sink<Object> sink ) {
+			public IndexedObjectSink( AddableSet<String> uc, Sink<Object> sink, String name ) {
 				this.uploadCache = uc;
 				this.indexResultSink = sink;
+				this.name = name;
 			}
 			
 			public boolean contains( String urn ) {
@@ -289,6 +291,10 @@ public class FlowUploader implements FlowUploaderSettings
 			
 			public void give( Object thing ) throws Exception {
 				indexResultSink.give(thing);
+			}
+
+			public String toString() {
+				return "IndexedObjectSink '"+name+"'";
 			}
 		}
 		
@@ -587,7 +593,10 @@ public class FlowUploader implements FlowUploaderSettings
 				for( IndexedObjectSink d : destinations ) {
 					if( !d.contains(fi.getUrn()) ) {
 						d.give( blobInfo );
-						if( fullyUploaded ) d.give( new FullyStoredMarker(treeUrn) );
+						if( fullyUploaded ) {
+							if( debug ) System.err.println("Indexer: Sending FullyStoredMarker("+treeUrn+") to "+d);
+							d.give( new FullyStoredMarker(treeUrn) );
+						}
 					}
 				}
 			} else if( !file.exists() ) {
@@ -912,7 +921,7 @@ public class FlowUploader implements FlowUploaderSettings
 			String serverName = uploadClientSpecs[i].getServerName();
 			final AddableSet<String> uc = getUploadCache(serverName, scanMode);
 			uploadClients[i] = uploadClientSpecs[i].createClient( uc, tt, this );
-			indexedObjectSinks.add(new IndexedObjectSink( uc, uploadClients[i]));
+			indexedObjectSinks.add(new IndexedObjectSink( uc, uploadClients[i], serverName ));
 			if( debug ) {
 				System.err.println("For remote server '"+serverName+"'...");
 				System.err.println("  Using "+uc+" to remember fully-uploaded blobs");
@@ -973,7 +982,8 @@ public class FlowUploader implements FlowUploaderSettings
 									LogMessage lm = new LogMessage(BlobUtil.bytes(message));
 									d.give( lm );
 								d.give( commitBlobInfo );
-								d.give( new FullyStoredMarker(csr.latestCommitDataUrn) );
+								// 2021-11-07: this seems wrong, so commenting-out:
+								//d.give( new FullyStoredMarker(csr.latestCommitDataUrn) );
 							}
 							
 						}
@@ -986,7 +996,8 @@ public class FlowUploader implements FlowUploaderSettings
 								// Send the head to any server that doesn't have it
 								if( !d.contains(headNameUrn) ) {
 									d.give( ph );
-									d.give( new FullyStoredMarker(headNameUrn) );
+									// 2021-11-07: this seems wrong, so commenting-out:
+									//d.give( new FullyStoredMarker(headNameUrn) );
 								}
 							}
 						}
