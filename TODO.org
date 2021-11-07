@@ -24,7 +24,7 @@ Things seem to go haywire when I kill the process before it's done.
 Then when I try to run it again, it just says it's done before it's done anything.
 
 
-*** Some pretty hard evidence
+*** [2021-11-07] Some pretty hard evidence
 
 #+BEGIN_EXAMPLE
 C:\Users\togos\stuff\proj\TOGoSUtils>java -jar "C:\Users\togos\stuff\proj\ContentCouch3\CCouch3.jar" upload -repo D:\datastore\ccouch -command-server:togos-fbs plink tog@togos-fbs.nuke24.net ccouch3 cmd-server -sector apps -repo /home/tog/.ccouch ";" x-ccouch-head:/togthoms1/archives/apps/latest -recurse:scan-text-for-rdf-object-urns
@@ -41,6 +41,86 @@ C:\Users\togos\stuff\proj\TOGoSUtils>java -jar "C:\Users\togos\stuff\proj\Conten
 
 Somehow that stuff got marked as fully cached even though scan mode wasn't even supported!
 What the heck!
+
+So I created an 'invalid' scan mode that should never work:
+
+#+BEGIN_EXAMPLE
+C:\Users\togos\stuff\proj\TOGoSUtils>java -jar "C:\Users\togos\stuff\proj\ContentCouch3\CCouch3.jar" upload -repo D:\datastore\ccouch -command-server:togos-fbs plink tog@togos-fbs.nuke24.net ccouch3 cmd-server -sector apps -repo /home/tog/.ccouch ";" x-ccouch-head:/togthoms1/archives/apps/latest -recurse:invalid -debug
+For remote server 'togos-fbs'...
+  Using uploaded-to-togos-fbs-rs-invalid.slf2 to remember fully-uploaded blobs
+  Created CommandUploadClient togos-fbs (plink ...)
+Waiting for upload clients to finish...
+Indexer: D:\datastore\ccouch\heads\togthoms1\archives\apps\0...
+Indexer: Hash cache says D:\datastore\ccouch\heads\togthoms1\archives\apps\0 = urn:bitprint:LNHTIY4K5LZHEUA637O3KTZALLIKL2SK.BXYRHRQ5F4M6SYS6YSBB5KV32R7E5GSXTXJ2UTA
+Indexer: D:\datastore\ccouch\heads\togthoms1\archives\apps\0 = urn:bitprint:LNHTIY4K5LZHEUA637O3KTZALLIKL2SK.BXYRHRQ5F4M6SYS6YSBB5KV32R7E5GSXTXJ2UTA
+Indexer: Some destinations don't yet have urn:bitprint:LNHTIY4K5LZHEUA637O3KTZALLIKL2SK.BXYRHRQ5F4M6SYS6YSBB5KV32R7E5GSXTXJ2UTA
+Send head command to togos-fbs: head D:\datastore\ccouch\heads\togthoms1\archives\apps\0 urn:bitprint:LNHTIY4K5LZHEUA637O3KTZALLIKL2SK.BXYRHRQ5F4M6SYS6YSBB5KV32R7E5GSXTXJ2UTA
+INVALID scan mode not supported!
+Indexer: D:\datastore\ccouch\heads\togthoms1\archives\apps\0: done: urn:bitprint:LNHTIY4K5LZHEUA637O3KTZALLIKL2SK.BXYRHRQ5F4M6SYS6YSBB5KV32R7E5GSXTXJ2UTA
+Send head command to togos-fbs: post x incoming-log chunk 180
+Send head command to togos-fbs: chunk 180
+Send head command to togos-fbs: end-chunks
+Indexer: Sending EndMessage to IndexedObjectSink.
+Send head command to togos-fbs: bye
+Read head response from togos-fbs: ok head D:\datastore\ccouch\heads\togthoms1\archives\apps\0 urn:bitprint:LNHTIY4K5LZHEUA637O3KTZALLIKL2SK.BXYRHRQ5F4M6SYS6YSBB5KV32R7E5GSXTXJ2UTA found
+Send upload command to togos-fbs: echo fully-stored urn:bitprint:LNHTIY4K5LZHEUA637O3KTZALLIKL2SK.BXYRHRQ5F4M6SYS6YSBB5KV32R7E5GSXTXJ2UTA
+Read head response from togos-fbs: ok post x incoming-log accepted
+Read head response from togos-fbs: ok bye null and farewell
+Send upload command to togos-fbs: bye
+Read upload response from togos-fbs: ok echo fully-stored urn:bitprint:LNHTIY4K5LZHEUA637O3KTZALLIKL2SK.BXYRHRQ5F4M6SYS6YSBB5KV32R7E5GSXTXJ2UTA
+Read upload response from togos-fbs: ok bye null and farewell
+Upload clients all completed.
+Waiting for index thread to finish...
+Index thread completed.
+Not everything indexed could be queued for upload.
+Error: Some uploads did not complete successfully.
+#+END_EXAMPLE
+
+I would expect it to say "Indexer: Marking (something) fully uploaded' if it were FlowUploader erroneously
+adding those messages, but that's not in there.
+
+Wait, what is this, in ~runUpload~ ~IndexRunner~:
+
+#+BEGIN_SRC java
+                                        if( ut.commitConfig != null ) {
+                                                CommitManager.CommitSaveResult csr = getCommitManager().saveCommit(
+                                                        new File(ut.path), indexResult.urn, timestamp, ut.commitConfig );
+
+                                                SmallBlobInfo commitBlobInfo = new SmallBlobInfo( csr.latestCommitDataUrn, csr.latestCommitData );
+                                                for( IndexedObjectSink d : indexedObjectSinks ) {
+                                                        // Log the commit and send the data to any server that doesn't have it
+                                                        if( !d.contains(csr.latestCommitDataUrn) ) {
+                                                                String message =
+                                                                                "[" + new Date(System.currentTimeMillis()).toString() + "] Uploaded\n" +
+                                                                                "Commit '" + ut.name + "' = " + csr.latestCommitUrn;
+                                                                        LogMessage lm = new LogMessage(BlobUtil.bytes(message));
+                                                                        d.give( lm );
+                                                                d.give( commitBlobInfo );
+                                                                d.give( new FullyStoredMarker(csr.latestCommitDataUrn) );
+                                                        }
+
+                                                }
+
+                                                if( ut.commitConfig.headName != null ) {
+                                                        int headNum = getHeadManager().addHead(ut.commitConfig.headName, 0, csr.latestCommitData);
+                                                        PutHead ph = new PutHead( ut.commitConfig.headName, headNum, csr.latestCommitDataUrn );
+                                                        String headNameUrn = "ccouch-head:"+ut.commitConfig.headName+"/"+headNum;
+                                                        for( IndexedObjectSink d : indexedObjectSinks ) {
+                                                                // Send the head to any server that doesn't have it
+                                                                if( !d.contains(headNameUrn) ) {
+                                                                        d.give( ph );
+                                                                        d.give( new FullyStoredMarker(headNameUrn) );
+                                                                }
+                                                        }
+                                                }
+                                        }
+#+END_SRC
+
+It looks like...when creating commits, FullyStoredMarkers are unconditionally pushed to blob sinks.
+That is probably bad!
+
+
+
 
 ** ccouch3-cache has some issues
 
