@@ -14,7 +14,8 @@ import java.util.regex.Pattern;
 enum BlobReferenceScanMode {
 	NEVER("never", "Never scan blobs"),
 	SCAN_TEXT_FOR_URNS("text", "Scan UTF-8 text blobs for 'urn:....'"),
-	SCAN_TEXT_FOR_RDF_OBJECT_URNS("text-rdf", "Scan UTF-8 text blobs for 'parse-rdf:' or 'x-rdf-subject:'-prefixed or '#'-postfixed URNs");
+	SCAN_TEXT_FOR_RDF_OBJECT_URNS("text-rdf", "Scan UTF-8 text blobs for 'parse-rdf:' or 'x-rdf-subject:'-prefixed or '#'-postfixed URNs"),
+	INVALID("invalid", "Invalid scan mode, here for debugging purposes");
 
 	public String getNiceName() {
 		return this.name().replaceAll("_", "-").toLowerCase();
