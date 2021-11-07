@@ -383,6 +383,7 @@ public class FlowUploader implements FlowUploaderSettings
 			case NEVER:
 				return true;
 			case SCAN_TEXT_FOR_URNS:
+			case SCAN_TEXT_FOR_RDF_OBJECT_URNS:
 				try {
 					return getBlobReferenceScanner().scanTextForUrns(blob.getUrn(), blob.openInputStream(), new ScanCallback() {
 						@Override public boolean handle(String urn) {
