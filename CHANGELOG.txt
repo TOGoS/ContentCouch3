@@ -1,0 +1,10 @@
+---------------------------------------------------------------------------------------------------
+Version: 3.5.1
+Date: 2021-11-07
+  Changes:
+    - Start changelog and version numbers
+    - Additional debug messages from FlowUploader relating to FullyStoredMarkers
+    - FullyStoredMarkers no longer unconditionally sent after creating commits
+  Notes:
+    - This is the first numbered version.  "3.5.1" was pulled out of thin air (but '3' is because this is ContentCouch3)
+---------------------------------------------------------------------------------------------------

@@ -6,6 +6,7 @@ import java.util.Iterator;
 
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
+import togos.ccouch3.Versions;
 
 public class CCouch3Command
 {
@@ -39,6 +40,7 @@ public class CCouch3Command
 	
 	public static String USAGE =
 		"Usage: ccouch3 <subcommand> <subcommand-arguments>\n" +
+		"Version: "+Versions.CCOUCH_VERSION+"\n" +
 		"Subcommands:\n" +
 		"  identify          ; identify files/directories\n" +
 		"  upload            ; upload files to a remote repository\n" +
@@ -91,6 +93,9 @@ public class CCouch3Command
 				return M3UAnnotator.main(ctx, argi);
 			} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
 				System.out.print(USAGE);
+				return 0;
+			} else if( "--version".equals(cmd) || "-version".equals(cmd) ) {
+				System.out.println("ContentCouch "+Versions.CCOUCH_VERSION);
 				return 0;
 			} else {
 				System.err.println("Error: Unrecognized command: "+cmd);
