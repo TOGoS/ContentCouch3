@@ -475,6 +475,7 @@ public class FlowUploader implements FlowUploaderSettings
 			boolean fullyUploaded = scanBlobReferences( bi, destinations );
 			
 			if( fullyUploaded ) {
+				if( debug ) System.err.println("Indexer: Marking "+urn+" as fully uploaded");
 				for( IndexedObjectSink d : destinations ) {
 					d.give( new FullyStoredMarker(urn) );
 				}
@@ -550,6 +551,7 @@ public class FlowUploader implements FlowUploaderSettings
 				
 				if( fullyUploaded ) {
 					for( IndexedObjectSink d : destinations ) {
+						if( debug ) System.err.println("Indexer: Marking file "+fileUrn+" fully uploaded");
 						d.give( new FullyStoredMarker(fileUrn) );
 					}
 				}

@@ -4,7 +4,7 @@
 
 ** ~upload -recurse~ doesn't seem to work
 
-[2020-09-27T17:40:39-05:00] This might be due to things being marked as fully uploaded before they are actually fully uploaded.
+*** [2020-09-27T17:40:39-05:00] This might be due to things being marked as fully uploaded before they are actually fully uploaded.
 
 e.g. was trying to upload wedding pix with
 #+BEGIN_SRC sh
@@ -16,12 +16,31 @@ ccouch3 upload -recurse -http-server:piccouch piccouch.appspot.com \
 
 but it wasn't recursing!
 
-[2020-01-04T22:18:42-06:00] I've been having a similar problem again.
+*** [2020-01-04T22:18:42-06:00] I've been having a similar problem again.
 When I pass ~-no-cache~ it seems to work properly.
 And when I run it for the first time after removing the remote blob presence cache file
 (~uploaded-to-X-rs-text.slf2~) it seems to work properly.
 Things seem to go haywire when I kill the process before it's done.
 Then when I try to run it again, it just says it's done before it's done anything.
+
+
+*** Some pretty hard evidence
+
+#+BEGIN_EXAMPLE
+C:\Users\togos\stuff\proj\TOGoSUtils>java -jar "C:\Users\togos\stuff\proj\ContentCouch3\CCouch3.jar" upload -repo D:\datastore\ccouch -command-server:togos-fbs plink tog@togos-fbs.nuke24.net ccouch3 cmd-server -sector apps -repo /home/tog/.ccouch ";" x-ccouch-head:/togthoms1/archives/apps/latest -recurse:scan-text-for-rdf-object-urns
+SCAN_TEXT_FOR_RDF_OBJECT_URNS scan mode not supported!
+Not everything indexed could be queued for upload.
+Error: Some uploads did not complete successfully.
+#+END_EXAMPLE
+
+But then if I run it a second time...
+
+#+BEGIN_EXAMPLE
+C:\Users\togos\stuff\proj\TOGoSUtils>java -jar "C:\Users\togos\stuff\proj\ContentCouch3\CCouch3.jar" upload -repo D:\datastore\ccouch -command-server:togos-fbs plink tog@togos-fbs.nuke24.net ccouch3 cmd-server -sector apps -repo /home/tog/.ccouch ";" x-ccouch-head:/togthoms1/archives/apps/latest -recurse:scan-text-for-rdf-object-urns
+#+END_EXAMPLE
+
+Somehow that stuff got marked as fully cached even though scan mode wasn't even supported!
+What the heck!
 
 ** ccouch3-cache has some issues
 
