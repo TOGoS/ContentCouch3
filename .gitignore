@@ -11,3 +11,5 @@ target
 temp
 /java-bin/
 *~
+/bin/
+/eclipse-java-bin/

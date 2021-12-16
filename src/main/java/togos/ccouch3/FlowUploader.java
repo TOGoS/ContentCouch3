@@ -241,13 +241,15 @@ public class FlowUploader implements FlowUploaderSettings
 		}
 	}
 	
-	static class FileMissing {
+	static class FileStatus {
 		public final String path;
 		public final String urn;
+		public final boolean exists;
 		
-		public FileMissing( String path, String urn ) {
+		public FileStatus( String path, String urn, boolean exists ) {
 			this.path = path;
 			this.urn = urn;
+			this.exists = exists;
 		}
 		
 		@Override

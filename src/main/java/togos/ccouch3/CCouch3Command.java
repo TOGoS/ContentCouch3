@@ -6,7 +6,6 @@ import java.util.Iterator;
 
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
-import togos.ccouch3.Versions;
 
 public class CCouch3Command
 {

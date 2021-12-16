@@ -6,7 +6,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 
 import togos.ccouch3.FlowUploader.EndMessage;
-import togos.ccouch3.FlowUploader.FileMissing;
+import togos.ccouch3.FlowUploader.FileStatus;
 import togos.ccouch3.FlowUploader.FullyStoredMarker;
 import togos.ccouch3.FlowUploader.LogMessage;
 import togos.ccouch3.FlowUploader.Piper;
@@ -75,10 +75,15 @@ class CommandUploadClient implements UploadClient
 		
 		@Override
 		public void give(Object m) throws Exception {
-			if( m instanceof FileMissing ) {
-				FileMissing fm = (FileMissing)m;
-				File f = new File(fm.path);
-				w.writeCmd( new String[] { "put", fm.urn, fm.urn, "chunk", String.valueOf(f.length()) } );
+			if( m instanceof FileStatus ) {
+				FileStatus fileStatus = (FileStatus)m;
+				if( fileStatus.exists ) {
+					// Nothing to do!
+					return;
+				}
+				
+				File f = new File(fileStatus.path);
+				w.writeCmd( new String[] { "put", fileStatus.urn, fileStatus.urn, "chunk", String.valueOf(f.length()) } );
 				byte[] buffer = new byte[(int)Math.min(1024*1024, f.length())];
 				FileInputStream fis = new FileInputStream(f);
 				try {
@@ -150,17 +155,13 @@ class CommandUploadClient implements UploadClient
 						if( "head".equals(m[1]) ) {
 							// 0:ok 1:head 2:<path> 3:<urn> 4:{found|missing}
 							boolean found = "found".equals(m[4]);
-							if( found ) {
-								messageSink.give( new FullyStoredMarker(m[3]) );
-							} else {
-								messageSink.give( new FileMissing(m[2], m[3]) );
-							}
+							messageSink.give( new FileStatus(m[2], m[3], found) );
 						} else if( "post".equals(m[1]) ) {
 							// Great!
 						} else if( "put".equals(m[1]) && m.length >= 3 ) {
 							// 0:ok 1:put 2:<urn> 3:<urn>
 							// Then one of our blobs went through; woot.
-							messageSink.give( new FullyStoredMarker(m[3]) );
+							messageSink.give( new FileStatus(null, m[2], true) );
 						} else if( "echo".equals(m[1]) && m.length == 4 && "fully-stored".equals(m[2]) ) {
 							// 0:ok 1:echo 2:fully-stored 3:<urn>
 							messageSink.give( new FullyStoredMarker(m[3]) );

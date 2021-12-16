@@ -1,4 +1,9 @@
 ---------------------------------------------------------------------------------------------------
+Version: 3.6.0
+Date: 2021-12-15
+  Bugfixes:
+    - Hopefully fix that inappropriate FullyStoredMarkers were being returned from CommandUploadClient
+---------------------------------------------------------------------------------------------------
 Version: 3.5.1
 Date: 2021-11-07
   Changes:
