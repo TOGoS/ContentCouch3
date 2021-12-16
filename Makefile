@@ -1,11 +1,15 @@
 # May need to override this on Windows to the full path to git.exe, e.g. by running
 # > set git_exe="C:\Program Files (x86)\Git\bin\git.exe"
 # before running make.
+
 git_exe ?= git
+find_exe ?= find
+# On windows, this may need to be changed to ';'
+pathsep ?= :
+
 javac   := javac -source 1.6 -target 1.6
 ccouch3 := java -jar CCouch3.jar
-# On windows, this may need to be changed to ';'
-pathsep := :
+
 temporary_files = \
 	.*-src.lst \
 	CCouch3.jar \
@@ -24,9 +28,10 @@ default: CCouch3.jar.urn
 
 .DELETE_ON_ERROR:
 
-CCouch3.jar: $(shell find src/main)
+CCouch3.jar: $(shell "${find_exe}" src/main)
+	rm "$@"
 	rm -rf target/main
-	find src/main ext-lib/*/src/main -name '*.java' >.java-main-src.lst
+	"${find_exe}" src/main ext-lib/*/src/main -name '*.java' >.java-main-src.lst
 	mkdir -p target/main
 	${javac} -sourcepath src/main/java -d target/main @.java-main-src.lst
 	jar -ce togos.ccouch3.CCouch3Command -C target/main . >CCouch3.jar
@@ -66,8 +71,8 @@ test-dependencies: ${unit_test_dependencies}
 .PHONY: run-unit-tests
 run-unit-tests: ${unit_test_dependencies}
 	rm -rf target/test
-	find src/main src/test ext-lib/*/src/main -name *.java >.java-test-src.lst
+	"${find_exe}" src/main src/test ext-lib/*/src/main -name *.java >.java-test-src.lst
 	mkdir -p target/test
 	${javac} -cp ext-lib/JUnit.jar -sourcepath src/main/java -sourcepath src/test/java -d target/test @.java-test-src.lst
-	find src/test -name *Test.java | sed -e s=src/test/java/==g -e s/.java// -e s=/=.=g | xargs \
+	"${find_exe}" src/test -name *Test.java | sed -e s=src/test/java/==g -e s/.java// -e s=/=.=g | xargs \
 		java -cp target/test${pathsep}ext-lib/JUnit.jar junit.textui.TestRunner
