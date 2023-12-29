@@ -64,8 +64,11 @@ public class WalkFilesystemCmd {
 		Process p = pb.start();
 		p.getOutputStream().close();
 		ByteArrayOutputStream collector = new ByteArrayOutputStream();
-		try(InputStream is = p.getInputStream()) {
+		InputStream is = p.getInputStream();
+		try {
 			pipe(is, collector);
+		} finally {
+			is.close();
 		}
 		int exitCode = p.waitFor();
 		if( exitCode != 0 ) {
@@ -83,13 +86,16 @@ public class WalkFilesystemCmd {
 		}
 		
 		BitprintDigest digest = new BitprintDigest();
-		try( FileInputStream fis = new FileInputStream(f) ) {
+		FileInputStream fis = new FileInputStream(f);
+		try {
 			int z;
 			byte[] buf = new byte[65536];
 			while( (z=fis.read(buf)) > 0 ) {
 				digest.update(buf, 0, z);
 			}
 			return BitprintDigest.formatUrn(digest.digest());
+		} finally {
+			fis.close();
 		}
 	}
 	
