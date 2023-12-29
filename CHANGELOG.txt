@@ -2,8 +2,10 @@
 Version: 3.7.0
 Date: 2023-12-28
   Features:
-    - Add 'walk-fs' subcommand, which is sort of experimental
-      and shouldn't be relied upon just yet.
+    - Add 'walk-fs' subcommand, which is sort of experimental and not super useful yet.
+    - Note that walk-fs will try to use the Windows `fsutil` command to get the 'file key'
+      for each file.  On other systems it should get inode instead, but this isn't yet
+      implemented.
 ---------------------------------------------------------------------------------------------------
 Version: 3.6.0
 Date: 2021-12-15

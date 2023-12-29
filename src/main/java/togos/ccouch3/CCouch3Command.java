@@ -52,7 +52,7 @@ public class CCouch3Command
 		"  web-server        ; run a web server\n" +
 		"  store-stream      ; store files or pipe contents\n"+
 		"  annotate-m3u      ; add #URN lines to an M3U file\n"+
-		"  walk-fs           ; walk filesystem and output information in a flat output format\n" +
+		"  walk-fs           ; walk filesystem and output basic info\n" +
 		"  <subcommand> -?   ; get help on a specific command\n"+
 		"\n"+
 		"'backup' exists primarily because its implementation is simpler\n"+
