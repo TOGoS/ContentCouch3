@@ -8,7 +8,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.ProcessBuilder.Redirect;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.regex.Matcher;
@@ -44,13 +46,27 @@ public class WalkFilesystemCmd {
 		return sb.toString();
 	}
 	
-	boolean includeDirs = true;
-	boolean includeFiles = true;
-	boolean recurse = true;
-	boolean beChatty = true;
-	float extraErrorChance = 0.0f;
-	Random rand = new Random(new Date().getTime());
-	Pattern namePattern = Pattern.compile("^[^.].*");
+	static Pattern NODOTFILES = Pattern.compile("^[^.].*");
+	static Pattern ALLFILES = Pattern.compile("^.*");
+	
+	final boolean includeDirs = true;
+	final boolean includeFiles = true;
+	final boolean recurse = true;
+	final boolean beChatty = true;
+	final float extraErrorChance;
+	final Random rand = new Random(new Date().getTime());
+	final Pattern namePattern;
+	final List<Pair<String,File>> roots;
+	
+	public WalkFilesystemCmd(
+		List<Pair<String,File>> roots,
+		Pattern namePattern,
+		float extraErrorChance
+	) {
+		this.roots = roots;
+		this.namePattern = namePattern;
+		this.extraErrorChance = extraErrorChance;
+	}
 	
 	protected String getFileKey(File f) throws IOException, InterruptedException {
 		if( extraErrorChance > 0 && rand.nextFloat() < extraErrorChance ) {
@@ -169,7 +185,7 @@ public class WalkFilesystemCmd {
 		return errorCount;
 	}
 	
-	public void walk(List<Pair<String,File>> roots) throws InterruptedException {
+	public int run() throws InterruptedException {
 		Date startDate = new Date();
 		if( beChatty ) {
 			System.out.println("# "+getClass().getSimpleName()+"#walk starting at "+DateUtil.formatDate(startDate));
@@ -186,6 +202,7 @@ public class WalkFilesystemCmd {
 			System.out.println("# Processing took "+(endDate.getTime()-startDate.getTime())/1000+" seconds");
 			System.out.println("# There were "+errorCount+" errors");
 		}
+		return errorCount == 0 ? 0 : 1;
 	}
 	
 	static Pattern ROOT_PATTERN = Pattern.compile("([^=]+)=(.*)");
@@ -199,16 +216,23 @@ public class WalkFilesystemCmd {
 		}
 	}
 	
-	public static void main(String[] args) throws InterruptedException {
+	public static WalkFilesystemCmd parse(Iterator<String> argi) {
 		ArrayList<Pair<String,File>> roots = new ArrayList<Pair<String,File>>();
 		boolean parseMode = true;
-		for( String arg : args ) {
+		boolean includeDotFiles = false;
+		float extraErrorChance = 0;
+		while( argi.hasNext() ) {
+			String arg = argi.next();
 			if( parseMode ) {
 				Matcher m;
 				if( (m = ROOT_PATTERN.matcher(arg)).matches() ) {
 					roots.add(new Pair<String,File>(m.group(1), new File(m.group(2))));
 				} else if( !arg.startsWith("-") ) {
 					roots.add(new Pair<String,File>(arg, new File(arg)));
+				} else if( "--include-dot-files".equals(arg) ) {
+					includeDotFiles = true;
+				} else if( "--ignore-dot-files".equals(arg) ) {
+					includeDotFiles = false;
 				} else if( "--".equals(arg) ) {
 					parseMode = false;
 				} else {
@@ -220,8 +244,14 @@ public class WalkFilesystemCmd {
 			}
 		}
 		
-		WalkFilesystemCmd cmd = new WalkFilesystemCmd();
-		
-		cmd.walk(roots);
+		return new WalkFilesystemCmd(roots, includeDotFiles ? ALLFILES : NODOTFILES, extraErrorChance);
+	}
+	
+	public static int main(Iterator<String> argi) throws InterruptedException {
+		return parse(argi).run();
+	}
+	
+	public static void main(String[] args) throws InterruptedException {
+		System.exit(main(Arrays.asList(args).iterator()));
 	}
 }
