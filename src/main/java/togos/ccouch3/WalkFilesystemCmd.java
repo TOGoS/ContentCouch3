@@ -48,7 +48,7 @@ public class WalkFilesystemCmd {
 	boolean includeFiles = true;
 	boolean recurse = true;
 	boolean beChatty = true;
-	float extraErrorChance = 0.1f;
+	float extraErrorChance = 0.0f;
 	Random rand = new Random(new Date().getTime());
 	Pattern namePattern = Pattern.compile("^[^.].*");
 	
@@ -168,7 +168,7 @@ public class WalkFilesystemCmd {
 		if( beChatty ) {
 			System.out.println("# "+getClass().getSimpleName()+"#walk starting at "+DateUtil.formatDate(startDate));
 		}
-		System.err.println("#COLUMNS:path\tsize\tmtime\tfilekey\tbitprinturn");
+		System.out.println("#COLUMNS:path\tsize\tmtime\tfilekey\tbitprinturn");
 		
 		int errorCount = 0;
 		for( Pair<String,File> root : roots ) {
