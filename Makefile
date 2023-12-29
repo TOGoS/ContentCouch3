@@ -7,6 +7,7 @@ find_exe ?= find
 # On windows, this may need to be changed to ';'
 pathsep ?= :
 
+touch   := touch
 javac   := javac -source 1.6 -target 1.6
 ccouch3 := java -jar CCouch3.jar
 
@@ -28,12 +29,15 @@ default: CCouch3.jar.urn
 
 .DELETE_ON_ERROR:
 
-CCouch3.jar: $(shell "${find_exe}" src/main)
-	rm "$@"
+target/main.built: $(shell "${find_exe}" src/main ext-lib/*/src/main)
 	rm -rf target/main
 	"${find_exe}" src/main ext-lib/*/src/main -name '*.java' >.java-main-src.lst
 	mkdir -p target/main
 	${javac} -sourcepath src/main/java -d target/main @.java-main-src.lst
+	${touch} "$@" 
+
+CCouch3.jar: target/main.built
+	rm -f "$@"
 	jar -ce togos.ccouch3.CCouch3Command -C target/main . >CCouch3.jar
 
 CCouch3.jar.urn: CCouch3.jar
