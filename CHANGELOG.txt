@@ -1,23 +1,25 @@
 ---------------------------------------------------------------------------------------------------
 Version: 3.7.0
 Date: 2023-12-28
-  Features:
-    - Add 'walk-fs' subcommand, which is sort of experimental and not super useful yet.
-    - Note that walk-fs will try to use the Windows `fsutil` command to get the 'file key'
-      for each file.  On other systems it should get inode instead, but this isn't yet
-      implemented.
+JAR: urn:bitprint:RUDHX7A6M5JXMJCM4WMN27C4QRT6YILI.4EUW4NQT7FP7NYM3CGNKXJKVFWLMKCHS6WDU36I
+Features:
+  - Add 'walk-fs' subcommand, which is sort of experimental and not super useful yet.
+  - Note that walk-fs will try to use the Windows `fsutil` command to get the 'file key'
+    for each file.  On other systems it should get inode instead, but this isn't yet
+    implemented.
 ---------------------------------------------------------------------------------------------------
 Version: 3.6.0
 Date: 2021-12-15
-  Bugfixes:
-    - Hopefully fix that inappropriate FullyStoredMarkers were being returned from CommandUploadClient
+JAR: urn:bitprint:SXFTOGEABADEMLKDCAVDUNFZYVVTG46Y.UYN3I3GJS4MAJ67QJYPHI4ZWGYNZL2J4WYNW2RY
+Bugfixes:
+  - Hopefully fix that inappropriate FullyStoredMarkers were being returned from CommandUploadClient
 ---------------------------------------------------------------------------------------------------
 Version: 3.5.1
 Date: 2021-11-07
-  Changes:
-    - Start changelog and version numbers
-    - Additional debug messages from FlowUploader relating to FullyStoredMarkers
-    - FullyStoredMarkers no longer unconditionally sent after creating commits
-  Notes:
-    - This is the first numbered version.  "3.5.1" was pulled out of thin air (but '3' is because this is ContentCouch3)
+Changes:
+  - Start changelog and version numbers
+  - Additional debug messages from FlowUploader relating to FullyStoredMarkers
+  - FullyStoredMarkers no longer unconditionally sent after creating commits
+Notes:
+  - This is the first numbered version.  "3.5.1" was pulled out of thin air (but '3' is because this is ContentCouch3)
 ---------------------------------------------------------------------------------------------------
