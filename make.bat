@@ -15,11 +15,21 @@ if not defined JAR_CMD set "JAR_CMD=jar"
 if defined any_errors goto fail
 
 "%UNIX_FIND_EXE%" src/main ext-lib/*/src/main -name '*.java' >.java-main-src.lst
+if errorlevel 1 goto fail
 rmdir /s/q target\main
 mkdir target/main
 %JAVAC_CMD% -source 1.7 -target 1.7 -sourcepath src/main/java -d target/main @.java-main-src.lst
+if errorlevel 1 goto fail
 rm CCouch3.jar
 %JAR_CMD% -ce togos.ccouch3.CCouch3Command -C target/main . >CCouch3.jar
+if errorlevel 1 goto fail
+
+goto eof
+
 
 :fail
+echo make.bat: Failed>&2
 exit /B 1
+
+
+:eof
