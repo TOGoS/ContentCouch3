@@ -1,9 +1,20 @@
 ---------------------------------------------------------------------------------------------------
+Version: ???
+Date: ???
+Features:
+  - Add `find-files` subcommand, which is rather over-engineered inside,
+    the result being that it supports custom format strings.
+Changes:
+  - `backup` subcommand will use `CCOUCH_REPO_DIR` if it exists
+  - Default repository dir/name is now derived from CCOUCH_REPO_DIR, CCOUCH_REPO_NAME
+    rather than the lowercase versions, in line with what I've been saying
+    for a while in https://github.com/TOGoS/ContentCouchRepositoryFormat
+---------------------------------------------------------------------------------------------------
 Version: 3.7.0
 Date: 2023-12-28
 JAR: urn:bitprint:RUDHX7A6M5JXMJCM4WMN27C4QRT6YILI.4EUW4NQT7FP7NYM3CGNKXJKVFWLMKCHS6WDU36I
 Features:
-  - Add 'walk-fs' subcommand, which is sort of experimental and not super useful yet.
+  - Add `walk-fs` subcommand, which is sort of experimental and not super useful yet.
   - Note that walk-fs will try to use the Windows `fsutil` command to get the 'file key'
     for each file.  On other systems it should get inode instead, but this isn't yet
     implemented.
