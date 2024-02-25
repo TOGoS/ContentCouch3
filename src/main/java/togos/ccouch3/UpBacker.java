@@ -162,7 +162,7 @@ public class UpBacker
 		System.err.print( String.format("% 8d; % 8d; %-55s\r", objectsRead, objectsStored, pathTail) );
 	}
 	protected void hideProgress() {
-        String s10 = "          ";
+		String s10 = "          ";
 		System.err.print( s10+s10+s10+s10+s10+s10+s10+"     \r" );
 	}
 	
@@ -324,6 +324,7 @@ public class UpBacker
 			}
 		}
 		
+		ctx.fix(); // I SHOULDN'T HAVE TO REMEMBER TO DO THIS; STINKY CODE!!!
 		if( ctx.primaryRepo == null ) {
 			return new BackupCmd(BackupCmd.Mode.USAGE_ERROR, "No -repo specified");
 		}
