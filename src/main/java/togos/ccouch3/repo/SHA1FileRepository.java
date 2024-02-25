@@ -123,20 +123,23 @@ public class SHA1FileRepository implements Repository
 				File tempFile = new File(dataDir + "/" + storeSector + "/." + tempFileName1 + "-" + r.nextInt(Integer.MAX_VALUE) + ".temp" );
 				try {
 					FileUtil.mkParentDirs( tempFile );
-					FileOutputStream fos = new FileOutputStream( tempFile );
 					MessageDigest digestor;
 					try {
 						digestor = MessageDigest.getInstance("SHA-1");
 					} catch( NoSuchAlgorithmException e ) {
 						throw new StoreException( "sha1-not-found-which-is-ridiculous", e );
 					}
-					byte[] buffer = new byte[65536];
-					int z;
-					while( (z = is.read(buffer)) > 0 ) {
-						digestor.update( buffer, 0, z );
-						fos.write( buffer, 0, z );
+					FileOutputStream fos = new FileOutputStream( tempFile );
+					try {
+						byte[] buffer = new byte[65536];
+						int z;
+						while( (z = is.read(buffer)) > 0 ) {
+							digestor.update( buffer, 0, z );
+							fos.write( buffer, 0, z );
+						}
+					} finally {
+						fos.close();
 					}
-					fos.close();
 					byte[] digest = digestor.digest();
 					String calculatedSha1Base32 = Base32.encode(digest);
 					if( expectedSha1Base32 != null && !calculatedSha1Base32.equals(expectedSha1Base32) ) {
