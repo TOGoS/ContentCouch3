@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -39,6 +41,27 @@ public class SHA1FileRepository implements Repository
 	
 	Pattern SHA1EXTRACTOR = Pattern.compile("^urn:(?:sha1|bitprint):([A-Z2-7]{32})");
 	
+	@Override public List<File> getFiles( String urn ) {
+		Matcher m = SHA1EXTRACTOR.matcher(urn);
+		if( !m.find() ) return null;
+		if( !dataDir.exists() ) return null;
+		
+		String sha1Base32 = m.group(1);
+		
+		String postSectorPath = sha1Base32.substring(0,2) + "/" + sha1Base32;
+		
+		File[] sectorFileList = dataDir.listFiles();
+		if( sectorFileList == null ) return null;
+		
+		List<File> files = new ArrayList<File>();
+		
+		for( File sector : sectorFileList ) {
+			File file = new File(sector, postSectorPath);
+			if( file.exists() ) files.add(file);
+		}
+		return files;
+	}
+	
 	@Override public FileBlob getBlob( String urn ) {
 		Matcher m = SHA1EXTRACTOR.matcher(urn);
 		if( !m.find() ) return null;
@@ -52,7 +75,7 @@ public class SHA1FileRepository implements Repository
 		if( sectorFileList == null ) return null;
 		
 		for( File sector : sectorFileList ) {
-			FileBlob blobFile = new FileBlob(sector, postSectorPath); 
+			FileBlob blobFile = new FileBlob(sector, postSectorPath);
 			if( blobFile.exists() ) return blobFile;
 		}
 		return null;

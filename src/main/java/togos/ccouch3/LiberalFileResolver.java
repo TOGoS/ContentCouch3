@@ -5,6 +5,8 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 import togos.blob.ByteBlob;
 import togos.blob.file.FileBlob;
@@ -85,5 +87,13 @@ public class LiberalFileResolver implements FileResolver, BlobResolver
 		}
 		if( b instanceof File ) return (File)b;
 		throw new FileNotFoundException(name+" resolved to a "+b.getClass().getName()+", which can't be used as a file");
+	}
+	
+	public List<File> getFiles(String name) {
+		List<File> files = new ArrayList<File>();
+		for( Repository r : repos ) {
+			files.addAll(r.getFiles(name));
+		}
+		return files;
 	}
 }

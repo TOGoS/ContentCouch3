@@ -23,6 +23,15 @@ import togos.ccouch3.util.DateUtil;
 /**
  * Simple tool for walking the filesystem and collecting
  * various information about files and directories.
+ * 
+ * Maybe could be extended to walk RDF directories,
+ * but I haven't bothered, yet
+ * 
+ * It would be nice if this had a formatting option.
+ * See FindFilesCommand for some preliminary and sloppy
+ * work on a formatting system, not to mention sloppy,
+ * experimental groundwork for defining these commands
+ * in such a way that they can be piped together.
  */
 public class WalkFilesystemCmd {
 	static void pipe(InputStream is, OutputStream os) throws IOException {

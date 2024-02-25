@@ -2,6 +2,7 @@ package togos.ccouch3.repo;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 public interface FileResolver
 {
@@ -12,4 +13,12 @@ public interface FileResolver
 	 * (FileNotFoundException is recommended for generic 'I don't have that' errors).   
 	 */
 	public File getFile(String name) throws IOException;
+	
+	/**
+	 * Return a list of all files for the given name.
+	 * Note that resources may be stored in ways that do
+	 * not directly map to files, and those cases won't
+	 * be accounted for in the resulting list.
+	 */
+	public List<File> getFiles(String name);
 }

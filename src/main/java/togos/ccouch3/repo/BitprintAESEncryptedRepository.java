@@ -9,6 +9,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
+import java.util.Collections;
+import java.util.List;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -122,6 +124,10 @@ public class BitprintAESEncryptedRepository implements Repository
 	@Override
 	public File getFile(String name) throws IOException {
 		throw new IOException("Can't return a file for "+name+" because it's encrypted!");
+	}
+	
+	@Override public List<File> getFiles(String name) {
+		return Collections.emptyList();
 	}
 	
 	protected CipherSource getCipherSource(byte[] key) {

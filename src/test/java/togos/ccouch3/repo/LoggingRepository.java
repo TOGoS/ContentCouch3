@@ -13,6 +13,7 @@ public class LoggingRepository implements Repository
 {
 	public enum EventType {
 		GET,
+		GET_FILES,
 		PUT,
 		CONTAINS,
 	}
@@ -80,6 +81,17 @@ public class LoggingRepository implements Repository
 			return f;
 		} finally {
 			events.add(new Event(EventType.GET, urn, true, success));
+		}
+	}
+	
+	@Override public List<File> getFiles(String urn) {
+		boolean success = false;
+		try {
+			List<File> f = backingRepository.getFiles(urn);
+			success = true;
+			return f;
+		} finally {
+			events.add(new Event(EventType.GET_FILES, urn, true, success));
 		}
 	}
 	

@@ -50,6 +50,7 @@ public class CCouch3Command
 		"  backup            ; back up files locally (simplified implementation)\n" +
 		"  command-server    ; run a command server\n" +
 		"  web-server        ; run a web server\n" +
+		"  find-files        ; find files in local repo for named objects\n"+
 		"  store-stream      ; store files or pipe contents\n"+
 		"  annotate-m3u      ; add #URN lines to an M3U file\n"+
 		"  walk-fs           ; walk filesystem and output basic info\n" +
@@ -77,6 +78,8 @@ public class CCouch3Command
 				return ConfigDump.main(ctx, argi);
 			} else if( "backup".equals(cmd) ) {
 				return UpBacker.backupMain(ctx, argi);
+			} else if( "find-files".equals(cmd) ) {
+				return FindFilesCommand.main(ctx, argi);
 			} else if( "store-stream".equals(cmd) ) {
 				return StoreStream.main(ctx, argi);
 			} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
