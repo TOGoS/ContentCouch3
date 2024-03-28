@@ -18,7 +18,9 @@ import java.util.regex.Pattern;
 
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.util.Charsets;
+import togos.ccouch3.util.Consumer;
 import togos.ccouch3.util.DateUtil;
+import togos.ccouch3.util.SimpleProcessLikeAction;
 
 /**
  * Simple tool for walking the filesystem and collecting
@@ -33,7 +35,9 @@ import togos.ccouch3.util.DateUtil;
  * experimental groundwork for defining these commands
  * in such a way that they can be piped together.
  */
-public class WalkFilesystemCmd {
+public class WalkFilesystemCmd
+implements SimpleProcessLikeAction
+{
 	static void pipe(InputStream is, OutputStream os) throws IOException {
 		byte[] buf = new byte[65536];
 		int z;
@@ -66,15 +70,18 @@ public class WalkFilesystemCmd {
 	final Random rand = new Random(new Date().getTime());
 	final Pattern namePattern;
 	final List<Pair<String,File>> roots;
+	final Consumer<FileInfo> dest;
 	
 	public WalkFilesystemCmd(
 		List<Pair<String,File>> roots,
 		Pattern namePattern,
-		float extraErrorChance
+		float extraErrorChance,
+		Consumer<FileInfo> dest
 	) {
 		this.roots = roots;
 		this.namePattern = namePattern;
 		this.extraErrorChance = extraErrorChance;
+		this.dest = dest;
 	}
 	
 	protected String getFileKey(File f) throws IOException, InterruptedException {
@@ -139,10 +146,6 @@ public class WalkFilesystemCmd {
 		}
 	}
 	
-	protected void leaf(FileInfo fi) {
-		System.out.println(fi.path+"\t"+fi.size+"\t"+DateUtil.formatDate(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint);
-	}
-	
 	protected int walk(File f, String asName) throws InterruptedException {
 		boolean isDir = f.isDirectory();
 		boolean include = isDir ? includeDirs : includeFiles;
@@ -175,7 +178,7 @@ public class WalkFilesystemCmd {
 				++errorCount;
 			}
 			
-			leaf(new FileInfo(asName, size, mtime, fileKey, bitprint));
+			dest.accept(new FileInfo(asName, size, mtime, fileKey, bitprint));
 		}
 		
 		if( f.isDirectory() && recurse ) {
@@ -225,7 +228,12 @@ public class WalkFilesystemCmd {
 		}
 	}
 	
-	public static WalkFilesystemCmd parse(Iterator<String> argi) {
+	static final String HELP_TEXT =
+		"Usage: walk-fs <options> <file|dir> ...\n" +
+		"\n"+
+		"Walks the filesystem and outputs basic information about files\n";
+	
+	public static SimpleProcessLikeAction parse(Iterator<String> argi) {
 		ArrayList<Pair<String,File>> roots = new ArrayList<Pair<String,File>>();
 		boolean parseMode = true;
 		boolean includeDotFiles = false;
@@ -244,6 +252,13 @@ public class WalkFilesystemCmd {
 					includeDotFiles = false;
 				} else if( "--".equals(arg) ) {
 					parseMode = false;
+				} else if( CCouch3Command.isHelpArgument(arg) ) {
+					return new SimpleProcessLikeAction() {
+						@Override public int run() throws IOException, InterruptedException {
+							System.out.print(HELP_TEXT);
+							return 0;
+						}
+					};
 				} else {
 					System.err.println("Unrecognized argument: "+arg);
 					System.exit(1);
@@ -253,14 +268,21 @@ public class WalkFilesystemCmd {
 			}
 		}
 		
-		return new WalkFilesystemCmd(roots, includeDotFiles ? ALLFILES : NODOTFILES, extraErrorChance);
+		Consumer<FileInfo> dest = new Consumer<FileInfo>() {
+			@Override
+			public void accept(FileInfo fi) {
+				System.out.println(fi.path+"\t"+fi.size+"\t"+DateUtil.formatDate(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint);
+			}
+		};
+		
+		return new WalkFilesystemCmd(roots, includeDotFiles ? ALLFILES : NODOTFILES, extraErrorChance, dest);
 	}
 	
-	public static int main(Iterator<String> argi) throws InterruptedException {
+	public static int main(Iterator<String> argi) throws IOException, InterruptedException {
 		return parse(argi).run();
 	}
 	
-	public static void main(String[] args) throws InterruptedException {
+	public static void main(String[] args) throws IOException, InterruptedException {
 		System.exit(main(Arrays.asList(args).iterator()));
 	}
 }
