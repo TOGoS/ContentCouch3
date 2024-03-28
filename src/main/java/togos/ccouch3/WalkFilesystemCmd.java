@@ -62,10 +62,11 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 	static Pattern NODOTFILES = Pattern.compile("^[^.].*");
 	static Pattern ALLFILES = Pattern.compile("^.*");
 	
+	final static boolean beChatty = true;
+	
 	final boolean includeDirs = true;
 	final boolean includeFiles = true;
 	final boolean recurse = true;
-	final boolean beChatty = true;
 	final float extraErrorChance;
 	final Random rand = new Random(new Date().getTime());
 	final Pattern namePattern;
@@ -128,14 +129,26 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 		}
 	}
 	
-	class FileInfo {
+	static class FileInfo {
+		static enum FileType {
+			FILE("file"),
+			DIRECTORY("dir");
+			
+			final String code;
+			FileType(String code) {
+				this.code = code;
+			}
+			@Override public String toString() { return code; }
+		};
 		public final String path;
+		public final FileType fileType;
 		public final long size;
 		public final long mtime;
 		public final String fileKey;
 		public final String bitprint;
-		public FileInfo(String path, long size, long mtime, String fileKey, String bitprint) {
+		public FileInfo(String path, FileType fileType, long size, long mtime, String fileKey, String bitprint) {
 			this.path = path;
+			this.fileType = fileType;
 			this.size = size;
 			this.mtime = mtime;
 			this.fileKey = fileKey;
@@ -145,6 +158,7 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 	
 	protected int walk(File f, String asName, Consumer<FileInfo> dest) throws InterruptedException {
 		boolean isDir = f.isDirectory();
+		FileInfo.FileType fileType = isDir ? FileInfo.FileType.DIRECTORY : FileInfo.FileType.FILE;
 		boolean include = isDir ? includeDirs : includeFiles;
 		int errorCount = 0;
 		
@@ -175,7 +189,7 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 				++errorCount;
 			}
 			
-			dest.accept(new FileInfo(asName, size, mtime, fileKey, bitprint));
+			dest.accept(new FileInfo(asName, fileType, size, mtime, fileKey, bitprint));
 		}
 		
 		if( f.isDirectory() && recurse ) {
@@ -195,23 +209,11 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 	}
 	
 	@Override public Integer run(Consumer<FileInfo> dest) throws InterruptedException {
-		Date startDate = new Date();
-		if( beChatty ) {
-			System.out.println("# "+getClass().getSimpleName()+"#walk starting at "+DateUtil.formatDate(startDate));
-		}
-		System.out.println("#COLUMNS:path\tsize\tmtime\tfilekey\tbitprinturn");
-		
 		int errorCount = 0;
 		for( Pair<String,File> root : roots ) {
 			errorCount += walk(root.right, root.left, dest);
 		}
-		Date endDate = new Date();
-		if( beChatty ) {
-			System.out.println("# "+getClass().getSimpleName()+"#walk finishing at "+DateUtil.formatDate(startDate));
-			System.out.println("# Processing took "+(endDate.getTime()-startDate.getTime())/1000+" seconds");
-			System.out.println("# There were "+errorCount+" errors");
-		}
-		return errorCount == 0 ? 0 : 1;
+		return errorCount;
 	}
 	
 	static Pattern ROOT_PATTERN = Pattern.compile("([^=]+)=(.*)");
@@ -271,14 +273,34 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 		return new StreamingCmdlet<byte[], Integer>() {
 			@Override
 			public Integer run(final Consumer<byte[]> dest) throws IOException, InterruptedException {
+				String selfName = WalkFilesystemCmd.class.getSimpleName()+"#walk";
+				Date startDate = new Date();
+				
+				if( beChatty ) {
+					dest.accept(("# "+selfName+" starting at "+DateUtil.formatDate(startDate)+"\n").getBytes(Charsets.UTF8));
+				}
+				dest.accept("#COLUMNS:path\ttype\tsize\tmtime\tfilekey\tbitprinturn\n".getBytes(Charsets.UTF8));
+				
 				final Consumer<FileInfo> fileInfoDest = new Consumer<FileInfo>() {
 					@Override
 					public void accept(FileInfo fi) {
-						String formatted = fi.path+"\t"+fi.size+"\t"+DateUtil.formatDate(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint+"\n";
+						String formatted = fi.path+"\t"+fi.fileType+"\t"+fi.size+"\t"+DateUtil.formatDate(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint+"\n";
 						dest.accept(formatted.getBytes(Charsets.UTF8));
 					}
 				};
-				return new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance).run(fileInfoDest);
+				
+				int errorCount = new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance).run(fileInfoDest);
+				
+				if( beChatty ) {
+					Date endDate = new Date();
+					dest.accept((
+						"# "+selfName+" finished at "+DateUtil.formatDate(startDate)+"\n"+
+						"# Processing took "+(endDate.getTime()-startDate.getTime())/1000+" seconds\n"+
+						"# There were "+errorCount+" errors\n"
+					).getBytes(Charsets.UTF8));
+				}
+				
+				return errorCount == 0 ? 0 : 1;
 			}
 		};
 	}
