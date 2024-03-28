@@ -1,11 +1,15 @@
 package togos.ccouch3;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Iterator;
 
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
+import togos.ccouch3.util.Consumer;
+import togos.ccouch3.util.StreamingCmdlet;
 
 public class CCouch3Command
 {
@@ -28,7 +32,29 @@ public class CCouch3Command
 	public static LiberalFileResolver getCommandLineFileResolver(CCouchContext ctx) {
 		return getCommandLineFileResolver(ctx.getRepoDirs());
 	}
-
+	
+	//// Streamy...stuff
+	
+	static Consumer<byte[]> outputStreamToConsumer(final OutputStream os) {
+		return new Consumer<byte[]>() {
+			@Override public void accept(byte[] value) {
+				try {
+					os.write(value);
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		};
+	}
+	
+	public static <R> R run(StreamingCmdlet<byte[], R> cmdlet, OutputStream os) throws IOException, InterruptedException {
+		try {
+			return cmdlet.run(outputStreamToConsumer(os));
+		} finally {
+			os.flush();
+		}
+	}
+	
 	////
 	
 	public static boolean isHelpArgument( String arg ) {

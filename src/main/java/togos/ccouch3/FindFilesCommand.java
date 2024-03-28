@@ -11,30 +11,8 @@ import java.util.regex.Pattern;
 
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.util.Charsets;
-
-// This Code Is Over-Engineered Because
-// 
-// I am experimenting with some pattern
-// that could conceivably be used to
-// make it possible to internally
-// pipe these commands together.
-// 
-// The particular abstractions I picked here
-// don't seem to compose all that well.
-// How would I StreamDest#pipe(...)?
-// 
-// It might be good to 'sit down sometime'
-// and flesh the system out a bit, and
-// refactor multiple commands to use it,
-// otherwise what's the point lmao.
-interface StreamDest<T> {
-	public void accept(T value);
-	public void end();
-}
-
-interface Streamy<T,R> {
-	public R run(StreamDest<T> dest);
-}
+import togos.ccouch3.util.Consumer;
+import togos.ccouch3.util.StreamingCmdlet;
 
 class FoundItem {
 	public final String urn;
@@ -136,7 +114,7 @@ class Formatter<I> implements Function<I,byte[]> {
 	}
 }
 
-class Dumper<T,R> implements Streamy<T,R> {
+class Dumper<T,R> implements StreamingCmdlet<T,R> {
 	final T item;
 	final R r;
 	public Dumper(T item, R r) {
@@ -145,14 +123,14 @@ class Dumper<T,R> implements Streamy<T,R> {
 	}
 	
 	@Override
-	public R run(StreamDest<T> dest) {
+	public R run(Consumer<T> dest) {
 		dest.accept(this.item);
 		return this.r;
 	}
 }
 
 public class FindFilesCommand
-implements Streamy<FoundItem,Integer> {
+implements StreamingCmdlet<FoundItem,Integer> {
 	final Repository[] repos;
 	final String[] urns;
 	
@@ -164,7 +142,7 @@ implements Streamy<FoundItem,Integer> {
 		this.urns = urns;
 	}
 	
-	@Override public Integer run(StreamDest<FoundItem> dest) {
+	@Override public Integer run(Consumer<FoundItem> dest) {
 		for( Repository repo : repos ) {
 			for( String urn : urns ) {
 				try {
@@ -176,7 +154,6 @@ implements Streamy<FoundItem,Integer> {
 				}
 			}
 		}
-		dest.end();
 		return Integer.valueOf(0);
 	}
 	
@@ -192,7 +169,7 @@ implements Streamy<FoundItem,Integer> {
 	throws ParseException
 	{
 		Matcher m = FORMAT_TOKEN_REGEX.matcher(formatString);
-		List<Function<FoundItem,byte[]>> components = new ArrayList<>();
+		List<Function<FoundItem,byte[]>> components = new ArrayList<Function<FoundItem,byte[]>>();
 		int index = 0;
 		while( m.find(index) ) {
 			if( m.group(1) != null ) {
@@ -241,7 +218,7 @@ implements Streamy<FoundItem,Integer> {
 		"No record separator is implied in format strings.\n"+
 		"Default format is effectively \"{filepath}{lf}\"\n";
 	
-	protected static Streamy<byte[],Integer> parse(CCouchContext ctx, Iterator<String> argi)
+	protected static StreamingCmdlet<byte[],Integer> parse(CCouchContext ctx, Iterator<String> argi)
 	throws UsageError
 	{
 		String arg;
@@ -282,38 +259,26 @@ implements Streamy<FoundItem,Integer> {
 		
 		ctx.fix(); // Ow hacky!
 		final FindFilesCommand ffc = new FindFilesCommand(ctx.getLocalRepositories(), urns.toArray(new String[urns.size()]));
-		return new Streamy<byte[],Integer>() {
+		return new StreamingCmdlet<byte[],Integer>() {
 			@Override
-			public Integer run(final StreamDest<byte[]> dest) {
-				return ffc.run(new StreamDest<FoundItem>() {
+			public Integer run(final Consumer<byte[]> dest) {
+				return ffc.run(new Consumer<FoundItem>() {
 					@Override public void accept(FoundItem value) {
 						dest.accept(_formatter.apply(value));
 					}
-					@Override public void end() { dest.end(); }
 				});
 			}
 		};
 	}
 	
-	public static int main(CCouchContext ctx, Iterator<String> argi) throws InterruptedException {
-		Streamy<byte[],Integer> cmd;
+	public static int main(CCouchContext ctx, Iterator<String> argi) throws IOException, InterruptedException {
+		StreamingCmdlet<byte[],Integer> cmd;
 		try {
 			cmd = parse(ctx, argi);
 		} catch( UsageError e ) {
 			System.err.println(e.getMessage());
 			return 1;
 		}
-		return cmd.run(new StreamDest<byte[]>() {
-			@Override public void accept(byte[] text) {
-				try {
-					System.out.write(text);
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
-			}
-			@Override public void end() {
-				System.out.flush();
-			}
-		});
+		return CCouch3Command.run(cmd, System.out);
 	}
 }

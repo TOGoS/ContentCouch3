@@ -20,7 +20,7 @@ import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.util.Charsets;
 import togos.ccouch3.util.Consumer;
 import togos.ccouch3.util.DateUtil;
-import togos.ccouch3.util.SimpleProcessLikeAction;
+import togos.ccouch3.util.StreamingCmdlet;
 
 /**
  * Simple tool for walking the filesystem and collecting
@@ -36,7 +36,7 @@ import togos.ccouch3.util.SimpleProcessLikeAction;
  * in such a way that they can be piped together.
  */
 public class WalkFilesystemCmd
-implements SimpleProcessLikeAction
+implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 {
 	static void pipe(InputStream is, OutputStream os) throws IOException {
 		byte[] buf = new byte[65536];
@@ -70,18 +70,15 @@ implements SimpleProcessLikeAction
 	final Random rand = new Random(new Date().getTime());
 	final Pattern namePattern;
 	final List<Pair<String,File>> roots;
-	final Consumer<FileInfo> dest;
 	
 	public WalkFilesystemCmd(
 		List<Pair<String,File>> roots,
 		Pattern namePattern,
-		float extraErrorChance,
-		Consumer<FileInfo> dest
+		float extraErrorChance
 	) {
 		this.roots = roots;
 		this.namePattern = namePattern;
 		this.extraErrorChance = extraErrorChance;
-		this.dest = dest;
 	}
 	
 	protected String getFileKey(File f) throws IOException, InterruptedException {
@@ -146,7 +143,7 @@ implements SimpleProcessLikeAction
 		}
 	}
 	
-	protected int walk(File f, String asName) throws InterruptedException {
+	protected int walk(File f, String asName, Consumer<FileInfo> dest) throws InterruptedException {
 		boolean isDir = f.isDirectory();
 		boolean include = isDir ? includeDirs : includeFiles;
 		int errorCount = 0;
@@ -189,7 +186,7 @@ implements SimpleProcessLikeAction
 				System.err.println("Failed to read entries from "+f.getPath());
 			} else for( File fil : files ) {
 				if( namePattern.matcher(fil.getName()).matches() ) {
-					errorCount += walk(fil, asName+"/"+fil.getName());
+					errorCount += walk(fil, asName+"/"+fil.getName(), dest);
 				}
 			}
 		}
@@ -197,7 +194,7 @@ implements SimpleProcessLikeAction
 		return errorCount;
 	}
 	
-	public int run() throws InterruptedException {
+	@Override public Integer run(Consumer<FileInfo> dest) throws InterruptedException {
 		Date startDate = new Date();
 		if( beChatty ) {
 			System.out.println("# "+getClass().getSimpleName()+"#walk starting at "+DateUtil.formatDate(startDate));
@@ -206,7 +203,7 @@ implements SimpleProcessLikeAction
 		
 		int errorCount = 0;
 		for( Pair<String,File> root : roots ) {
-			errorCount += walk(root.right, root.left);
+			errorCount += walk(root.right, root.left, dest);
 		}
 		Date endDate = new Date();
 		if( beChatty ) {
@@ -233,8 +230,8 @@ implements SimpleProcessLikeAction
 		"\n"+
 		"Walks the filesystem and outputs basic information about files\n";
 	
-	public static SimpleProcessLikeAction parse(Iterator<String> argi) {
-		ArrayList<Pair<String,File>> roots = new ArrayList<Pair<String,File>>();
+	public static StreamingCmdlet<byte[],Integer> parse(Iterator<String> argi) {
+		final ArrayList<Pair<String,File>> roots = new ArrayList<Pair<String,File>>();
 		boolean parseMode = true;
 		boolean includeDotFiles = false;
 		float extraErrorChance = 0;
@@ -253,9 +250,9 @@ implements SimpleProcessLikeAction
 				} else if( "--".equals(arg) ) {
 					parseMode = false;
 				} else if( CCouch3Command.isHelpArgument(arg) ) {
-					return new SimpleProcessLikeAction() {
-						@Override public int run() throws IOException, InterruptedException {
-							System.out.print(HELP_TEXT);
+					return new StreamingCmdlet<byte[],Integer>() {
+						@Override public Integer run(Consumer<byte[]> dest) throws IOException, InterruptedException {
+							dest.accept(HELP_TEXT.getBytes(Charsets.UTF8));
 							return 0;
 						}
 					};
@@ -268,18 +265,26 @@ implements SimpleProcessLikeAction
 			}
 		}
 		
-		Consumer<FileInfo> dest = new Consumer<FileInfo>() {
+		final float _extraErrorChance = extraErrorChance;
+		final boolean _includeDotFiles = includeDotFiles;
+		
+		return new StreamingCmdlet<byte[], Integer>() {
 			@Override
-			public void accept(FileInfo fi) {
-				System.out.println(fi.path+"\t"+fi.size+"\t"+DateUtil.formatDate(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint);
+			public Integer run(final Consumer<byte[]> dest) throws IOException, InterruptedException {
+				final Consumer<FileInfo> fileInfoDest = new Consumer<FileInfo>() {
+					@Override
+					public void accept(FileInfo fi) {
+						String formatted = fi.path+"\t"+fi.size+"\t"+DateUtil.formatDate(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint+"\n";
+						dest.accept(formatted.getBytes(Charsets.UTF8));
+					}
+				};
+				return new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance).run(fileInfoDest);
 			}
 		};
-		
-		return new WalkFilesystemCmd(roots, includeDotFiles ? ALLFILES : NODOTFILES, extraErrorChance, dest);
 	}
 	
 	public static int main(Iterator<String> argi) throws IOException, InterruptedException {
-		return parse(argi).run();
+		return CCouch3Command.run( parse(argi), System.out );
 	}
 	
 	public static void main(String[] args) throws IOException, InterruptedException {
