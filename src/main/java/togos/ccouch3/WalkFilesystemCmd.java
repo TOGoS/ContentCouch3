@@ -7,8 +7,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.ProcessBuilder.Redirect;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -19,7 +22,6 @@ import java.util.regex.Pattern;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.util.Charsets;
 import togos.ccouch3.util.Consumer;
-import togos.ccouch3.util.DateUtil;
 import togos.ccouch3.util.StreamingCmdlet;
 
 /**
@@ -36,7 +38,7 @@ import togos.ccouch3.util.StreamingCmdlet;
  * in such a way that they can be piped together.
  */
 public class WalkFilesystemCmd
-implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
+implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
 {
 	static void pipe(InputStream is, OutputStream os) throws IOException {
 		byte[] buf = new byte[65536];
@@ -146,21 +148,30 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 		public final long mtime;
 		public final String fileKey;
 		public final String bitprint;
-		public FileInfo(String path, FileType fileType, long size, long mtime, String fileKey, String bitprint) {
+		public final List<String> errorMessages;
+		public FileInfo(String path, FileType fileType, long size, long mtime, String fileKey, String bitprint, List<String> errorMessages) {
 			this.path = path;
 			this.fileType = fileType;
 			this.size = size;
 			this.mtime = mtime;
 			this.fileKey = fileKey;
 			this.bitprint = bitprint;
+			this.errorMessages = errorMessages;
 		}
 	}
 	
-	protected int walk(File f, String asName, Consumer<FileInfo> dest) throws InterruptedException {
+	static <T> List<T> add(List<T> l, T item) {
+		if( l == Collections.EMPTY_LIST ) l = new ArrayList<T>();
+		l.add(item);
+		return l;
+	}
+	
+	protected int walk(File f, String asName, Consumer<Object> dest) throws InterruptedException {
 		boolean isDir = f.isDirectory();
 		FileInfo.FileType fileType = isDir ? FileInfo.FileType.DIRECTORY : FileInfo.FileType.FILE;
 		boolean include = isDir ? includeDirs : includeFiles;
 		int errorCount = 0;
+		List<String> errorMessages = new ArrayList<String>();
 		
 		if( include ) {
 			String bitprint;
@@ -175,7 +186,7 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 			try {
 				bitprint = isDir ? null : getFileBitprint(f);
 			} catch( IOException e ) {
-				System.err.print("Failed to get bitprint for "+f+": ");
+				add(errorMessages, "Failed to get bitprint for "+f+": "+e.getMessage());
 				bitprint = "ERROR";
 				++errorCount;
 			}
@@ -183,21 +194,19 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 			try {
 				fileKey = getFileKey(f); 
 			} catch (IOException e) {
-				System.err.print("Failed to get fileKey for "+f+": ");
-				e.printStackTrace();
+				add(errorMessages, "Failed to get fileKey for "+f+": "+e.getMessage());
 				fileKey = "ERROR";
 				++errorCount;
 			}
 			
-			dest.accept(new FileInfo(asName, fileType, size, mtime, fileKey, bitprint));
+			dest.accept(new FileInfo(asName, fileType, size, mtime, fileKey, bitprint, errorMessages));
 		}
 		
 		if( f.isDirectory() && recurse ) {
 			File[] files = f.listFiles();
 			if( files == null ) {
 				++errorCount;
-				System.out.println("# Failed to read directory entries from "+asName);
-				System.err.println("Failed to read entries from "+f.getPath());
+				dest.accept(new IOException("Failed to read entries from "+f.getPath()));
 			} else for( File fil : files ) {
 				if( namePattern.matcher(fil.getName()).matches() ) {
 					errorCount += walk(fil, asName+"/"+fil.getName(), dest);
@@ -208,7 +217,7 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 		return errorCount;
 	}
 	
-	@Override public Integer run(Consumer<FileInfo> dest) throws InterruptedException {
+	@Override public Integer run(Consumer<Object> dest) throws InterruptedException {
 		int errorCount = 0;
 		for( Pair<String,File> root : roots ) {
 			errorCount += walk(root.right, root.left, dest);
@@ -217,6 +226,7 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 	}
 	
 	static Pattern ROOT_PATTERN = Pattern.compile("([^=]+)=(.*)");
+	static Pattern EXTRA_ERROR_CHANCE_PATTERN = Pattern.compile("--extra-error-chance=(\\d+(?:\\.\\d+)?)");
 	
 	static class Pair<A,B> {
 		public final A left;
@@ -228,9 +238,16 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 	}
 	
 	static final String HELP_TEXT =
-		"Usage: walk-fs <options> <file|dir> ...\n" +
+		"Usage: walk-fs <options> [<alias>=]<file|dir> ...\n" +
 		"\n"+
-		"Walks the filesystem and outputs basic information about files\n";
+		"Walks the filesystem and outputs basic information about files\n"+
+		"\n"+
+		"Options:\n"+
+		"  --extra-error-chance=0.123 ; chance per file of emitting fake errors\n"+
+		"  --ignore-dot-files\n"+
+		"  --include-dot-files\n";
+	
+	public static final DateFormat DATEFORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
 	
 	public static StreamingCmdlet<byte[],Integer> parse(Iterator<String> argi) {
 		final ArrayList<Pair<String,File>> roots = new ArrayList<Pair<String,File>>();
@@ -241,10 +258,14 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 			String arg = argi.next();
 			if( parseMode ) {
 				Matcher m;
-				if( (m = ROOT_PATTERN.matcher(arg)).matches() ) {
-					roots.add(new Pair<String,File>(m.group(1), new File(m.group(2))));
+				if( (m = EXTRA_ERROR_CHANCE_PATTERN.matcher(arg)).matches() ) {
+					extraErrorChance = Float.parseFloat(m.group(1));
 				} else if( !arg.startsWith("-") ) {
-					roots.add(new Pair<String,File>(arg, new File(arg)));
+					if( (m = ROOT_PATTERN.matcher(arg)).matches() ) {
+						roots.add(new Pair<String,File>(m.group(1), new File(m.group(2))));
+					} else {
+						roots.add(new Pair<String,File>(arg, new File(arg)));
+					}
 				} else if( "--include-dot-files".equals(arg) ) {
 					includeDotFiles = true;
 				} else if( "--ignore-dot-files".equals(arg) ) {
@@ -273,19 +294,31 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 		return new StreamingCmdlet<byte[], Integer>() {
 			@Override
 			public Integer run(final Consumer<byte[]> dest) throws IOException, InterruptedException {
-				String selfName = WalkFilesystemCmd.class.getSimpleName()+"#walk";
+				final String walkerName = WalkFilesystemCmd.class.getSimpleName()+"#walk";
 				Date startDate = new Date();
 				
 				if( beChatty ) {
-					dest.accept(("# "+selfName+" starting at "+DateUtil.formatDate(startDate)+"\n").getBytes(Charsets.UTF8));
+					dest.accept(("# "+walkerName+" starting at "+DATEFORMAT.format(startDate)+"\n").getBytes(Charsets.UTF8));
 				}
 				dest.accept("#COLUMNS:path\ttype\tsize\tmtime\tfilekey\tbitprinturn\n".getBytes(Charsets.UTF8));
 				
-				final Consumer<FileInfo> fileInfoDest = new Consumer<FileInfo>() {
+				final Consumer<Object> fileInfoDest = new Consumer<Object>() {
+					void error(String message) {
+						dest.accept(("# "+message.replace("\n", "\n#  ")+"\n").getBytes(Charsets.UTF8));
+					}
+					
 					@Override
-					public void accept(FileInfo fi) {
-						String formatted = fi.path+"\t"+fi.fileType+"\t"+fi.size+"\t"+DateUtil.formatDate(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint+"\n";
-						dest.accept(formatted.getBytes(Charsets.UTF8));
+					public void accept(Object item) {
+						if( item instanceof FileInfo ) {
+							FileInfo fi = (FileInfo)item;
+							for( String errorMessage : fi.errorMessages ) error(errorMessage);
+							String formatted = fi.path+"\t"+fi.fileType+"\t"+fi.size+"\t"+DATEFORMAT.format(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint+"\n";
+							dest.accept(formatted.getBytes(Charsets.UTF8));
+						} else if( item instanceof Exception ) {
+							error(((Exception)item).getMessage());
+						} else {
+							throw new RuntimeException("Unexpected output from "+walkerName+": "+item);
+						}
 					}
 				};
 				
@@ -294,7 +327,7 @@ implements StreamingCmdlet<WalkFilesystemCmd.FileInfo,Integer>
 				if( beChatty ) {
 					Date endDate = new Date();
 					dest.accept((
-						"# "+selfName+" finished at "+DateUtil.formatDate(startDate)+"\n"+
+						"# "+walkerName+" finished at "+DATEFORMAT.format(startDate)+"\n"+
 						"# Processing took "+(endDate.getTime()-startDate.getTime())/1000+" seconds\n"+
 						"# There were "+errorCount+" errors\n"
 					).getBytes(Charsets.UTF8));
