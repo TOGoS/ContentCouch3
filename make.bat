@@ -20,7 +20,7 @@ rmdir /s/q target\main
 mkdir target/main
 %JAVAC_CMD% -source 1.7 -target 1.7 -sourcepath src/main/java -d target/main @.java-main-src.lst
 if errorlevel 1 goto fail
-rm CCouch3.jar
+del CCouch3.jar
 %JAR_CMD% -ce togos.ccouch3.CCouch3Command -C target/main . >CCouch3.jar
 if errorlevel 1 goto fail
 
