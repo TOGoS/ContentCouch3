@@ -1,9 +1,11 @@
 ---------------------------------------------------------------------------------------------------
-Version: ???
-Date: ???
+Version: 3.7.2
+Date: 2024-05-18
+JAR: urn:bitprint:TDTMA3W4TFXUTM33GEKYRLSIEXMXZ73G.LET3WDPEBIWS74VHQU4PZC6P4B6ELTDYQJJX5IY
 Features:
   - Add `find-files` subcommand, which is rather over-engineered inside,
     the result being that it supports custom format strings.
+  - `walk-fs` command defaults to outputting in the TSVFileManifestV1 format
 Changes:
   - `backup` subcommand will use `CCOUCH_REPO_DIR` if it exists
   - Default repository dir/name is now derived from CCOUCH_REPO_DIR, CCOUCH_REPO_NAME
