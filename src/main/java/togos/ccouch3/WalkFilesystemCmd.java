@@ -22,7 +22,7 @@ import java.util.regex.Pattern;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.util.Charsets;
 import togos.ccouch3.util.Consumer;
-import togos.ccouch3.util.StreamingCmdlet;
+import togos.ccouch3.util.Action;
 
 /**
  * Simple tool for walking the filesystem and collecting
@@ -38,7 +38,7 @@ import togos.ccouch3.util.StreamingCmdlet;
  * in such a way that they can be piped together.
  */
 public class WalkFilesystemCmd
-implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
+implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileInfo | Exception
 {
 	static void pipe(InputStream is, OutputStream os) throws IOException {
 		byte[] buf = new byte[65536];
@@ -64,7 +64,7 @@ implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
 	static Pattern NODOTFILES = Pattern.compile("^[^.].*");
 	static Pattern ALLFILES = Pattern.compile("^.*");
 	
-	final static boolean beChatty = true;
+	// final static boolean beChatty = true;
 	
 	final boolean includeDirs = true;
 	final boolean includeFiles = true;
@@ -131,7 +131,9 @@ implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
 		}
 	}
 	
-	static class FileInfo {
+	// The 'W' is to differentiate from togos.ccouch3.FileInfo,
+	// which is different.
+	static class WFileInfo {
 		static enum FileType {
 			FILE("file"),
 			DIRECTORY("dir");
@@ -149,7 +151,7 @@ implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
 		public final String fileKey;
 		public final String bitprint;
 		public final List<String> errorMessages;
-		public FileInfo(String path, FileType fileType, long size, long mtime, String fileKey, String bitprint, List<String> errorMessages) {
+		public WFileInfo(String path, FileType fileType, long size, long mtime, String fileKey, String bitprint, List<String> errorMessages) {
 			this.path = path;
 			this.fileType = fileType;
 			this.size = size;
@@ -166,9 +168,9 @@ implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
 		return l;
 	}
 	
-	protected int walk(File f, String asName, Consumer<Object> dest) throws InterruptedException {
+	protected int walk(File f, String asName, FileInfoConsumer dest) throws InterruptedException {
 		boolean isDir = f.isDirectory();
-		FileInfo.FileType fileType = isDir ? FileInfo.FileType.DIRECTORY : FileInfo.FileType.FILE;
+		WFileInfo.FileType fileType = isDir ? WFileInfo.FileType.DIRECTORY : WFileInfo.FileType.FILE;
 		boolean include = isDir ? includeDirs : includeFiles;
 		int errorCount = 0;
 		List<String> errorMessages = new ArrayList<String>();
@@ -199,14 +201,14 @@ implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
 				++errorCount;
 			}
 			
-			dest.accept(new FileInfo(asName, fileType, size, mtime, fileKey, bitprint, errorMessages));
+			dest.fileInfo(new WFileInfo(asName, fileType, size, mtime, fileKey, bitprint, errorMessages));
 		}
 		
 		if( f.isDirectory() && recurse ) {
 			File[] files = f.listFiles();
 			if( files == null ) {
 				++errorCount;
-				dest.accept(new IOException("Failed to read entries from "+f.getPath()));
+				dest.error(new IOException("Failed to read entries from "+f.getPath()));
 			} else for( File fil : files ) {
 				if( namePattern.matcher(fil.getName()).matches() ) {
 					errorCount += walk(fil, asName+"/"+fil.getName(), dest);
@@ -217,7 +219,7 @@ implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
 		return errorCount;
 	}
 	
-	@Override public Integer run(Consumer<Object> dest) throws InterruptedException {
+	@Override public Integer execute(FileInfoConsumer dest) throws InterruptedException {
 		int errorCount = 0;
 		for( Pair<String,File> root : roots ) {
 			errorCount += walk(root.right, root.left, dest);
@@ -249,10 +251,81 @@ implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
 	
 	public static final DateFormat DATEFORMAT = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
 	
-	public static StreamingCmdlet<byte[],Integer> parse(Iterator<String> argi) {
+	public static interface FileInfoConsumer {
+		void begin(Date startDate);
+		void fileInfo(WFileInfo info);
+		void error(Exception error);
+		void end(Date endDate, int errorCount);
+	}
+	
+	static abstract class ChattyFileInfoOutputter implements FileInfoConsumer {
+		final Consumer<byte[]> dest;
+		final String walkerName;
+		final boolean beChatty;
+		Date startDate;
+		public ChattyFileInfoOutputter(
+			Consumer<byte[]> dest,
+			String walkerName,
+			boolean beChatty
+		) {
+			this.dest = dest;
+			this.walkerName = walkerName;
+			this.beChatty = beChatty;
+		}
+		
+		@Override public void begin(Date startDate) {
+			this.startDate = startDate;
+			if( beChatty ) {
+				dest.accept(("# "+walkerName+" starting at "+DATEFORMAT.format(startDate)+"\n").getBytes(Charsets.UTF8));
+			}
+		}
+		
+		
+		void error(String message) {
+			dest.accept(("# "+message.replace("\n", "\n#  ")+"\n").getBytes(Charsets.UTF8));
+		}
+		
+		@Override public void error(Exception error) {
+			error(error.getMessage());
+		}
+		
+		@Override public void end(Date endDate, int errorCount) {
+			if( beChatty ) {
+				dest.accept((
+					"# "+walkerName+" finished at "+DATEFORMAT.format(startDate)+"\n"+
+					"# Processing took "+(endDate.getTime()-startDate.getTime())/1000+" seconds\n"+
+					"# There were "+errorCount+" errors\n"
+				).getBytes(Charsets.UTF8));
+			}
+		}
+	}
+	
+	static class TSVFileInfoWriter extends ChattyFileInfoOutputter {
+		public TSVFileInfoWriter(
+			Consumer<byte[]> dest,
+			String walkerName,
+			boolean beChatty
+		) {
+			super(dest, walkerName, beChatty);
+		}
+		
+		@Override public void begin(Date startDate) {
+			super.begin(startDate);
+			dest.accept("#COLUMNS:path\ttype\tsize\tmtime\tfilekey\tbitprinturn\n".getBytes(Charsets.UTF8));
+		}
+		
+		@Override public void fileInfo(WFileInfo fi) {
+			for( String errorMessage : fi.errorMessages ) error(errorMessage);
+			String formatted = fi.path+"\t"+fi.fileType+"\t"+fi.size+"\t"+DATEFORMAT.format(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint+"\n";
+			dest.accept(formatted.getBytes(Charsets.UTF8));
+		}
+	};
+	
+	public static Action<Consumer<byte[]>,Integer> parse(Iterator<String> argi) {
 		final ArrayList<Pair<String,File>> roots = new ArrayList<Pair<String,File>>();
 		boolean parseMode = true;
 		boolean includeDotFiles = false;
+		boolean beChatty = true;
 		float extraErrorChance = 0;
 		while( argi.hasNext() ) {
 			String arg = argi.next();
@@ -273,8 +346,8 @@ implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
 				} else if( "--".equals(arg) ) {
 					parseMode = false;
 				} else if( CCouch3Command.isHelpArgument(arg) ) {
-					return new StreamingCmdlet<byte[],Integer>() {
-						@Override public Integer run(Consumer<byte[]> dest) throws IOException, InterruptedException {
+					return new Action<Consumer<byte[]>,Integer>() {
+						@Override public Integer execute(Consumer<byte[]> dest) throws IOException, InterruptedException {
 							dest.accept(HELP_TEXT.getBytes(Charsets.UTF8));
 							return 0;
 						}
@@ -290,48 +363,17 @@ implements StreamingCmdlet<Object,Integer> // Object = FileInfo | Exception
 		
 		final float _extraErrorChance = extraErrorChance;
 		final boolean _includeDotFiles = includeDotFiles;
+		final boolean _beChatty = beChatty;
 		
-		return new StreamingCmdlet<byte[], Integer>() {
+		return new Action<Consumer<byte[]>, Integer>() {
 			@Override
-			public Integer run(final Consumer<byte[]> dest) throws IOException, InterruptedException {
+			public Integer execute(final Consumer<byte[]> dest) throws IOException, InterruptedException {
 				final String walkerName = WalkFilesystemCmd.class.getSimpleName()+"#walk";
-				Date startDate = new Date();
 				
-				if( beChatty ) {
-					dest.accept(("# "+walkerName+" starting at "+DATEFORMAT.format(startDate)+"\n").getBytes(Charsets.UTF8));
-				}
-				dest.accept("#COLUMNS:path\ttype\tsize\tmtime\tfilekey\tbitprinturn\n".getBytes(Charsets.UTF8));
-				
-				final Consumer<Object> fileInfoDest = new Consumer<Object>() {
-					void error(String message) {
-						dest.accept(("# "+message.replace("\n", "\n#  ")+"\n").getBytes(Charsets.UTF8));
-					}
-					
-					@Override
-					public void accept(Object item) {
-						if( item instanceof FileInfo ) {
-							FileInfo fi = (FileInfo)item;
-							for( String errorMessage : fi.errorMessages ) error(errorMessage);
-							String formatted = fi.path+"\t"+fi.fileType+"\t"+fi.size+"\t"+DATEFORMAT.format(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint+"\n";
-							dest.accept(formatted.getBytes(Charsets.UTF8));
-						} else if( item instanceof Exception ) {
-							error(((Exception)item).getMessage());
-						} else {
-							throw new RuntimeException("Unexpected output from "+walkerName+": "+item);
-						}
-					}
-				};
-				
-				int errorCount = new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance).run(fileInfoDest);
-				
-				if( beChatty ) {
-					Date endDate = new Date();
-					dest.accept((
-						"# "+walkerName+" finished at "+DATEFORMAT.format(startDate)+"\n"+
-						"# Processing took "+(endDate.getTime()-startDate.getTime())/1000+" seconds\n"+
-						"# There were "+errorCount+" errors\n"
-					).getBytes(Charsets.UTF8));
-				}
+				FileInfoConsumer fileInfoDest = new TSVFileInfoWriter(dest, walkerName, _beChatty);
+				fileInfoDest.begin(new Date());
+				int errorCount = new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance).execute(fileInfoDest);
+				fileInfoDest.end(new Date(), errorCount);
 				
 				return errorCount == 0 ? 0 : 1;
 			}

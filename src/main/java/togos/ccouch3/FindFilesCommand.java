@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.util.Charsets;
 import togos.ccouch3.util.Consumer;
-import togos.ccouch3.util.StreamingCmdlet;
+import togos.ccouch3.util.Action;
 
 class FoundItem {
 	public final String urn;
@@ -114,7 +114,7 @@ class Formatter<I> implements Function<I,byte[]> {
 	}
 }
 
-class Dumper<T,R> implements StreamingCmdlet<T,R> {
+class Dumper<T,R> implements Action<Consumer<T>,R> {
 	final T item;
 	final R r;
 	public Dumper(T item, R r) {
@@ -123,14 +123,14 @@ class Dumper<T,R> implements StreamingCmdlet<T,R> {
 	}
 	
 	@Override
-	public R run(Consumer<T> dest) {
+	public R execute(Consumer<T> dest) {
 		dest.accept(this.item);
 		return this.r;
 	}
 }
 
 public class FindFilesCommand
-implements StreamingCmdlet<FoundItem,Integer> {
+implements Action<Consumer<FoundItem>,Integer> {
 	final Repository[] repos;
 	final String[] urns;
 	
@@ -142,7 +142,7 @@ implements StreamingCmdlet<FoundItem,Integer> {
 		this.urns = urns;
 	}
 	
-	@Override public Integer run(Consumer<FoundItem> dest) {
+	@Override public Integer execute(Consumer<FoundItem> dest) {
 		for( Repository repo : repos ) {
 			for( String urn : urns ) {
 				try {
@@ -218,7 +218,7 @@ implements StreamingCmdlet<FoundItem,Integer> {
 		"No record separator is implied in format strings.\n"+
 		"Default format is effectively \"{filepath}{lf}\"\n";
 	
-	protected static StreamingCmdlet<byte[],Integer> parse(CCouchContext ctx, Iterator<String> argi)
+	protected static Action<Consumer<byte[]>,Integer> parse(CCouchContext ctx, Iterator<String> argi)
 	throws UsageError
 	{
 		String arg;
@@ -259,10 +259,10 @@ implements StreamingCmdlet<FoundItem,Integer> {
 		
 		ctx.fix(); // Ow hacky!
 		final FindFilesCommand ffc = new FindFilesCommand(ctx.getLocalRepositories(), urns.toArray(new String[urns.size()]));
-		return new StreamingCmdlet<byte[],Integer>() {
+		return new Action<Consumer<byte[]>,Integer>() {
 			@Override
-			public Integer run(final Consumer<byte[]> dest) {
-				return ffc.run(new Consumer<FoundItem>() {
+			public Integer execute(final Consumer<byte[]> dest) {
+				return ffc.execute(new Consumer<FoundItem>() {
 					@Override public void accept(FoundItem value) {
 						dest.accept(_formatter.apply(value));
 					}
@@ -272,7 +272,7 @@ implements StreamingCmdlet<FoundItem,Integer> {
 	}
 	
 	public static int main(CCouchContext ctx, Iterator<String> argi) throws IOException, InterruptedException {
-		StreamingCmdlet<byte[],Integer> cmd;
+		Action<Consumer<byte[]>,Integer> cmd;
 		try {
 			cmd = parse(ctx, argi);
 		} catch( UsageError e ) {

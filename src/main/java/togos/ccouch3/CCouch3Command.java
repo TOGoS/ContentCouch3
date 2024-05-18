@@ -9,7 +9,7 @@ import java.util.Iterator;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.util.Consumer;
-import togos.ccouch3.util.StreamingCmdlet;
+import togos.ccouch3.util.Action;
 
 public class CCouch3Command
 {
@@ -47,9 +47,9 @@ public class CCouch3Command
 		};
 	}
 	
-	public static <R> R run(StreamingCmdlet<byte[], R> cmdlet, OutputStream os) throws IOException, InterruptedException {
+	public static <R> R run(Action<Consumer<byte[]>, R> cmdlet, OutputStream os) throws IOException, InterruptedException {
 		try {
-			return cmdlet.run(outputStreamToConsumer(os));
+			return cmdlet.execute(outputStreamToConsumer(os));
 		} finally {
 			os.flush();
 		}

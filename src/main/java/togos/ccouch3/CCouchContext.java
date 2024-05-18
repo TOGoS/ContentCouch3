@@ -82,12 +82,15 @@ implements CommandLineOptionHandler
 	}
 	
 	protected static RepoSpec getEnvSpecifiedRepository() {
-		// 2020-07-07 I have decided that using a default (based on user.home) is PROBLEMATIC
+		// 2020-07-07: I have decided that using a default (based on user.home) is PROBLEMATIC
 		// after on at least a couple occasions running out of disk space
 		// when ccouch cached things to the default location, when I didn't mean for it to!
-		String dir = getNonEmptyEnv("ccouch_repo_dir");
+		
+		// 2024-02-24: Switching to UPPERCASE!
+		
+		String dir = getNonEmptyEnv("CCOUCH_REPO_DIR");
 		if( dir == null ) return null;
-		return new RepoSpec( getNonEmptyEnv("ccouch_repo_name"), RepoType.FILESYSTEM, dir );
+		return new RepoSpec( getNonEmptyEnv("CCOUCH_REPO_NAME"), RepoType.FILESYSTEM, dir );
 	}
 	
 	static String optArg(String opt, String explicit, Iterator<String> rest) {
