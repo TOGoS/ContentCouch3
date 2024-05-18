@@ -74,6 +74,8 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 	final Pattern namePattern;
 	final List<Pair<String,File>> roots;
 	
+	boolean includeFileKeys = false;
+	
 	public WalkFilesystemCmd(
 		List<Pair<String,File>> roots,
 		Pattern namePattern,
@@ -189,16 +191,18 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 				bitprint = isDir ? null : getFileBitprint(f);
 			} catch( IOException e ) {
 				add(errorMessages, "Failed to get bitprint for "+f+": "+e.getMessage());
-				bitprint = "ERROR";
+				bitprint = null;
 				++errorCount;
 			}
 			
-			try {
+			if( includeFileKeys ) try {
 				fileKey = getFileKey(f); 
 			} catch (IOException e) {
 				add(errorMessages, "Failed to get fileKey for "+f+": "+e.getMessage());
-				fileKey = "ERROR";
+				fileKey = null;
 				++errorCount;
+			} else {
+				fileKey = null;
 			}
 			
 			dest.fileInfo(new WFileInfo(asName, fileType, size, mtime, fileKey, bitprint, errorMessages));
@@ -314,9 +318,14 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 			dest.accept("#COLUMNS:path\ttype\tsize\tmtime\tfilekey\tbitprinturn\n".getBytes(Charsets.UTF8));
 		}
 		
+		protected String toTsvF(String v) {
+			if( v == null ) return "-";
+			return v;
+		}
+		
 		@Override public void fileInfo(WFileInfo fi) {
 			for( String errorMessage : fi.errorMessages ) error(errorMessage);
-			String formatted = fi.path+"\t"+fi.fileType+"\t"+fi.size+"\t"+DATEFORMAT.format(fi.mtime)+"\t"+fi.fileKey+"\t"+fi.bitprint+"\n";
+			String formatted = fi.path+"\t"+fi.fileType+"\t"+fi.size+"\t"+DATEFORMAT.format(fi.mtime)+"\t"+toTsvF(fi.fileKey)+"\t"+toTsvF(fi.bitprint)+"\n";
 			dest.accept(formatted.getBytes(Charsets.UTF8));
 		}
 	};
@@ -326,6 +335,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		boolean parseMode = true;
 		boolean includeDotFiles = false;
 		boolean beChatty = true;
+		boolean includeFileKeys = false;
 		float extraErrorChance = 0;
 		while( argi.hasNext() ) {
 			String arg = argi.next();
@@ -343,6 +353,8 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 					includeDotFiles = true;
 				} else if( "--ignore-dot-files".equals(arg) ) {
 					includeDotFiles = false;
+				} else if( "--include-file-keys".equals(arg) ) {
+					includeFileKeys = true;
 				} else if( "--".equals(arg) ) {
 					parseMode = false;
 				} else if( CCouch3Command.isHelpArgument(arg) ) {
@@ -364,15 +376,19 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		final float _extraErrorChance = extraErrorChance;
 		final boolean _includeDotFiles = includeDotFiles;
 		final boolean _beChatty = beChatty;
+		final boolean _includeFileKeys = includeFileKeys;
 		
 		return new Action<Consumer<byte[]>, Integer>() {
 			@Override
 			public Integer execute(final Consumer<byte[]> dest) throws IOException, InterruptedException {
-				final String walkerName = WalkFilesystemCmd.class.getSimpleName()+"#walk";
+				final String walkerName = WalkFilesystemCmd.class.getSimpleName()+"#walk (ContentCouch"+Versions.CCOUCH_VERSION+")";
+				
+				WalkFilesystemCmd walker = new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance);
+				walker.includeFileKeys = _includeFileKeys;
 				
 				FileInfoConsumer fileInfoDest = new TSVFileInfoWriter(dest, walkerName, _beChatty);
 				fileInfoDest.begin(new Date());
-				int errorCount = new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance).execute(fileInfoDest);
+				int errorCount = walker.execute(fileInfoDest);
 				fileInfoDest.end(new Date(), errorCount);
 				
 				return errorCount == 0 ? 0 : 1;
