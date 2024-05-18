@@ -19,6 +19,7 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import togos.ccouch3.WalkFilesystemCmd.WFileInfo.FileType;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.util.Charsets;
 import togos.ccouch3.util.Consumer;
@@ -149,6 +150,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		public final String path;
 		public final FileType fileType;
 		public final long size;
+		// Modification time, or 0 to indicate unknown
 		public final long mtime;
 		public final String fileKey;
 		public final String bitprint;
@@ -249,6 +251,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		"Walks the filesystem and outputs basic information about files\n"+
 		"\n"+
 		"Options:\n"+
+		"  --output-format={tsv|tsv-manifest} ; indicate output format by name\n"+
 		"  --extra-error-chance=0.123 ; chance per file of emitting fake errors\n"+
 		"  --ignore-dot-files\n"+
 		"  --include-dot-files\n";
@@ -280,13 +283,17 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		@Override public void begin(Date startDate) {
 			this.startDate = startDate;
 			if( beChatty ) {
-				dest.accept(("# "+walkerName+" starting at "+DATEFORMAT.format(startDate)+"\n").getBytes(Charsets.UTF8));
+				emit("# "+walkerName+" starting at "+DATEFORMAT.format(startDate)+"\n");
 			}
 		}
 		
 		
+		void emit(String text) {
+			dest.accept(text.getBytes(Charsets.UTF8));
+		}
+		
 		void error(String message) {
-			dest.accept(("# "+message.replace("\n", "\n#  ")+"\n").getBytes(Charsets.UTF8));
+			emit("# "+message.replace("\n", "\n#  ")+"\n");
 		}
 		
 		@Override public void error(Exception error) {
@@ -295,11 +302,11 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		
 		@Override public void end(Date endDate, int errorCount) {
 			if( beChatty ) {
-				dest.accept((
+				emit(
 					"# "+walkerName+" finished at "+DATEFORMAT.format(startDate)+"\n"+
 					"# Processing took "+(endDate.getTime()-startDate.getTime())/1000+" seconds\n"+
 					"# There were "+errorCount+" errors\n"
-				).getBytes(Charsets.UTF8));
+				);
 			}
 		}
 	}
@@ -315,7 +322,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		
 		@Override public void begin(Date startDate) {
 			super.begin(startDate);
-			dest.accept("#COLUMNS:path\ttype\tsize\tmtime\tfilekey\tbitprinturn\n".getBytes(Charsets.UTF8));
+			emit("#COLUMNS:path\ttype\tsize\tmtime\tfilekey\tbitprinturn\n");
 		}
 		
 		protected String toTsvF(String v) {
@@ -330,6 +337,75 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		}
 	};
 	
+	static class TSVFMFileInfoWriter extends ChattyFileInfoOutputter {
+		public TSVFMFileInfoWriter(
+			Consumer<byte[]> dest,
+			String walkerName,
+			boolean beChatty
+		) {
+			super(dest, walkerName, beChatty);
+		}
+		
+		@Override public void begin(Date startDate) {
+			emit("#format http://ns.nuke24.net/Formats/TSVFileManifestV1\n");
+			emit("# (See http://www.nuke24.net/docs/2024/TSVFileManifestV1.html)\n");
+			// TODO Auto-generated method stub
+			super.begin(startDate);
+		}
+		
+		@Override public void fileInfo(WFileInfo info) {
+			if( info.fileType != FileType.FILE ) {
+				// This format's not really designed to
+				// talk about directories.
+				return;
+			}
+			for( String errorMessage : info.errorMessages ) error(errorMessage);
+			
+			StringBuilder sb = new StringBuilder();
+			
+			String encodedPath = info.path
+				.replace("%", "%25")
+				.replace(" ", "%20")
+				.replace("\t","%09")
+				.replace("\n","%0A"); // Eh, good enough for now?
+			
+			sb.append(encodedPath);
+			// Always put in the tabs even when some values
+			// are blank so you can split on them and get the parts
+			// at predictable indexes
+			sb.append("\t");
+			sb.append(info.bitprint == null ? "" : info.bitprint);
+			sb.append("\t");
+			
+			String sep = "";
+			if( info.mtime != 0 ) {
+				sb.append(sep).append(": dc:modified @ ").append(info.mtime);
+				sep = " ";
+			}
+			// Assuming for now that info.size is always meaningful;
+			// empty files are a thing and special-case leaving it out
+			// might confuse some reader of this file.
+			sb.append(sep).append(": bz:fileLength @ ").append(info.size);
+			sep = " ";
+			sb.append("\n");
+			
+			emit(sb.toString());
+		}
+	}
+	
+	static enum OutputFormat {
+		TSV,
+		TSVFileManifest
+	};
+	
+	static FileInfoConsumer makeOutputter(OutputFormat format, Consumer<byte[]> dest, String walkerName, boolean beChatty) {
+		switch( format ) {
+		case TSV: return new TSVFileInfoWriter(dest, walkerName, beChatty);
+		case TSVFileManifest: return new TSVFMFileInfoWriter(dest, walkerName, beChatty);
+		default: throw new RuntimeException("Bad format: "+format);
+		}
+	}
+	
 	public static Action<Consumer<byte[]>,Integer> parse(Iterator<String> argi) {
 		final ArrayList<Pair<String,File>> roots = new ArrayList<Pair<String,File>>();
 		boolean parseMode = true;
@@ -337,6 +413,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		boolean beChatty = true;
 		boolean includeFileKeys = false;
 		float extraErrorChance = 0;
+		OutputFormat outputFormat = OutputFormat.TSVFileManifest;
 		while( argi.hasNext() ) {
 			String arg = argi.next();
 			if( parseMode ) {
@@ -355,6 +432,10 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 					includeDotFiles = false;
 				} else if( "--include-file-keys".equals(arg) ) {
 					includeFileKeys = true;
+				} else if( "--output-format=tsv-manifest".equals(arg) ) {
+					outputFormat = OutputFormat.TSVFileManifest;
+				} else if( "--output-format=tsv".equals(arg) ) {
+					outputFormat = OutputFormat.TSV;
 				} else if( "--".equals(arg) ) {
 					parseMode = false;
 				} else if( CCouch3Command.isHelpArgument(arg) ) {
@@ -377,6 +458,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		final boolean _includeDotFiles = includeDotFiles;
 		final boolean _beChatty = beChatty;
 		final boolean _includeFileKeys = includeFileKeys;
+		final OutputFormat _outputFormat = outputFormat;
 		
 		return new Action<Consumer<byte[]>, Integer>() {
 			@Override
@@ -386,7 +468,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 				WalkFilesystemCmd walker = new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance);
 				walker.includeFileKeys = _includeFileKeys;
 				
-				FileInfoConsumer fileInfoDest = new TSVFileInfoWriter(dest, walkerName, _beChatty);
+				FileInfoConsumer fileInfoDest = makeOutputter(_outputFormat, dest, walkerName, _beChatty);
 				fileInfoDest.begin(new Date());
 				int errorCount = walker.execute(fileInfoDest);
 				fileInfoDest.end(new Date(), errorCount);
