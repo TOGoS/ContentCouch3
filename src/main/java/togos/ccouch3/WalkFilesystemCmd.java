@@ -387,6 +387,10 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 			// might confuse some reader of this file.
 			sb.append(sep).append(": bz:fileLength @ ").append(info.size);
 			sep = " ";
+			if( info.fileKey != null ) {
+				sb.append(sep).append(": ccouch:fileNodeId @ \"" + info.fileKey + "\"");
+				sep = " ";
+			}
 			sb.append("\n");
 			
 			emit(sb.toString());
