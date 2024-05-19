@@ -1,9 +1,9 @@
 ---------------------------------------------------------------------------------------------------
 Verstion: ???
 Date: ???
-Changes:
-  - `walk-fs` URI-encodes path components, but not the initial prefix
-  - `walk-fs` root aliases default to empty rather than to the file path,
+Changes to `walk-fs`:
+  - Path components (but not the user-provided prefix) are URI-encoded for TSVFM output
+  - Root aliases default to the last section of the file path,
     with special logic to make "/" and "" prefixes work properly.
 ---------------------------------------------------------------------------------------------------
 Version: 3.7.4

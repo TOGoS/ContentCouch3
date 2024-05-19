@@ -42,6 +42,53 @@ import togos.ccouch3.util.Action;
 public class WalkFilesystemCmd
 implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileInfo | Exception
 {
+	/**
+	 * An object representing a filesystem path
+	 * that can create new instances representing
+	 * sub-paths
+	 */
+	interface AppendablePathLike {
+		AppendablePathLike sub(String entryName);
+		/** Returns the string representation of the path */
+		@Override String toString();
+	}
+	// Maybe it would be better to just store a prefix
+	// and a list of path segments and let someone
+	// else figure out what to do with them later.
+	static class AppendablePathLikeImpl implements AppendablePathLike {
+		final String current;
+		final String separator;
+		final Function<String,String> pathsegEncoder;
+		public AppendablePathLikeImpl(
+			String current, String separator,
+			Function<String,String> pathsegEncoder
+		) {
+			this.current = current;
+			this.separator = separator;
+			this.pathsegEncoder = pathsegEncoder;
+		}
+		@Override
+		public AppendablePathLike sub(String entryName) {
+			String prefix =
+				current.isEmpty() ? "" :
+				current.endsWith(this.separator) ? this.current :
+				this.current + this.separator;
+			return new AppendablePathLikeImpl(
+				prefix + pathsegEncoder.apply(entryName),
+				this.separator,
+				this.pathsegEncoder
+			);
+		}
+		@Override
+		public String toString() {
+			if( this.current.isEmpty() ) {
+				return ".";
+			} else {
+				return this.current;
+			}
+		}
+	}
+	
 	static void pipe(InputStream is, OutputStream os) throws IOException {
 		byte[] buf = new byte[65536];
 		int z;
@@ -74,21 +121,18 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 	final float extraErrorChance;
 	final Random rand = new Random(new Date().getTime());
 	final Pattern namePattern;
-	final List<Pair<String,File>> roots;
-	final Function<String,String> pathsegEncoder;
+	final List<Pair<AppendablePathLike,File>> roots;
 	
 	boolean includeFileKeys = false;
 	
 	public WalkFilesystemCmd(
-		List<Pair<String,File>> roots,
+		List<Pair<AppendablePathLike,File>> roots,
 		Pattern namePattern,
-		float extraErrorChance,
-		Function<String,String> pathsegEncoder
+		float extraErrorChance
 	) {
 		this.roots = roots;
 		this.namePattern = namePattern;
 		this.extraErrorChance = extraErrorChance;
-		this.pathsegEncoder = pathsegEncoder;
 	}
 	
 	protected String getFileKey(File f) throws IOException, InterruptedException {
@@ -154,7 +198,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		/**
 		 * An abstract path-like identifier for the file
 		 */
-		public final String path;
+		public final AppendablePathLike path;
 		public final FileType fileType;
 		public final long size;
 		// Modification time, or 0 to indicate unknown
@@ -162,7 +206,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		public final String fileKey;
 		public final String bitprint;
 		public final List<String> errorMessages;
-		public WFileInfo(String path, FileType fileType, long size, long mtime, String fileKey, String bitprint, List<String> errorMessages) {
+		public WFileInfo(AppendablePathLike path, FileType fileType, long size, long mtime, String fileKey, String bitprint, List<String> errorMessages) {
 			this.path = path;
 			this.fileType = fileType;
 			this.size = size;
@@ -179,7 +223,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		return l;
 	}
 	
-	protected int walk(File f, String asName, FileInfoConsumer dest) throws InterruptedException {
+	protected int walk(File f, AppendablePathLike asName, FileInfoConsumer dest) throws InterruptedException {
 		boolean isDir = f.isDirectory();
 		WFileInfo.FileType fileType = isDir ? WFileInfo.FileType.DIRECTORY : WFileInfo.FileType.FILE;
 		boolean include = isDir ? includeDirs : includeFiles;
@@ -223,12 +267,9 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 				++errorCount;
 				dest.error(new IOException("Failed to read entries from "+f.getPath()));
 			} else for( File fil : files ) {
-				if( namePattern.matcher(fil.getName()).matches() ) {
-					String prefix =
-						asName.isEmpty() ? "" :
-						asName.endsWith("/") ? asName :
-						asName + "/";
-					errorCount += walk(fil, prefix+pathsegEncoder.apply(f.getName()), dest);
+				String filName = fil.getName();
+				if( namePattern.matcher(filName).matches() ) {
+					errorCount += walk(fil, asName.sub(filName), dest);
 				}
 			}
 		}
@@ -238,7 +279,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 	
 	@Override public Integer execute(FileInfoConsumer dest) throws InterruptedException {
 		int errorCount = 0;
-		for( Pair<String,File> root : roots ) {
+		for( Pair<AppendablePathLike,File> root : roots ) {
 			errorCount += walk(root.right, root.left, dest);
 		}
 		return errorCount;
@@ -404,11 +445,15 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 	
 	static class URIEncoder implements Function<String,String> {
 		static final URIEncoder instance = new URIEncoder();
-		
-		@Override
-		public String apply(String input) {
-			return URLEncoder.encode(input, Charsets.UTF8);
+		private URIEncoder() { }
+		@Override public String apply(String input) {
+			return URLEncoder.encode(input, Charsets.UTF8).replace("+", "%20");
 		}
+	}
+	static class NoEncoder implements Function<String,String> {
+		static final NoEncoder instance = new NoEncoder();
+		private NoEncoder() { }
+		@Override public String apply(String input) { return input; }
 	}
 	
 	static enum OutputFormat {
@@ -442,7 +487,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 					if( (m = ROOT_PATTERN.matcher(arg)).matches() ) {
 						roots.add(new Pair<String,File>(m.group(1), new File(m.group(2))));
 					} else {
-						roots.add(new Pair<String,File>("", new File(arg)));
+						roots.add(new Pair<String,File>(null, new File(arg)));
 					}
 				} else if( "--include-dot-files".equals(arg) ) {
 					includeDotFiles = true;
@@ -483,7 +528,18 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 			public Integer execute(final Consumer<byte[]> dest) throws IOException, InterruptedException {
 				final String walkerName = WalkFilesystemCmd.class.getSimpleName()+"#walk (ContentCouch"+Versions.CCOUCH_VERSION+")";
 				
-				WalkFilesystemCmd walker = new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance, URIEncoder.instance);
+				List<Pair<AppendablePathLike,File>> roots1 = new ArrayList<Pair<AppendablePathLike,File>>();
+				Function<String,String> pathsegEncoder = _outputFormat == OutputFormat.TSV ? NoEncoder.instance : URIEncoder.instance;
+				for( Pair<String,File> root : roots ) {
+					String prefix = root.left;
+					if( prefix == null ) prefix = pathsegEncoder.apply(root.right.getName());
+					roots1.add(new Pair<AppendablePathLike,File>(
+						new AppendablePathLikeImpl(prefix, "/", pathsegEncoder),
+						root.right
+					));
+				}
+				
+				WalkFilesystemCmd walker = new WalkFilesystemCmd(roots1, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance);
 				walker.includeFileKeys = _includeFileKeys;
 				
 				FileInfoConsumer fileInfoDest = makeOutputter(_outputFormat, dest, walkerName, _beChatty);
