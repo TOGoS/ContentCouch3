@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.URLEncoder;
 import java.text.DateFormat;
@@ -447,7 +448,11 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		static final URIEncoder instance = new URIEncoder();
 		private URIEncoder() { }
 		@Override public String apply(String input) {
-			return URLEncoder.encode(input, Charsets.UTF8).replace("+", "%20");
+			try {
+				return URLEncoder.encode(input, "UTF-8").replace("+", "%20");
+			} catch (UnsupportedEncodingException e) {
+				throw new RuntimeException(e);
+			}
 		}
 	}
 	static class NoEncoder implements Function<String,String> {
