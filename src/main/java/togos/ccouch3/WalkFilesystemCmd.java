@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.ProcessBuilder.Redirect;
+import java.net.URLEncoder;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -74,17 +75,20 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 	final Random rand = new Random(new Date().getTime());
 	final Pattern namePattern;
 	final List<Pair<String,File>> roots;
+	final Function<String,String> pathsegEncoder;
 	
 	boolean includeFileKeys = false;
 	
 	public WalkFilesystemCmd(
 		List<Pair<String,File>> roots,
 		Pattern namePattern,
-		float extraErrorChance
+		float extraErrorChance,
+		Function<String,String> pathsegEncoder
 	) {
 		this.roots = roots;
 		this.namePattern = namePattern;
 		this.extraErrorChance = extraErrorChance;
+		this.pathsegEncoder = pathsegEncoder;
 	}
 	
 	protected String getFileKey(File f) throws IOException, InterruptedException {
@@ -147,6 +151,9 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 			}
 			@Override public String toString() { return code; }
 		};
+		/**
+		 * An abstract path-like identifier for the file
+		 */
 		public final String path;
 		public final FileType fileType;
 		public final long size;
@@ -217,7 +224,11 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 				dest.error(new IOException("Failed to read entries from "+f.getPath()));
 			} else for( File fil : files ) {
 				if( namePattern.matcher(fil.getName()).matches() ) {
-					errorCount += walk(fil, asName+"/"+fil.getName(), dest);
+					String prefix =
+						asName.isEmpty() ? "" :
+						asName.endsWith("/") ? asName :
+						asName + "/";
+					errorCount += walk(fil, prefix+pathsegEncoder.apply(f.getName()), dest);
 				}
 			}
 		}
@@ -233,7 +244,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		return errorCount;
 	}
 	
-	static Pattern ROOT_PATTERN = Pattern.compile("([^=]+)=(.*)");
+	static Pattern ROOT_PATTERN = Pattern.compile("([^=]*)=(.*)");
 	static Pattern EXTRA_ERROR_CHANCE_PATTERN = Pattern.compile("--extra-error-chance=(\\d+(?:\\.\\d+)?)");
 	
 	static class Pair<A,B> {
@@ -363,13 +374,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 			
 			StringBuilder sb = new StringBuilder();
 			
-			String encodedPath = info.path
-				.replace("%", "%25")
-				.replace(" ", "%20")
-				.replace("\t","%09")
-				.replace("\n","%0A"); // Eh, good enough for now?
-			
-			sb.append(encodedPath);
+			sb.append(info.path);
 			// Always put in the tabs even when some values
 			// are blank so you can split on them and get the parts
 			// at predictable indexes
@@ -394,6 +399,15 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 			sb.append("\n");
 			
 			emit(sb.toString());
+		}
+	}
+	
+	static class URIEncoder implements Function<String,String> {
+		static final URIEncoder instance = new URIEncoder();
+		
+		@Override
+		public String apply(String input) {
+			return URLEncoder.encode(input, Charsets.UTF8);
 		}
 	}
 	
@@ -428,7 +442,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 					if( (m = ROOT_PATTERN.matcher(arg)).matches() ) {
 						roots.add(new Pair<String,File>(m.group(1), new File(m.group(2))));
 					} else {
-						roots.add(new Pair<String,File>(arg, new File(arg)));
+						roots.add(new Pair<String,File>("", new File(arg)));
 					}
 				} else if( "--include-dot-files".equals(arg) ) {
 					includeDotFiles = true;
@@ -469,7 +483,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 			public Integer execute(final Consumer<byte[]> dest) throws IOException, InterruptedException {
 				final String walkerName = WalkFilesystemCmd.class.getSimpleName()+"#walk (ContentCouch"+Versions.CCOUCH_VERSION+")";
 				
-				WalkFilesystemCmd walker = new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance);
+				WalkFilesystemCmd walker = new WalkFilesystemCmd(roots, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance, URIEncoder.instance);
 				walker.includeFileKeys = _includeFileKeys;
 				
 				FileInfoConsumer fileInfoDest = makeOutputter(_outputFormat, dest, walkerName, _beChatty);

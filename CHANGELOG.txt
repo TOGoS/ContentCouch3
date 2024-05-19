@@ -1,4 +1,11 @@
 ---------------------------------------------------------------------------------------------------
+Verstion: ???
+Date: ???
+Changes:
+  - `walk-fs` URI-encodes path components, but not the initial prefix
+  - `walk-fs` root aliases default to empty rather than to the file path,
+    with special logic to make "/" and "" prefixes work properly.
+---------------------------------------------------------------------------------------------------
 Version: 3.7.4
 Date: 2024-05-18
 JAR: urn:bitprint:XDJP72VGPG3ENXUFFU2MMXY2Q7CG7YAP.MHGDGDUS4SJV6TFN4V2SG4IKRS5MEQN3DV45EWY
