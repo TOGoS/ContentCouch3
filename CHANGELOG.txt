@@ -1,6 +1,7 @@
 ---------------------------------------------------------------------------------------------------
-Verstion: ???
-Date: ???
+Verstion: 3.7.6
+Date: 2024-05-19
+JAR: urn:bitprint:IXWL4QFBTND4HOH5O3QHZBDQD5FVNGIA.NCB3KZBERJPSC775JK6SDMSMBX3LHQAVOLUQYOA
 Changes to `walk-fs`:
   - Path components (but not the user-provided prefix) are URI-encoded for TSVFM output
   - Root aliases default to the last section of the file path,
