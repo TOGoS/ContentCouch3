@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -32,6 +31,8 @@ import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.repo.StoreException;
 import togos.ccouch3.util.AddableSet;
 import togos.ccouch3.util.EmptyAddableSet;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 import togos.ccouch3.util.SLFStringSet;
 
 public class Downloader
@@ -554,7 +555,7 @@ public class Downloader
 		"  http://hostname/...? -> http://hostname/...?<qs-escaped-urn>\n" +
 		"  http://hostname/.../ -> http://hostname/.../<pathseg-escaped-urn>";
 	
-	public static int main( CCouchContext ctx, Iterator<String> args )
+	public static int main( CCouchContext ctx, List<String> args )
 		throws IOException, InterruptedException
 	{
 		int connectionsPerRemote = 2;
@@ -572,10 +573,18 @@ public class Downloader
 		// false by default because the set may take up a lot of memory.
 		boolean rememberAttempts = false;
 		
-		while( args.hasNext() ) {
-			String arg = args.next();
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
 			BlobReferenceScanMode parsedScanMode;
-
+			
 			if( !arg.startsWith("-") ) {
 				urnArgs.add(arg);
 			} else if( (parsedScanMode = BlobReferenceScanMode.parseRecurseArg(arg)) != null ) {
@@ -601,9 +610,9 @@ public class Downloader
 				reportUnrecursableBlobs = true;
 				reportDownloadFailures = true;
 				beChatty = true;
-			} else if( ctx.handleCommandLineOption(arg, args) ) {
 			} else if( "-connections-per-remote".equals(arg) ) {
-				connectionsPerRemote = Integer.parseInt(args.next());
+				connectionsPerRemote = Integer.parseInt(ListUtil.car(args));
+				args = ListUtil.cdr(args);
 			} else if( "-remember-missing".equals(arg) || "-remember-attempts".equals(arg) ) {
 				rememberAttempts = true;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
@@ -616,7 +625,7 @@ public class Downloader
 			}
 		}
 		
-		ctx.fix();
+		ctx = ctx.fixed();
 		
 		final File primaryRepoDir = ctx.getPrimaryRepoDir();
 		final SHA1FileRepository localRepo = ctx.getPrimaryRepository();
@@ -664,6 +673,6 @@ public class Downloader
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit( main(new CCouchContext(), Arrays.asList(args).iterator()) );
+		System.exit( main(new CCouchContext(), Arrays.asList(args)) );
 	}
 }

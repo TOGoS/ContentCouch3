@@ -3,22 +3,31 @@ package togos.ccouch3;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.List;
 
 import togos.blob.ByteBlob;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 
 public class Cat
 {
 	public static String USAGE =
 		"Usage: ccouch3 cat [-repo <path>]* [<resource-path> ...]";
 	
-	public static int main(CCouchContext ctx, Iterator<String> argi) {
+	public static int main(CCouchContext ctx, List<String> args) {
 		ArrayList<String> resourcePaths = new ArrayList<String>();
 		
-		while( argi.hasNext() ) {
-			String arg = argi.next();
-			if( ctx.handleCommandLineOption(arg, argi) ) {
-			} else if( CCouch3Command.isHelpArgument(arg) ) {
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
+			if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println(USAGE);
 				return 0;
 			} else if( !arg.startsWith("-") || "-".equals(arg) ) {
@@ -29,7 +38,7 @@ public class Cat
 			}
 		}
 		
-		ctx.fix();
+		ctx = ctx.fixed();
 		
 		BlobResolver resolver = CCouch3Command.getCommandLineFileResolver(ctx);
 		

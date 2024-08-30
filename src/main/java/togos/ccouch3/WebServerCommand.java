@@ -11,7 +11,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -22,6 +21,8 @@ import togos.blob.ByteBlob;
 import togos.blob.file.FileBlob;
 import togos.blob.util.BlobUtil;
 import togos.ccouch3.repo.Repository;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 import togos.ccouch3.xml.XML;
 import togos.tinywebserver.WebServer;
 import togos.tinywebserver.WebServer.HTTPRequest;
@@ -258,24 +259,36 @@ public class WebServerCommand
 		"                                  ; next mount or union, and merging directory\n"+
 		"                                  ; listings with them.";
 	
-	public static int main(CCouchContext ctx, Iterator<String> argi) {
+	public static int main(CCouchContext ctx, List<String> args) {
 		WebServerCommand wsc = new WebServerCommand();
-		while( argi.hasNext() ) {
-			String arg = argi.next();
-			if( ctx.handleCommandLineOption(arg, argi) ) {
-			} else if( "-port".equals(arg) ) {
-				wsc.port = Integer.parseInt(argi.next());
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
+			if( "-port".equals(arg) ) {
+				wsc.port = Integer.parseInt(ListUtil.car(args));
+				args = ListUtil.cdr(args);
 			} else if( "-union".equals(arg) ) {
-				String fsPath = argi.next();
+				String fsPath = ListUtil.car(args);
+				args = ListUtil.cdr(args);
 				wsc.addMount("/", fsPath, false);
 			} else if( arg.startsWith("-union:") ) {
-				String fsPath = argi.next();
+				String fsPath = ListUtil.car(args);
+				args = ListUtil.cdr(args);
 				wsc.addMount(arg.substring(7), fsPath, false);
 			} else if( "-file".equals(arg) ) {
-				String fsPath = argi.next();
+				String fsPath = ListUtil.car(args);
+				args = ListUtil.cdr(args);
 				wsc.addMount("/", fsPath, true);
 			} else if( arg.startsWith("-file:") ) {
-				String fsPath = argi.next();
+				String fsPath = ListUtil.car(args);
+				args = ListUtil.cdr(args);
 				wsc.addMount(arg.substring(7), fsPath, true);
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println(USAGE_TEXT);
@@ -292,6 +305,6 @@ public class WebServerCommand
 	}
 	
 	public static void main(String[] args) {
-		System.exit( main( new CCouchContext(), Arrays.asList(args).iterator()) );
+		System.exit( main( new CCouchContext(), Arrays.asList(args)) );
 	}
 }

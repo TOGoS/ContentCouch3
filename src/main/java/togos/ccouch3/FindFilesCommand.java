@@ -4,15 +4,16 @@ import java.io.File;
 import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import togos.ccouch3.repo.Repository;
+import togos.ccouch3.util.Action;
 import togos.ccouch3.util.Charsets;
 import togos.ccouch3.util.Consumer;
-import togos.ccouch3.util.Action;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 
 class FoundItem {
 	public final String urn;
@@ -218,18 +219,24 @@ implements Action<Consumer<FoundItem>,Integer> {
 		"No record separator is implied in format strings.\n"+
 		"Default format is effectively \"{filepath}{lf}\"\n";
 	
-	protected static Action<Consumer<byte[]>,Integer> parse(CCouchContext ctx, Iterator<String> argi)
+	protected static Action<Consumer<byte[]>,Integer> parse(CCouchContext ctx, List<String> args)
 	throws UsageError
 	{
-		String arg;
 		List<String> urns = new ArrayList<String>();
 		Function<FoundItem,byte[]> formatter = null;
 		byte[] separator = "\n".getBytes(Charsets.UTF8);
 		Matcher m;
-		while( argi.hasNext() ) {
-			arg = argi.next();
-			if( ctx.handleCommandLineOption(arg, argi) ) {
-			} else if( !arg.startsWith("-") ) {
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
+			if( !arg.startsWith("-") ) {
 				urns.add(arg);
 			} else if( (m = FORMAT_ARG_PATTERN.matcher(arg)).matches() ) {
 				try {
@@ -257,7 +264,7 @@ implements Action<Consumer<FoundItem>,Integer> {
 		
 		final Function<FoundItem,byte[]> _formatter = formatter;
 		
-		ctx.fix(); // Ow hacky!
+		ctx = ctx.fixed(); // Ow hacky!
 		final FindFilesCommand ffc = new FindFilesCommand(ctx.getLocalRepositories(), urns.toArray(new String[urns.size()]));
 		return new Action<Consumer<byte[]>,Integer>() {
 			@Override
@@ -271,10 +278,10 @@ implements Action<Consumer<FoundItem>,Integer> {
 		};
 	}
 	
-	public static int main(CCouchContext ctx, Iterator<String> argi) throws IOException, InterruptedException {
+	public static int main(CCouchContext ctx, List<String> args) throws IOException, InterruptedException {
 		Action<Consumer<byte[]>,Integer> cmd;
 		try {
-			cmd = parse(ctx, argi);
+			cmd = parse(ctx, args);
 		} catch( UsageError e ) {
 			System.err.println(e.getMessage());
 			return 1;

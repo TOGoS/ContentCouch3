@@ -9,7 +9,7 @@ import java.io.InputStreamReader;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import togos.blob.ByteBlob;
@@ -17,6 +17,8 @@ import togos.blob.file.FileBlob;
 import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.hash.StreamURNifier;
 import togos.ccouch3.repo.Repository;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 import togos.ccouch3.util.RepoURLDefuzzer;
 
 public class M3UAnnotator
@@ -72,7 +74,7 @@ public class M3UAnnotator
 		return URI_PATTERN.matcher(filenameOrUri).matches();
 	}
 	
-	public static int main(CCouchContext ctx, Iterator<String> argi) {
+	public static int main(CCouchContext ctx, List<String> args) {
 		PathTransform pathTransform = PathTransform.NONE;
 		String defaultN2rPrefix = null;
 		boolean tidyFilenames = false;
@@ -80,8 +82,16 @@ public class M3UAnnotator
 		boolean strict = false;
 		
 		ArrayList<String> m3uPaths = new ArrayList<String>();
-		while( argi.hasNext() ) {
-			String arg = argi.next();
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
 			if( "-".equals(arg) || !arg.startsWith("-") ) {
 				m3uPaths.add(arg);
 			} else if( "-strict".equals(arg) ) {
@@ -89,7 +99,9 @@ public class M3UAnnotator
 			} else if( "-tidy-filenames".equals(arg) ) {
 				tidyFilenames = true;
 			} else if( "-transform".equals(arg) ) {
-				String transformSpec = argi.next();
+				String transformSpec = ListUtil.car(args);
+				args = ListUtil.cdr(args);
+				
 				if( "none".equals(transformSpec) ) {
 					pathTransform = PathTransform.NONE;
 				} else if( transformSpec.startsWith("raw:") ) {
@@ -105,7 +117,6 @@ public class M3UAnnotator
 					System.err.println("Unrecognized path transform: "+transformSpec);
 					return 1;
 				}
-			} else if( ctx.handleCommandLineOption(arg, argi)) {
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.print(USAGE);
 				return 0;
@@ -116,7 +127,7 @@ public class M3UAnnotator
 			}
 		}
 		
-		ctx.fix();
+		ctx = ctx.fixed();
 		if( m3uPaths.size() == 0 ) m3uPaths.add("-");
 		
 		final BlobResolver argumentResolver = CCouch3Command.getCommandLineFileResolver(ctx);

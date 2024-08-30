@@ -7,11 +7,13 @@ import java.io.InputStreamReader;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
-import java.util.Iterator;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import togos.ccouch3.util.Charsets;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 
 public class BlobReferenceScanner
 {
@@ -108,12 +110,22 @@ public class BlobReferenceScanner
 	public static String USAGE =
 			"Usage: ccouch3 extract-urns [-mode {scan-text-for-urns|scan-text-for-rdf-object-urns}]";
 	
-	public static int main(CCouchContext ctx, Iterator<String> argi) {
+	public static int main(CCouchContext ctx, List<String> args) {
 		BlobReferenceScanMode scanMode = BlobReferenceScanMode.SCAN_TEXT_FOR_URNS;
-		while( argi.hasNext() ) {
-			String arg = argi.next();
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
+			
 			if( "-mode".equals(arg) ) {
-				String scanModeStr = argi.next();
+				String scanModeStr = ListUtil.car(args);
+				args = ListUtil.cdr(args);
 				if( scanModeStr == null ) {
 					System.err.println("Error: -mode requires an argument");
 					return 1;

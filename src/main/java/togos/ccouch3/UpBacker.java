@@ -17,7 +17,9 @@ import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.repo.StoreException;
 import togos.ccouch3.util.FileUtil;
+import togos.ccouch3.util.ListUtil;
 import togos.ccouch3.util.LogUtil;
+import togos.ccouch3.util.ParseResult;
 
 public class UpBacker
 {
@@ -289,7 +291,7 @@ public class UpBacker
 		return errorCount;
 	}
 	
-	public static BackupCmd fromArgs(CCouchContext ctx, Iterator<String> argi ) {
+	public static BackupCmd fromArgs(CCouchContext ctx, List<String> args ) {
 		ArrayList<String> pathsToStore = new ArrayList<String>();
 		String storeSector = "local";
 		boolean showReport = false, showProgress = false;
@@ -297,14 +299,21 @@ public class UpBacker
 		boolean shouldStoreFileContents = true;
 		boolean shouldStoreDirectoryListings = true;
 				
-		while( argi.hasNext() ) {
-			String arg = argi.next();
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
 			if( !arg.startsWith("-") ) {
 				pathsToStore.add(arg);
-			} else if( ctx.handleCommandLineOption(arg,  argi) ) {
-				// Cool cool
 			} else if( "-sector".equals(arg) ) {
-				storeSector = argi.next();
+				storeSector = ListUtil.car(args);
+				args = ListUtil.cdr(args);
 			} else if( "-files-only".equals(arg) ) {
 				shouldStoreFileContents = true;
 				shouldStoreDirectoryListings = false;
@@ -324,7 +333,7 @@ public class UpBacker
 			}
 		}
 		
-		ctx.fix(); // I SHOULDN'T HAVE TO REMEMBER TO DO THIS; STINKY CODE!!!
+		ctx = ctx.fixed(); // I SHOULDN'T HAVE TO REMEMBER TO DO THIS; STINKY CODE!!!
 		if( ctx.primaryRepo == null ) {
 			return new BackupCmd(BackupCmd.Mode.USAGE_ERROR, "No -repo specified");
 		}
@@ -340,7 +349,7 @@ public class UpBacker
 		return new BackupCmd( upBacker, filesToStore );
 	}
 	
-	public static int backupMain(CCouchContext ctx, Iterator<String> argi ) {
-		return fromArgs(ctx, argi).run();
+	public static int backupMain(CCouchContext ctx, List<String> args ) {
+		return fromArgs(ctx, args).run();
 	}
 }

@@ -4,12 +4,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
-import java.util.Iterator;
+import java.util.List;
 
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
-import togos.ccouch3.util.Consumer;
 import togos.ccouch3.util.Action;
+import togos.ccouch3.util.Consumer;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 
 public class CCouch3Command
 {
@@ -87,42 +89,51 @@ public class CCouch3Command
 		"files, but have different options and implementations.\n"+
 		"";
 	
-	public static int main( Iterator<String> argi ) throws Exception {
+	public static int main( List<String> args ) throws Exception {
 		CCouchContext ctx = new CCouchContext();
-		while( argi.hasNext() ) {
-			String cmd = argi.next();
-			// TODO: Update commands to take general options
-			if( ctx.handleCommandLineOption(cmd, argi) ) {
-			} else if( "upload".equals(cmd) ) {
-				return FlowUploader.uploadMain(ctx, argi);
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			if( args.size() == 0 ) break;
+			
+			String cmd = ListUtil.car(args);
+			args = ListUtil.cdr(args);
+			
+			if( "upload".equals(cmd) ) {
+				return FlowUploader.uploadMain(ctx, args);
 			} else if( "cache".equals(cmd) ) {
-				return Downloader.main(ctx, argi);
+				return Downloader.main(ctx, args);
 			} else if( "cat".equals(cmd) ) {
-				return Cat.main(ctx, argi);
+				return Cat.main(ctx, args);
 			} else if( "copy".equals(cmd) ) {
-				return Copy.main(ctx, argi);
+				return Copy.main(ctx, args);
 			} else if( "config".equals(cmd) ) {
-				return ConfigDump.main(ctx, argi);
+				return ConfigDump.main(ctx, args);
 			} else if( "backup".equals(cmd) ) {
-				return UpBacker.backupMain(ctx, argi);
+				return UpBacker.backupMain(ctx, args);
 			} else if( "find-files".equals(cmd) ) {
-				return FindFilesCommand.main(ctx, argi);
+				return FindFilesCommand.main(ctx, args);
 			} else if( "store-stream".equals(cmd) ) {
-				return StoreStream.main(ctx, argi);
+				return StoreStream.main(ctx, args);
 			} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
-				return FlowUploader.identifyMain(ctx, argi);
+				return FlowUploader.identifyMain(ctx, args);
 			} else if( "cmd-server".equals(cmd) || "command-server".equals(cmd) ) {
-				return CmdServer.main(ctx, argi);
+				return CmdServer.main(ctx, args);
 			} else if( "walk-fs".equals(cmd) ) {
-				return WalkFilesystemCmd.main(argi);
+				return WalkFilesystemCmd.main(args);
 			} else if( "web-server".equals(cmd) || "ws".equals(cmd) || "webserv".equals(cmd) ) {
-				return WebServerCommand.main(ctx, argi);
+				return WebServerCommand.main(ctx, args);
 			} else if( "verify-tree".equals(cmd) ) {
-				return TreeVerifier.main(ctx, argi);
+				return TreeVerifier.main(ctx, args);
 			} else if( "extract-urns".equals(cmd) ) {
-				return BlobReferenceScanner.main(ctx, argi);
+				return BlobReferenceScanner.main(ctx, args);
 			} else if( "annotate-m3u".equals(cmd) ) {
-				return M3UAnnotator.main(ctx, argi);
+				return M3UAnnotator.main(ctx, args);
 			} else if( "help".equals(cmd) || isHelpArgument(cmd) ) {
 				System.out.print(USAGE);
 				return 0;
@@ -142,6 +153,6 @@ public class CCouch3Command
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit( main( Arrays.asList(args).iterator()) );
+		System.exit( main( Arrays.asList(args)) );
 	}
 }

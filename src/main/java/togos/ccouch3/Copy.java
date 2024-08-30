@@ -2,12 +2,14 @@ package togos.ccouch3;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Iterator;
+import java.util.List;
 
 import togos.blob.ByteBlob;
 import togos.ccouch3.OutChecker.OnDirCollision;
 import togos.ccouch3.OutChecker.OnFileCollision;
 import togos.ccouch3.OutChecker.Run;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 import togos.ccouch3.util.StreamUtil;
 
 public class Copy
@@ -15,16 +17,22 @@ public class Copy
 	public static String USAGE =
 		"Usage: ccouch3 copy [-repo <path]* <source> <destination>";
 	
-	public static int main(CCouchContext ctx, Iterator<String> argi) {
+	public static int main(CCouchContext ctx, List<String> args) {
 		String fromName = null;
 		String toName = null;
 		OnDirCollision onDirCollision = OnDirCollision.ABORT;
 		OnFileCollision onFileCollision = OnFileCollision.KEEP;
 		
-		while( argi.hasNext() ) {
-			String arg = argi.next();
-			if( ctx.handleCommandLineOption(arg, argi) ) {
-			} else if( "-merge".equals(arg) ) {
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			if( "-merge".equals(arg) ) {
 				onDirCollision = OnDirCollision.MERGE;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println(USAGE);
@@ -49,7 +57,7 @@ public class Copy
 			return 1;
 		}
 		
-		ctx.fix();
+		ctx = ctx.fixed();
 		
 		BlobResolver blobResolver = CCouch3Command.getCommandLineFileResolver(ctx);
 		ObjectResolver resolver = new ObjectResolver(blobResolver);

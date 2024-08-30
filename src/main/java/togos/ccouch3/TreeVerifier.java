@@ -6,7 +6,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -20,6 +20,8 @@ import togos.ccouch3.rdf.RDFIO;
 import togos.ccouch3.rdf.RDFNamespace;
 import togos.ccouch3.rdf.RDFNode;
 import togos.ccouch3.repo.Repository;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 
 /**
  * The idea is to debug stored commits and directory trees,
@@ -287,13 +289,20 @@ public class TreeVerifier
 		}
 	}
 	
-	public static int main(CCouchContext ctx, Iterator<String> argi ) throws Exception {
+	public static int main(CCouchContext ctx, List<String> args ) throws Exception {
 		ArrayList<String> urns = new ArrayList<String>();
 		OutputMode outputMode = OutputMode.SILENT;
-		for( ; argi.hasNext(); ) {
-			String arg = argi.next();
-			if( ctx.handleCommandLineOption(arg, argi) ) {
-			} else if( "-v".equals(arg) ) {
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
+			if( "-v".equals(arg) ) {
 				outputMode = OutputMode.PATH_TO_URN;
 			} else if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println( USAGE );
@@ -321,6 +330,6 @@ public class TreeVerifier
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(main( new CCouchContext(), Arrays.asList(args).iterator() ));
+		System.exit(main( new CCouchContext(), Arrays.asList(args) ));
 	}
 }

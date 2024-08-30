@@ -3,24 +3,33 @@ package togos.ccouch3;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.List;
 
 import togos.blob.ByteBlob;
 import togos.ccouch3.repo.Repository;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 
 public class StoreStream
 {
-	public static int main(CCouchContext ctx, Iterator<String> argi) {
+	public static int main(CCouchContext ctx, List<String> args) {
 		boolean noMoreOptions = false;
 		boolean verbose = false;
 		ArrayList<String> inputPaths = new ArrayList<String>();
-		while( argi.hasNext() ) {
-			String arg = argi.next();
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
 			if( "-".equals(arg) || !arg.startsWith("-") || noMoreOptions ) {
 				inputPaths.add(arg);
 			} else if( "-v".equals(arg) ) {
 				verbose = true;
-			} else if( ctx.handleCommandLineOption(arg, argi)) {
 			} else if( "--".equals(arg) ) {
 				noMoreOptions = true;
 			} else {
@@ -34,7 +43,7 @@ public class StoreStream
 			inputPaths.add("-");
 		}
 		
-		ctx.fix();
+		ctx = ctx.fixed();
 		Repository repo = ctx.getPrimaryRepository();
 		
 		final BlobResolver argumentResolver = CCouch3Command.getCommandLineFileResolver(

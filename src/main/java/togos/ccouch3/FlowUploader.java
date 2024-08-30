@@ -1250,8 +1250,7 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	static FlowUploaderCommand fromArgs( CCouchContext ctx, Iterator<String> args, boolean requireServer, boolean alwaysShowUrns ) throws Exception {
-		ctx.fix();
-		FlowUploaderConfig config = FlowUploaderConfig.from(ctx);
+		FlowUploaderConfig config = FlowUploaderConfig.from(ctx.fixed());
 		
 		boolean verbose = false;
 		boolean cacheEnabled = true;
@@ -1466,8 +1465,8 @@ public class FlowUploader implements FlowUploaderSettings
 		"    -a Tom -n archives/tom/pictures -m \"Tom's pictures\" /home/tom/pics/ \\\n" +
 		"    -a Tom -n archives/tom/docs -m \"Tom's documents\" /home/tom/docs/";
 	
-	public static int uploadMain( CCouchContext ctx, Iterator<String> args ) throws Exception {
-		FlowUploaderCommand fuc = fromArgs(ctx, args, true, false);
+	public static int uploadMain( CCouchContext ctx, List<String> args ) throws Exception {
+		FlowUploaderCommand fuc = fromArgs(ctx, args.iterator(), true, false);
 		switch( fuc.mode ) {
 		case ERROR:
 			System.err.println( "Error: " + fuc.errorMessage + "\n" );
@@ -1511,7 +1510,11 @@ public class FlowUploader implements FlowUploaderSettings
 		}
 	}
 	
+	public static int identifyMain( CCouchContext ctx, List<String> args ) throws Exception {
+		return identifyMain( ctx, args.iterator() );
+	}
+	
 	public static void main( String[] args ) throws Exception {
-		System.exit(uploadMain( new CCouchContext(), Arrays.asList(args).iterator() ));
+		System.exit(uploadMain( new CCouchContext(), Arrays.asList(args) ));
 	}
 }

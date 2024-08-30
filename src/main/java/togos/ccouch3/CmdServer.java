@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
-import java.util.Iterator;
+import java.util.List;
 
 import togos.blob.ByteChunk;
 import togos.ccouch3.cmdstream.CmdReader;
@@ -14,6 +14,8 @@ import togos.ccouch3.cmdstream.CmdWriter;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.StoreException;
 import togos.ccouch3.util.FileUtil;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 
 public class CmdServer
 {
@@ -180,11 +182,18 @@ public class CmdServer
 		"  -repo <path>   ; path to repo in which to store blobs, caches, and logs.\n" +
 		"  -sector <name> ; name of sector in which to store incoming data";
 	
-	public static int main(CCouchContext ctx, Iterator<String> argi ) throws Exception {
-		for( ; argi.hasNext(); ) {
-			String arg = argi.next();
-			if( ctx.handleCommandLineOption(arg,  argi)) {
-			} else if( CCouch3Command.isHelpArgument(arg) ) {
+	public static int main(CCouchContext ctx, List<String> args ) throws Exception {
+		while( !args.isEmpty() ) {
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
+			}
+			
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
+			if( CCouch3Command.isHelpArgument(arg) ) {
 				System.out.println( USAGE );
 				return 0;
 			} else {
@@ -193,9 +202,9 @@ public class CmdServer
 				return 1;
 			}
 		}
-		if( ctx.storeSector == null ) ctx.storeSector = "cmd-server";
+		if( ctx.storeSector == null ) ctx = ctx.withStoreSector("cmd-server");
 		
-		ctx.fix();
+		ctx = ctx.fixed();
 		
 		Repository repo = ctx.getPrimaryRepository();
 		File repoDir = ctx.getPrimaryRepoDir();
@@ -209,6 +218,6 @@ public class CmdServer
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(CmdServer.main( new CCouchContext(), Arrays.asList(args).iterator() ));
+		System.exit(CmdServer.main( new CCouchContext(), Arrays.asList(args) ));
 	}
 }

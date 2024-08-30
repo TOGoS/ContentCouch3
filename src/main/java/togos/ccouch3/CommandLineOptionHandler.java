@@ -1,9 +1,11 @@
 package togos.ccouch3;
 
-import java.util.Iterator;
+import java.util.List;
+
+import togos.ccouch3.util.ParseResult;
 
 /** Anything that handles command-line options. */
-public interface CommandLineOptionHandler
+public interface CommandLineOptionHandler<T>
 {
 	/**
 	 * Either handles the argument arg, also slurping any additional arguments needed from rest, returning true,
@@ -11,5 +13,5 @@ public interface CommandLineOptionHandler
 	 *
 	 * @return true if the option was understood, false otherwise
 	 */
-	boolean handleCommandLineOption(String arg, Iterator<String> rest);
+	ParseResult<List<String>,T> handleCommandLineOption(List<String> args);
 }

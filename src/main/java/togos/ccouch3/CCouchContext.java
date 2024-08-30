@@ -3,20 +3,22 @@ package togos.ccouch3;
 import static togos.ccouch3.util.RepoURLDefuzzer.defuzzRemoteRepoPrefix;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.List;
 
+import togos.ccouch3.CCouchContext.RepoSpec.RepoType;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
-import togos.ccouch3.CCouchContext.RepoSpec.RepoType;
+import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ParseResult;
 
 /**
  * Context within which all our work is done!
  * Indicates repositories and maybe other stuff.
  */
 public class CCouchContext
-implements CommandLineOptionHandler
+implements CommandLineOptionHandler<CCouchContext>
 {
 	/** Basic info about a repository */
 	static class RepoSpec {
@@ -24,7 +26,7 @@ implements CommandLineOptionHandler
 			FILESYSTEM,
 			HTTP_N2R
 		}
-
+		
 		public final String name;
 		public final RepoType type;
 		/** File path or HTTP server prefix */
@@ -54,19 +56,42 @@ implements CommandLineOptionHandler
 	}
 	
 	/** Repository into which to store stuff. */ 
-	public RepoSpec primaryRepo;
+	public final RepoSpec primaryRepo;
 	/** Name of sector into which to store stuff. */
-	public String storeSector;
+	public final String storeSector;
 	/**
 	 * List of repositories in addition to the primary one
 	 * that are considered local
 	 * (if we're caching and they contain stuff, nothing needs to be done).
 	 */
-	public final ArrayList<RepoSpec> localRepos = new ArrayList<RepoSpec>();
+	public final List<RepoSpec> localRepos;
 	/**
 	 * List of remote repositories.
 	 */
-	public final ArrayList<RepoSpec> remoteRepos = new ArrayList<RepoSpec>();
+	public final List<RepoSpec> remoteRepos;
+	
+	public CCouchContext(RepoSpec primaryRepo, String storeSector, List<RepoSpec> localRepos, List<RepoSpec> remoteRepos) {
+		this.primaryRepo = primaryRepo;
+		this.storeSector = storeSector;
+		this.localRepos  = localRepos;
+		this.remoteRepos = remoteRepos;
+	}
+	public CCouchContext() {
+		this(null, null, Collections.<RepoSpec>emptyList(), Collections.<RepoSpec>emptyList());
+	}
+	
+	public CCouchContext withPrimaryRepo(RepoSpec primaryRepo) {
+		return new CCouchContext(primaryRepo, storeSector, localRepos, remoteRepos);
+	}
+	public CCouchContext withStoreSector(String storeSector) {
+		return new CCouchContext(primaryRepo, storeSector, localRepos, remoteRepos);
+	}
+	public CCouchContext withAdditionalLocalRepo(RepoSpec repo) {
+		return new CCouchContext(primaryRepo, storeSector, ListUtil.snoc(localRepos, repo), remoteRepos);
+	}
+	public CCouchContext withAdditionalRemoteRepo(RepoSpec repo) {
+		return new CCouchContext(primaryRepo, storeSector, localRepos, ListUtil.snoc(remoteRepos, repo));
+	}
 	
 	protected static String resolveRepoDir(String path) {
 		if( path.startsWith("~/") ) {
@@ -93,20 +118,21 @@ implements CommandLineOptionHandler
 		return new RepoSpec( getNonEmptyEnv("CCOUCH_REPO_NAME"), RepoType.FILESYSTEM, dir );
 	}
 	
-	static String optArg(String opt, String explicit, Iterator<String> rest) {
-		if( explicit != null ) return explicit;
+	static ParseResult<List<String>,String> optArg(String opt, String explicit, List<String> rest) {
+		if( explicit != null ) return ParseResult.of(rest, explicit);
 		
-		if( !rest.hasNext() ) {
+		if( rest.isEmpty() ) {
 			throw new RuntimeException(opt+" requires an argument but wasn't given one");
 		}
 		
-		return rest.next();
+		return ParseResult.of(ListUtil.cdr(rest), ListUtil.car(rest));
 	}
 	
 	@Override
-	public boolean handleCommandLineOption(String rawOpt, Iterator<String> moreArgs ) {
+	public ParseResult<List<String>,CCouchContext> handleCommandLineOption(List<String> args) {
 		String opt;
 		String explicitArgument = null;
+		String rawOpt = ListUtil.car(args);
 		if( rawOpt.startsWith("--") ) {
 			final int equalIndex = rawOpt.indexOf("=");
 			if( equalIndex != -1 ) {
@@ -117,8 +143,9 @@ implements CommandLineOptionHandler
 		} else if( rawOpt.startsWith("-") ) {
 			opt = rawOpt.substring(1);
 		} else {
-			return false;
+			return ParseResult.of(args, this);
 		}
+		List<String> args1 = ListUtil.cdr(args);
 		
 		final String name;
 		final int colonIdx = opt.indexOf(':');
@@ -130,20 +157,32 @@ implements CommandLineOptionHandler
 		}
 		
 		if( "repo".equals(opt) ) {
-			primaryRepo = new RepoSpec(name, RepoType.FILESYSTEM, resolveRepoDir(optArg(rawOpt, explicitArgument, moreArgs)));
-			return true;
+			ParseResult<List<String>,String> dirPr = optArg(rawOpt, explicitArgument, args1);
+			return ParseResult.of(
+				dirPr.remainingInput, 
+				withPrimaryRepo(new RepoSpec(name, RepoType.FILESYSTEM, resolveRepoDir(dirPr.result)))
+			);
 		} else if( "local-repo".equals(opt) ) {
-			localRepos.add(new RepoSpec(opt.substring("-repo:".length()), RepoType.FILESYSTEM, resolveRepoDir(optArg(rawOpt, explicitArgument, moreArgs))));
-			return true;
+			ParseResult<List<String>,String> dirPr = optArg(rawOpt, explicitArgument, args1);
+			return ParseResult.of(
+				dirPr.remainingInput,
+				withAdditionalLocalRepo(new RepoSpec(opt.substring("-repo:".length()), RepoType.FILESYSTEM, resolveRepoDir(dirPr.result)))
+			);
 		} else if( "remote-repo".equals(opt) ) {
-			localRepos.add(new RepoSpec(opt.substring("-repo:".length()), RepoType.HTTP_N2R, defuzzRemoteRepoPrefix(optArg(rawOpt, explicitArgument, moreArgs))));
-			return true;
+			ParseResult<List<String>,String> uriPr = optArg(rawOpt, explicitArgument, args1);
+			return ParseResult.of(
+				uriPr.remainingInput,
+				withAdditionalRemoteRepo(new RepoSpec(opt.substring("-repo:".length()), RepoType.HTTP_N2R, defuzzRemoteRepoPrefix(uriPr.result)))
+			);
 		} else if( "sector".equals(opt) ) {
-			storeSector = optArg(rawOpt, explicitArgument, moreArgs);
-			return true;
+			ParseResult<List<String>,String> storeSectorPr = optArg(rawOpt, explicitArgument, args1);
+			return ParseResult.of(
+				storeSectorPr.remainingInput,
+				withStoreSector(storeSectorPr.result)
+			);
+		} else {
+			return ParseResult.of(args, this);
 		}
-		
-		return false;
 	}
 	
 	/**
@@ -154,15 +193,18 @@ implements CommandLineOptionHandler
 	 * Maybe there should be separate config/context classes
 	 * so there is a clearer (and typechecked) point of transformation?
 	 */
-	public void fix() {
+	public CCouchContext fixed() {
+		RepoSpec primaryRepo = this.primaryRepo;
 		if( primaryRepo == null ) {
 			primaryRepo = getEnvSpecifiedRepository();
 		}
+		String storeSector = this.storeSector;
 		if( storeSector == null ) storeSector = "user"; // The traditional default.  But maybe there should be no default idk.
 		// TODO: read primaryRepo/remote-repos.lst, or whatever it's called,
 		// or any other configuration based on reading files in .ccouch,
 		// which maybe actually we don't want to do at all lol
 		// (preferring environment variables instead these days)
+		return new CCouchContext(primaryRepo, storeSector, localRepos, remoteRepos);
 	}
 	
 	public File getPrimaryRepoDir() {

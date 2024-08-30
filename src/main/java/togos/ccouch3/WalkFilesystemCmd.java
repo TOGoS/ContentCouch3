@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.regex.Matcher;
@@ -23,9 +22,10 @@ import java.util.regex.Pattern;
 
 import togos.ccouch3.WalkFilesystemCmd.WFileInfo.FileType;
 import togos.ccouch3.hash.BitprintDigest;
+import togos.ccouch3.util.Action;
 import togos.ccouch3.util.Charsets;
 import togos.ccouch3.util.Consumer;
-import togos.ccouch3.util.Action;
+import togos.ccouch3.util.ListUtil;
 
 /**
  * Simple tool for walking the filesystem and collecting
@@ -474,7 +474,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		}
 	}
 	
-	public static Action<Consumer<byte[]>,Integer> parse(Iterator<String> argi) {
+	public static Action<Consumer<byte[]>,Integer> parse(List<String> args) {
 		final ArrayList<Pair<String,File>> roots = new ArrayList<Pair<String,File>>();
 		boolean parseMode = true;
 		boolean includeDotFiles = false;
@@ -482,8 +482,9 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		boolean includeFileKeys = false;
 		float extraErrorChance = 0;
 		OutputFormat outputFormat = OutputFormat.TSVFileManifest;
-		while( argi.hasNext() ) {
-			String arg = argi.next();
+		while( !args.isEmpty() ) {
+			String arg = ListUtil.car(args);
+			args = ListUtil.cdr(args);
 			if( parseMode ) {
 				Matcher m;
 				if( (m = EXTRA_ERROR_CHANCE_PATTERN.matcher(arg)).matches() ) {
@@ -557,11 +558,11 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		};
 	}
 	
-	public static int main(Iterator<String> argi) throws IOException, InterruptedException {
-		return CCouch3Command.run( parse(argi), System.out );
+	public static int main(List<String> args) throws IOException, InterruptedException {
+		return CCouch3Command.run( parse(args), System.out );
 	}
 	
 	public static void main(String[] args) throws IOException, InterruptedException {
-		System.exit(main(Arrays.asList(args).iterator()));
+		System.exit(main(Arrays.asList(args)));
 	}
 }
