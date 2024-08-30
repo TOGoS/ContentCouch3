@@ -67,24 +67,25 @@ public class CCouch3Command
 		"Usage: ccouch3 <subcommand> <subcommand-arguments>\n" +
 		"Version: "+Versions.CCOUCH_VERSION+"\n" +
 		"Subcommands:\n" +
-		"  identify          ; identify files/directories\n" +
-		"  upload            ; upload files to a remote repository\n" +
+		"  annotate-m3u      ; add #URN lines to an M3U file\n"+
+		"  backup            ; back up files locally (simplified implementation)\n" +
 		"  cache             ; download and cache files from remote repositories\n" +
 		"  cat               ; output blobs to standard output\n" +
 		"  config            ; dump configuration to stdout\n" +
-		"  copy              ; copy files/blobs/directories\n" +
-		"  backup            ; back up files locally (simplified implementation)\n" +
 		"  command-server    ; run a command server\n" +
-		"  web-server        ; run a web server\n" +
+		"  copy              ; copy files/blobs/directories\n" +
 		"  find-files        ; find files in local repo for named objects\n"+
+		"  identify          ; identify files/directories\n" +
 		"  store-stream      ; store files or pipe contents\n"+
-		"  annotate-m3u      ; add #URN lines to an M3U file\n"+
+		"  upload            ; upload files to a remote repository\n" +
 		"  walk-fs           ; walk filesystem and output basic info\n" +
+		"  web-server        ; run a web server\n" +
 		"  <subcommand> -?   ; get help on a specific command\n"+
 		"\n"+
-		"'backup' exists primarily because its implementation is simpler\n"+
-		"and easier to debug than that of 'upload';\n"+
-		"Otherwise they serve similar purposes.\n";
+		"There is overlap in functionality between the commands.\n"+
+		"e.g. 'backup', 'upload', and 'store-stream' can all store\n"+
+		"files, but have different options and implementations.\n"+
+		"";
 	
 	public static int main( Iterator<String> argi ) throws Exception {
 		CCouchContext ctx = new CCouchContext();
