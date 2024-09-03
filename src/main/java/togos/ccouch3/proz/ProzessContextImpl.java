@@ -32,9 +32,10 @@ implements ProzessContext
 	static class NullOutputStream extends OutputStream {
 		static final NullOutputStream INSTANCE = new NullOutputStream();
 		private NullOutputStream() {}
-		public void write(int b) throws IOException {
-			throw new IOException("Stream closed");
-		}
+		// Unlike PRocessBuilder's NullOutputStream,
+		// this one acts more like /dev/null and just ignores the data.
+		public void write(int b) {}
+		public void write(byte[] data, int offset, int length) {}
 	}
 	
 	@Override public InputStream getInputStream(int fd) {
