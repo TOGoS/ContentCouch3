@@ -5,7 +5,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 
-public interface ProzessContext {
+public interface SystemContext {
 	public File getPwd();
 	public Map<String,String> getEnv();
 	public OutputStream getOutputStream(int fd);

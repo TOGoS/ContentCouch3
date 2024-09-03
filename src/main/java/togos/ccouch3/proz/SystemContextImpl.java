@@ -6,13 +6,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 
-public class ProzessContextImpl
-implements ProzessContext
+public class SystemContextImpl
+implements SystemContext
 {
 	final File pwd;
 	final Map<String,String> env;
 	Object[] io;
-	public ProzessContextImpl(File pwd, Map<String,String> env, Object[] io) {
+	public SystemContextImpl(File pwd, Map<String,String> env, Object[] io) {
 		this.pwd = pwd;
 		this.env = env;
 		this.io = io;

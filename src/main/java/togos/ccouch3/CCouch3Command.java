@@ -6,10 +6,10 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.List;
 
-import togos.ccouch3.proz.ProzessContext;
-import togos.ccouch3.proz.ProzessContextImpl;
+import togos.ccouch3.proz.SystemContext;
+import togos.ccouch3.proz.SystemContextImpl;
 import togos.ccouch3.proz.ProzessRunner;
-import togos.ccouch3.proz.ProzessState;
+import togos.ccouch3.proz.Prozess;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.util.Action;
@@ -49,9 +49,9 @@ public class CCouch3Command
 			os.flush();
 		}
 	}
-	public static int run(ProzessState cmdlet, OutputStream os) throws IOException, InterruptedException {
+	public static int run(Prozess<SystemContext,Integer> cmdlet, OutputStream os) throws IOException, InterruptedException {
 		try {
-			ProzessContext ctx = new ProzessContextImpl(
+			SystemContext ctx = new SystemContextImpl(
 				new File("").getAbsoluteFile(), System.getenv(), new Object[] {
 					null, os, System.err
 				});
