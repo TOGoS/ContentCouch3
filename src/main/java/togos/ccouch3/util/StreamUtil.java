@@ -36,4 +36,16 @@ public class StreamUtil
 		copy(in, baos);
 		return baos.toByteArray();
 	}
+	
+	public static Consumer<byte[]> outputStreamToConsumer(final OutputStream os) {
+		return new Consumer<byte[]>() {
+			@Override public void accept(byte[] value) {
+				try {
+					os.write(value);
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			}
+		};
+	}
 }

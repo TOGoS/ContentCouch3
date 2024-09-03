@@ -22,10 +22,14 @@ import java.util.regex.Pattern;
 
 import togos.ccouch3.WalkFilesystemCmd.WFileInfo.FileType;
 import togos.ccouch3.hash.BitprintDigest;
+import togos.ccouch3.proz.ProzessContext;
+import togos.ccouch3.proz.ProzessState;
+import togos.ccouch3.proz.ProzessState.ProtoProzessState;
 import togos.ccouch3.util.Action;
 import togos.ccouch3.util.Charsets;
 import togos.ccouch3.util.Consumer;
 import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.StreamUtil;
 
 /**
  * Simple tool for walking the filesystem and collecting
@@ -474,7 +478,30 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		}
 	}
 	
-	public static Action<Consumer<byte[]>,Integer> parse(List<String> args) {
+	static ProzessState outputter(final int fd, final byte[] data, final int exitCode) {
+		return new ProtoProzessState() {
+			public @Override ProzessState start(final ProzessContext ctx) {
+				return new RunnableProzessState() {
+					@Override
+					public ProzessState run() {
+						int exitCode1 = exitCode;
+						try {
+							ctx.getOutputStream(fd).write(data);
+						} catch (IOException e) {
+							exitCode1 = -1;
+						}
+						return new ProzessState.CompletedProzessState(exitCode1);
+					}
+				};
+			}
+		};
+	}
+	
+	static ProzessState outputter(final int fd, final String text, final int exitCode) {
+		return outputter(fd, text.getBytes(Charsets.UTF8), exitCode);
+	}
+	
+	public static ProzessState parse(List<String> args) {
 		final ArrayList<Pair<String,File>> roots = new ArrayList<Pair<String,File>>();
 		boolean parseMode = true;
 		boolean includeDotFiles = false;
@@ -508,15 +535,9 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 				} else if( "--".equals(arg) ) {
 					parseMode = false;
 				} else if( CCouch3Command.isHelpArgument(arg) ) {
-					return new Action<Consumer<byte[]>,Integer>() {
-						@Override public Integer execute(Consumer<byte[]> dest) throws IOException, InterruptedException {
-							dest.accept(HELP_TEXT.getBytes(Charsets.UTF8));
-							return 0;
-						}
-					};
+					return outputter(1, HELP_TEXT, 0);
 				} else {
-					System.err.println("Unrecognized argument: "+arg);
-					System.exit(1);
+					return outputter(1, "Unrecognized argument: "+arg, 1);
 				}
 			} else {
 				roots.add(new Pair<String,File>(arg, new File(arg)));
@@ -529,31 +550,41 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		final boolean _includeFileKeys = includeFileKeys;
 		final OutputFormat _outputFormat = outputFormat;
 		
-		return new Action<Consumer<byte[]>, Integer>() {
+		return new ProtoProzessState() {
 			@Override
-			public Integer execute(final Consumer<byte[]> dest) throws IOException, InterruptedException {
-				final String walkerName = WalkFilesystemCmd.class.getSimpleName()+"#walk (ContentCouch"+Versions.CCOUCH_VERSION+")";
-				
-				List<Pair<AppendablePathLike,File>> roots1 = new ArrayList<Pair<AppendablePathLike,File>>();
-				Function<String,String> pathsegEncoder = _outputFormat == OutputFormat.TSV ? NoEncoder.instance : URIEncoder.instance;
-				for( Pair<String,File> root : roots ) {
-					String prefix = root.left;
-					if( prefix == null ) prefix = pathsegEncoder.apply(root.right.getName());
-					roots1.add(new Pair<AppendablePathLike,File>(
-						new AppendablePathLikeImpl(prefix, "/", pathsegEncoder),
-						root.right
-					));
-				}
-				
-				WalkFilesystemCmd walker = new WalkFilesystemCmd(roots1, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance);
-				walker.includeFileKeys = _includeFileKeys;
-				
-				FileInfoConsumer fileInfoDest = makeOutputter(_outputFormat, dest, walkerName, _beChatty);
-				fileInfoDest.begin(new Date());
-				int errorCount = walker.execute(fileInfoDest);
-				fileInfoDest.end(new Date(), errorCount);
-				
-				return errorCount == 0 ? 0 : 1;
+			public ProzessState start(final ProzessContext ctx) {
+				return new RunnableProzessState() {
+					public ProzessState run() {
+						final Consumer<byte[]> dest = StreamUtil.outputStreamToConsumer(ctx.getOutputStream(1));
+						final String walkerName = WalkFilesystemCmd.class.getSimpleName()+"#walk (ContentCouch"+Versions.CCOUCH_VERSION+")";
+						
+						List<Pair<AppendablePathLike,File>> roots1 = new ArrayList<Pair<AppendablePathLike,File>>();
+						Function<String,String> pathsegEncoder = _outputFormat == OutputFormat.TSV ? NoEncoder.instance : URIEncoder.instance;
+						for( Pair<String,File> root : roots ) {
+							String prefix = root.left;
+							if( prefix == null ) prefix = pathsegEncoder.apply(root.right.getName());
+							roots1.add(new Pair<AppendablePathLike,File>(
+								new AppendablePathLikeImpl(prefix, "/", pathsegEncoder),
+								root.right
+							));
+						}
+						
+						WalkFilesystemCmd walker = new WalkFilesystemCmd(roots1, _includeDotFiles ? ALLFILES : NODOTFILES, _extraErrorChance);
+						walker.includeFileKeys = _includeFileKeys;
+						
+						FileInfoConsumer fileInfoDest = makeOutputter(_outputFormat, dest, walkerName, _beChatty);
+						fileInfoDest.begin(new Date());
+						int errorCount;
+						try {
+							errorCount = walker.execute(fileInfoDest);
+						} catch (InterruptedException e) {
+							return new CompletedProzessState(1);
+						}
+						fileInfoDest.end(new Date(), errorCount);
+						
+						return new CompletedProzessState(errorCount == 0 ? 0 : 1);
+					};
+				};
 			}
 		};
 	}

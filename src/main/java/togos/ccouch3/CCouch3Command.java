@@ -6,12 +6,17 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.List;
 
+import togos.ccouch3.proz.ProzessContext;
+import togos.ccouch3.proz.ProzessContextImpl;
+import togos.ccouch3.proz.ProzessRunner;
+import togos.ccouch3.proz.ProzessState;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.util.Action;
 import togos.ccouch3.util.Consumer;
 import togos.ccouch3.util.ListUtil;
 import togos.ccouch3.util.ParseResult;
+import togos.ccouch3.util.StreamUtil;
 
 public class CCouch3Command
 {
@@ -37,21 +42,20 @@ public class CCouch3Command
 	
 	//// Streamy...stuff
 	
-	static Consumer<byte[]> outputStreamToConsumer(final OutputStream os) {
-		return new Consumer<byte[]>() {
-			@Override public void accept(byte[] value) {
-				try {
-					os.write(value);
-				} catch (IOException e) {
-					throw new RuntimeException(e);
-				}
-			}
-		};
-	}
-	
 	public static <R> R run(Action<Consumer<byte[]>, R> cmdlet, OutputStream os) throws IOException, InterruptedException {
 		try {
-			return cmdlet.execute(outputStreamToConsumer(os));
+			return cmdlet.execute(StreamUtil.outputStreamToConsumer(os));
+		} finally {
+			os.flush();
+		}
+	}
+	public static int run(ProzessState cmdlet, OutputStream os) throws IOException, InterruptedException {
+		try {
+			ProzessContext ctx = new ProzessContextImpl(
+				new File("").getAbsoluteFile(), System.getenv(), new Object[] {
+					null, os, System.err
+				});
+			return ProzessRunner.run(cmdlet, ctx);
 		} finally {
 			os.flush();
 		}
