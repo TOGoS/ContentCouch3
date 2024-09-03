@@ -5,6 +5,7 @@ import java.io.IOException;
 import togos.ccouch3.proz.Prozess.AsyncProzess;
 import togos.ccouch3.proz.Prozess.ProtoProzess;
 import togos.ccouch3.util.Charsets;
+import togos.ccouch3.util.StreamUtil;
 
 public class Prozesses {
 	private Prozesses() { throw new RuntimeException("Don't instantiate me, bro!"); }
@@ -77,6 +78,13 @@ public class Prozesses {
 					}
 				}
 			};
+		}
+	}
+	
+	public static abstract class RunnableWithSystemContextProzessImpl extends RunnableWithContextProzessImpl<SystemContext,Integer> {
+		@Override public Prozess<SystemContext,Integer> fail(Exception e, SystemContext ctx) {
+			e.printStackTrace(StreamUtil.toPrintStream(ctx.getInputStream(1)));
+			return Prozesses.done(1);
 		}
 	}
 }

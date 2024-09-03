@@ -25,7 +25,7 @@ import togos.ccouch3.hash.BitprintDigest;
 import togos.ccouch3.proz.Prozess;
 import togos.ccouch3.proz.SystemContext;
 import togos.ccouch3.proz.Prozesses;
-import togos.ccouch3.proz.Prozesses.RunnableWithContextProzessImpl;
+import togos.ccouch3.proz.Prozesses.RunnableWithSystemContextProzessImpl;
 import togos.ccouch3.util.Action;
 import togos.ccouch3.util.Charsets;
 import togos.ccouch3.util.Consumer;
@@ -528,11 +528,7 @@ implements Action<WalkFilesystemCmd.FileInfoConsumer,Integer> // Object = FileIn
 		final boolean _includeFileKeys = includeFileKeys;
 		final OutputFormat _outputFormat = outputFormat;
 		
-		return new RunnableWithContextProzessImpl<SystemContext,Integer>() {
-			@Override public Prozess<SystemContext,Integer> fail(Exception e, SystemContext ctx) {
-				e.printStackTrace(StreamUtil.toPrintStream(ctx.getInputStream(1)));
-				return Prozesses.done(1);
-			}
+		return new RunnableWithSystemContextProzessImpl() {
 			@Override public Prozess<SystemContext,Integer> run(SystemContext ctx) {
 				final Consumer<byte[]> dest = StreamUtil.outputStreamToConsumer(ctx.getOutputStream(1));
 				final String walkerName = WalkFilesystemCmd.class.getSimpleName()+"#walk (ContentCouch"+Versions.CCOUCH_VERSION+")";
