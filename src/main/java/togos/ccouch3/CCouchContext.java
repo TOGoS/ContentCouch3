@@ -6,6 +6,7 @@ import java.io.File;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 import togos.ccouch3.CCouchContext.RepoSpec.RepoType;
 import togos.ccouch3.repo.Repository;
@@ -70,27 +71,30 @@ implements CommandLineOptionHandler<CCouchContext>
 	 */
 	public final List<RepoSpec> remoteRepos;
 	
-	public CCouchContext(RepoSpec primaryRepo, String storeSector, List<RepoSpec> localRepos, List<RepoSpec> remoteRepos) {
+	final Map<String,String> env;
+	
+	public CCouchContext(Map<String,String> env, RepoSpec primaryRepo, String storeSector, List<RepoSpec> localRepos, List<RepoSpec> remoteRepos) {
+		this.env         = env;
 		this.primaryRepo = primaryRepo;
 		this.storeSector = storeSector;
 		this.localRepos  = localRepos;
 		this.remoteRepos = remoteRepos;
 	}
-	public CCouchContext() {
-		this(null, null, Collections.<RepoSpec>emptyList(), Collections.<RepoSpec>emptyList());
+	public CCouchContext(Map<String,String> env) {
+		this(env, null, null, Collections.<RepoSpec>emptyList(), Collections.<RepoSpec>emptyList());
 	}
 	
 	public CCouchContext withPrimaryRepo(RepoSpec primaryRepo) {
-		return new CCouchContext(primaryRepo, storeSector, localRepos, remoteRepos);
+		return new CCouchContext(env, primaryRepo, storeSector, localRepos, remoteRepos);
 	}
 	public CCouchContext withStoreSector(String storeSector) {
-		return new CCouchContext(primaryRepo, storeSector, localRepos, remoteRepos);
+		return new CCouchContext(env, primaryRepo, storeSector, localRepos, remoteRepos);
 	}
 	public CCouchContext withAdditionalLocalRepo(RepoSpec repo) {
-		return new CCouchContext(primaryRepo, storeSector, ListUtil.snoc(localRepos, repo), remoteRepos);
+		return new CCouchContext(env, primaryRepo, storeSector, ListUtil.snoc(localRepos, repo), remoteRepos);
 	}
 	public CCouchContext withAdditionalRemoteRepo(RepoSpec repo) {
-		return new CCouchContext(primaryRepo, storeSector, localRepos, ListUtil.snoc(remoteRepos, repo));
+		return new CCouchContext(env, primaryRepo, storeSector, localRepos, ListUtil.snoc(remoteRepos, repo));
 	}
 	
 	protected static String resolveRepoDir(String path) {
@@ -101,21 +105,21 @@ implements CommandLineOptionHandler<CCouchContext>
 		}
 	}
 	
-	protected static String getNonEmptyEnv(String name) {
-		String v = System.getenv(name);
+	protected static String getNonEmptyEnv(Map<String,String> env, String name) {
+		String v = env.get(name);
 		return v == null || v.isEmpty() ? null : v;
 	}
 	
-	protected static RepoSpec getEnvSpecifiedRepository() {
+	protected static RepoSpec getEnvSpecifiedRepository(Map<String,String> env) {
 		// 2020-07-07: I have decided that using a default (based on user.home) is PROBLEMATIC
 		// after on at least a couple occasions running out of disk space
 		// when ccouch cached things to the default location, when I didn't mean for it to!
 		
 		// 2024-02-24: Switching to UPPERCASE!
 		
-		String dir = getNonEmptyEnv("CCOUCH_REPO_DIR");
+		String dir = getNonEmptyEnv(env, "CCOUCH_REPO_DIR");
 		if( dir == null ) return null;
-		return new RepoSpec( getNonEmptyEnv("CCOUCH_REPO_NAME"), RepoType.FILESYSTEM, dir );
+		return new RepoSpec( getNonEmptyEnv(env, "CCOUCH_REPO_NAME"), RepoType.FILESYSTEM, dir );
 	}
 	
 	static ParseResult<List<String>,String> optArg(String opt, String explicit, List<String> rest) {
@@ -196,7 +200,7 @@ implements CommandLineOptionHandler<CCouchContext>
 	public CCouchContext fixed() {
 		RepoSpec primaryRepo = this.primaryRepo;
 		if( primaryRepo == null ) {
-			primaryRepo = getEnvSpecifiedRepository();
+			primaryRepo = getEnvSpecifiedRepository(env);
 		}
 		String storeSector = this.storeSector;
 		if( storeSector == null ) storeSector = "user"; // The traditional default.  But maybe there should be no default idk.
@@ -204,7 +208,7 @@ implements CommandLineOptionHandler<CCouchContext>
 		// or any other configuration based on reading files in .ccouch,
 		// which maybe actually we don't want to do at all lol
 		// (preferring environment variables instead these days)
-		return new CCouchContext(primaryRepo, storeSector, localRepos, remoteRepos);
+		return new CCouchContext(env, primaryRepo, storeSector, localRepos, remoteRepos);
 	}
 	
 	public File getPrimaryRepoDir() {

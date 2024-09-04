@@ -673,6 +673,6 @@ public class Downloader
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit( main(new CCouchContext(), Arrays.asList(args)) );
+		System.exit( main(new CCouchContext(System.getenv()), Arrays.asList(args)) );
 	}
 }

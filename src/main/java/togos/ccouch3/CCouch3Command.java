@@ -60,6 +60,13 @@ public class CCouch3Command
 			os.flush();
 		}
 	}
+	public static SystemContext getSystemContext() {
+		return new SystemContextImpl(
+			new File("").getAbsoluteFile(), System.getenv(), new Object[] {
+				System.in, System.out, System.err
+			}
+		);
+	}
 	
 	////
 	
@@ -93,8 +100,8 @@ public class CCouch3Command
 		"files, but have different options and implementations.\n"+
 		"";
 	
-	public static int main( List<String> args ) throws Exception {
-		CCouchContext ctx = new CCouchContext();
+	public static int main( List<String> args, SystemContext sysCtx ) throws Exception {
+		CCouchContext ctx = new CCouchContext(sysCtx.getEnv());
 		while( !args.isEmpty() ) {
 			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
 			if( ctxPr.remainingInput != args ) {
@@ -117,7 +124,7 @@ public class CCouch3Command
 			} else if( "copy".equals(cmd) ) {
 				return Copy.main(ctx, args);
 			} else if( "config".equals(cmd) ) {
-				return ConfigDump.main(ctx, args);
+				return ConfigDump.main(ctx, args, sysCtx);
 			} else if( "backup".equals(cmd) ) {
 				return UpBacker.backupMain(ctx, args);
 			} else if( "find-files".equals(cmd) ) {
@@ -157,6 +164,6 @@ public class CCouch3Command
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit( main( Arrays.asList(args)) );
+		System.exit( main( Arrays.asList(args), getSystemContext()) );
 	}
 }

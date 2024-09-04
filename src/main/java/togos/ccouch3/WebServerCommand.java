@@ -305,6 +305,6 @@ public class WebServerCommand
 	}
 	
 	public static void main(String[] args) {
-		System.exit( main( new CCouchContext(), Arrays.asList(args)) );
+		System.exit( main( new CCouchContext(System.getenv()), Arrays.asList(args)) );
 	}
 }

@@ -218,6 +218,6 @@ public class CmdServer
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(CmdServer.main( new CCouchContext(), Arrays.asList(args) ));
+		System.exit(CmdServer.main( new CCouchContext(System.getenv()), Arrays.asList(args) ));
 	}
 }

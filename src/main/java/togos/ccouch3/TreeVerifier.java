@@ -316,6 +316,7 @@ public class TreeVerifier
 				return 1;
 			}
 		}
+		ctx = ctx.fixed();
 		Repository repo = ctx.getPrimaryRepository();
 		// We shouldn't be writing anything to it.
 		// If 'wat' sector shows up, something's gone wrong.
@@ -331,6 +332,6 @@ public class TreeVerifier
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(main( new CCouchContext(), Arrays.asList(args) ));
+		System.exit(main( new CCouchContext(System.getenv()), Arrays.asList(args) ));
 	}
 }

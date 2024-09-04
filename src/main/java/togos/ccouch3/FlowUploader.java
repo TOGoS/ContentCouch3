@@ -1515,6 +1515,6 @@ public class FlowUploader implements FlowUploaderSettings
 	}
 	
 	public static void main( String[] args ) throws Exception {
-		System.exit(uploadMain( new CCouchContext(), Arrays.asList(args) ));
+		System.exit(uploadMain( new CCouchContext(System.getenv()), Arrays.asList(args) ));
 	}
 }
