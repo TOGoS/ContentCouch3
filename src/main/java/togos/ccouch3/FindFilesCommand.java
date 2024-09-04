@@ -14,6 +14,7 @@ import togos.ccouch3.util.Charsets;
 import togos.ccouch3.util.Consumer;
 import togos.ccouch3.util.ListUtil;
 import togos.ccouch3.util.ParseResult;
+import togos.ccouch3.util.UsageError;
 
 class FoundItem {
 	public final String urn;
@@ -156,13 +157,6 @@ implements Action<Consumer<FoundItem>,Integer> {
 			}
 		}
 		return Integer.valueOf(0);
-	}
-	
-	static class UsageError extends Exception {
-		private static final long serialVersionUID = 1L;
-		public UsageError(String message) {
-			super(message);
-		}
 	}
 	
 	static final Pattern FORMAT_TOKEN_REGEX = Pattern.compile("([^\\{]+)|\\{([^\\}]+)\\}");
