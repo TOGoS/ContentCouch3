@@ -129,6 +129,8 @@ public class CCouch3Command
 				return UpBacker.backupMain(ctx, args);
 			} else if( "find-files".equals(cmd) ) {
 				return FindFilesCommand.main(ctx, args);
+			} else if( "merge".equals(cmd) ) {
+				return MergeCommand.main(ctx, args, sysCtx);
 			} else if( "store-stream".equals(cmd) ) {
 				return StoreStream.main(ctx, args);
 			} else if( "id".equals(cmd) || "identify".equals(cmd) ) {
