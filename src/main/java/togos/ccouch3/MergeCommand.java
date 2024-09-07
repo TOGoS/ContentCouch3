@@ -10,6 +10,7 @@ import togos.ccouch3.proz.ProzessRunner;
 import togos.ccouch3.proz.Prozesses;
 import togos.ccouch3.proz.Prozesses.RunnableWithSystemContextProzessImpl;
 import togos.ccouch3.proz.SystemContext;
+import togos.ccouch3.repo.Repository;
 import togos.ccouch3.util.StreamUtil;
 import togos.ccouch3.util.UsageError;
 
@@ -61,6 +62,26 @@ public class MergeCommand extends RunnableWithSystemContextProzessImpl {
 	}
 	
 	static interface MergeContext extends Converter<Object,Object>, Storer<Object,URIRef> {}
+	
+	static class MergeContextImpl implements MergeContext {
+		final CCouchContext ccCtx;
+		final SystemContext sysCtx;
+		final Repository primaryRepo;
+		MergeContextImpl(CCouchContext ccCtx, SystemContext sysCtx) {
+			this.ccCtx = ccCtx;
+			this.sysCtx = sysCtx;
+			this.primaryRepo = ccCtx.getPrimaryRepository();
+		}
+		@Override
+		public <T> T convert(Object I, Class<T> expectedClass) throws IOException {
+			// TODO Auto-generated method stub
+			throw new UnsupportedOperationException("Unimplemented method 'convert'");
+		}
+		@Override
+		public URIRef store(Object item) throws IOException {
+			throw new UnsupportedOperationException("Unimplemented method 'store'");
+		}
+	}
 	
 	static URIRef merge( Directory dir1, Directory dir2, MergeContext ctx ) {
 		throw new RuntimeException("todo");
