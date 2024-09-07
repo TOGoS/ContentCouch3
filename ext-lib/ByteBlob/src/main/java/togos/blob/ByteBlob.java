@@ -1,7 +1,5 @@
 package togos.blob;
 
-import togos.blob.InputStreamable;
-
 public interface ByteBlob extends InputStreamable, OutputStreamable
 {
 	public long getSize();
