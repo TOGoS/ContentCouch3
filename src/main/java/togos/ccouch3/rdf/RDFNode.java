@@ -1,59 +1,72 @@
 package togos.ccouch3.rdf;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 
 public class RDFNode
 {
-	public static final RDFNode EMPTY = new RDFNode();
+	static final Map<String,Set<RDFNode>> EMPTY_PROPS = Collections.emptyMap();
+	public static final RDFNode EMPTY = new RDFNode(EMPTY_PROPS, null, null, null);
 	
 	public static RDFNode ref(String uri) {
-		RDFNode node = new RDFNode();
-		node.subjectUri = uri;
-		return node;
+		return new RDFNode(null, uri, null, null);
 	}
 	public static RDFNode value(Object val) {
-		RDFNode node = new RDFNode();
-		node.simpleValue = val;
-		return node;
+		return new RDFNode(EMPTY_PROPS, null, null, val);
 	}
-
-	
-	public MultiMap<String,RDFNode> properties;
-	public String subjectUri;
-	public String sourceUri;
-	public Object simpleValue;
-	
-	public RDFNode() {
-		this.properties = new MultiMap<String,RDFNode>();
-	}
-
-	public RDFNode( RDFNode cloneFrom ) {
-		this.properties = new MultiMap<String,RDFNode>(cloneFrom.properties);
-		this.subjectUri = cloneFrom.subjectUri;
-		this.sourceUri = cloneFrom.sourceUri;
-		this.simpleValue = cloneFrom.simpleValue;
+	public static RDFNode typedRef(String typeName, String subjectUri, String sourceUri) {
+		return new RDFNode(
+			MultiMap.of(RDFNamespace.RDF_TYPE, RDFNode.ref(typeName)),
+			null,
+			sourceUri,
+			null
+		);
 	}
 	
-	public RDFNode(String typeName, String subjectUri) {
-		this();
-		if( typeName != null ) this.setRdfTypeUri( typeName );
+	public final Map<String,Set<RDFNode>> properties;
+	public final String subjectUri;
+	public final String sourceUri;
+	public final Object simpleValue;
+	
+	protected RDFNode(
+		Map<String,Set<RDFNode>> properties,
+		String subjectUri, String sourceUri, Object simpleValue
+	) {
+		this.properties = MultiMap.freeze(properties);
 		this.subjectUri = subjectUri;
-	}
-
-	public String getRdfTypeUri() {
-		return properties.getSingle(RDFNamespace.RDF_TYPE, EMPTY).subjectUri;
-	}
-	
-	public void setRdfTypeUri( String typeName ) {
-		properties.putSingle(RDFNamespace.RDF_TYPE, RDFNode.ref(typeName));
+		this.sourceUri = sourceUri;
+		this.simpleValue = simpleValue;
 	}
 	
 	public String getSubjectUri() {
 		return subjectUri;
 	}
-
+	
+	public String getRdfTypeUri() {
+		return MultiMap.getSingle(properties, RDFNamespace.RDF_TYPE, EMPTY).subjectUri;
+	}
+	
+	public RDFNode withRdfTypeUri( String typeName ) {
+		return new RDFNode(
+			MultiMap.withValue(properties, RDFNamespace.RDF_TYPE, RDFNode.ref(typeName)),
+			subjectUri, sourceUri, simpleValue
+		);
+	}
+	
+	public RDFNode withProperties(Map<String,Set<RDFNode>> properties ) {
+		if( properties == this.properties ) return this;
+		return new RDFNode(properties, subjectUri, sourceUri, simpleValue);
+	}
+	
+	public RDFNode withAddedProperty(String name, RDFNode value) {
+		return withProperties(MultiMap.withValue(properties, name, value));
+	}
+	
+	public RDFNode withSourceUri(String sourceUri) {
+		return new RDFNode(properties, subjectUri, sourceUri, simpleValue);
+	}
 	
 	public boolean hasOnlySubjectUri() {
 		return properties.size() == 0 && subjectUri != null && simpleValue == null;

@@ -182,7 +182,7 @@ public class CmdServer
 		"  -repo <path>   ; path to repo in which to store blobs, caches, and logs.\n" +
 		"  -sector <name> ; name of sector in which to store incoming data";
 	
-	public static int main(CCouchContext ctx, List<String> args ) throws Exception {
+	public static int main(CCouchContext ctx, List<String> args) throws Exception {
 		while( !args.isEmpty() ) {
 			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
 			if( ctxPr.remainingInput != args ) {

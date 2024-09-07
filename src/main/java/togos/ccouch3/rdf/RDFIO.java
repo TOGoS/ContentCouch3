@@ -97,13 +97,13 @@ public class RDFIO {
 		return sortedStuff;
 	}
 	
-	public static void writeRdfProperties( Appendable w, MultiMap<String,RDFNode> properties, String padding, Map<String,String> standardNsAbbreviations, Map<String,String> usedNsAbbreviations )
+	public static void writeRdfProperties( Appendable w, Map<String,Set<RDFNode>> properties, String padding, Map<String,String> standardNsAbbreviations, Map<String,String> usedNsAbbreviations )
 		throws IOException
 	{
 		for( Iterator<String> propIter = sort(properties.keySet()).iterator(); propIter.hasNext(); ) {
 			String propName = propIter.next();
 			if( RDFNamespace.RDF_TYPE.equals(propName) ) continue;
-			Set<RDFNode> values = properties.getSet(propName);
+			Set<RDFNode> values = MultiMap.getSet(properties, propName);
 			
 			writeRdfProperties( w, propName, values, padding, standardNsAbbreviations, usedNsAbbreviations );
 		}
@@ -179,8 +179,7 @@ public class RDFIO {
 			// Subject should not _be_ the RDF node, but gotten by
 			// Calling RdfInterpreter#interpretSubject
 			String className = RDFNamespace.RDF_DESCRIPTION.equals(descOpenTag.name) ? null : descOpenTag.name;
-			RDFNode desc = new RDFNode(className, descOpenTag.attributes.get(RDFNamespace.RDF_ABOUT));
-			desc.sourceUri = sourceUri;
+			RDFNode desc = RDFNode.typedRef(className, descOpenTag.attributes.get(RDFNamespace.RDF_ABOUT), sourceUri);
 			
 			if( descOpenTag.closed ) {
 				return new XML.ParseResult( desc, offset );
@@ -203,14 +202,14 @@ public class RDFIO {
 					
 					String resourceUri = (String)predicateOpenTag.attributes.get(RDFNamespace.RDF_RESOURCE);
 					if( resourceUri != null ) {
-						desc.properties.add(predicateOpenTag.name, RDFNode.ref(resourceUri));
+						desc = desc.withAddedProperty(predicateOpenTag.name, RDFNode.ref(resourceUri));
 					}
 					
 					if( !predicateOpenTag.closed ) {
 						Collection<RDFNode> c = null;
 						if( "Collection".equals(predicateOpenTag.attributes.get(RDFNamespace.RDF_PARSETYPE)) ) {
 							c = new ArrayList<RDFNode>();
-							desc.properties.add(predicateOpenTag.name, RDFNode.value(c));
+							desc = desc.withAddedProperty(predicateOpenTag.name, RDFNode.value(c));
 						}
 						while( true ) {
 							XML.ParseResult rdfValueParseResult = parseRdf(chars, offset, predicateNsAbbreviations, sourceUri);
@@ -229,7 +228,7 @@ public class RDFIO {
 							if( c != null ) {
 								c.add(value);
 							} else {
-								desc.properties.add(predicateOpenTag.name, value);
+								desc = desc.withAddedProperty(predicateOpenTag.name, value);
 							}
 						}
 						XML.ParseResult predicateCloseTagParseResult = XML.parseXmlPart(chars, offset);
@@ -261,11 +260,11 @@ public class RDFIO {
 		Map<String,String> nsAbbreviations = CCouchNamespace.standardNsAbbreviations;
 		XML.ParseResult rdfParseResult = parseRdf( chars, 0, nsAbbreviations, sourceUri );
 		if( rdfParseResult.value instanceof RDFNode ) {
-			((RDFNode)rdfParseResult.value).sourceUri = sourceUri;
+			RDFNode res = (RDFNode)rdfParseResult.value;
+			return res.withSourceUri(sourceUri);
 		} else {
 			throw new RDFXMLParseException("RDF parse result wasn't an RDFNode, but a "+rdfParseResult.value.getClass().getName(), 0);
 		}
-		return (RDFNode)rdfParseResult.value;
 	}
 	
 	public static RDFNode parseRdf( ByteBlob rdf, String sourceUri ) throws IOException, ParseException {

@@ -83,21 +83,21 @@ public class RDFInterpreter
 						}
 						for( RDFNode entry : entriesNode.getItems() ) {
 							//System.err.println(entry.toString());
-							Object nameObj = entry.properties.getSingle(CCouchNamespace.NAME, RDFNode.EMPTY).simpleValue;
+							Object nameObj = MultiMap.getSingle(entry.properties, CCouchNamespace.NAME, RDFNode.EMPTY).simpleValue;
 							if( nameObj == null ) {
 								throw new RDFStructureException("Directory entry lacks a name", node.sourceUri);
 							} else if( !(nameObj instanceof String) ) {
 								throw new RDFStructureException("Directory entry name is not a string", node.sourceUri);
 							}
 							String name = (String)nameObj;
-							RDFNode target = entry.properties.getSingle(CCouchNamespace.TARGET, RDFNode.EMPTY);
+							RDFNode target = MultiMap.getSingle(entry.properties, CCouchNamespace.TARGET, RDFNode.EMPTY);
 							String targetUri = target.subjectUri;
 							if( targetUri == null ) {
 								throw new RDFStructureException("Directory entry lacks a target URI", node.sourceUri);
 							}
-							RDFNode sizeNode = target.properties.getSingle(BitziNamespace.BZ_FILELENGTH, null);
+							RDFNode sizeNode = MultiMap.getSingle(target.properties, BitziNamespace.BZ_FILELENGTH, null);
 							long size = sizeNode == null ? -1 : Long.parseLong(sizeNode.simpleValue.toString());
-							RDFNode mtimeNode = target.properties.getSingle(DCNamespace.DC_MODIFIED, null);
+							RDFNode mtimeNode = MultiMap.getSingle(target.properties, DCNamespace.DC_MODIFIED, null);
 							long mtime;
 							try {
 								mtime = mtimeNode == null ? -1 : DateUtil.parseDate(mtimeNode.simpleValue.toString()).getTime();

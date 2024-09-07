@@ -16,6 +16,7 @@ import togos.ccouch3.path.Path;
 import togos.ccouch3.path.PathLink;
 import togos.ccouch3.rdf.CCouchNamespace;
 import togos.ccouch3.rdf.DCNamespace;
+import togos.ccouch3.rdf.MultiMap;
 import togos.ccouch3.rdf.RDFIO;
 import togos.ccouch3.rdf.RDFNamespace;
 import togos.ccouch3.rdf.RDFNode;
@@ -136,7 +137,7 @@ public class TreeVerifier
 						}
 						for( RDFNode entry : entriesNode.getItems() ) {
 							//System.err.println(entry.toString());
-							Object nameObj = entry.properties.getSingle(CCouchNamespace.NAME, RDFNode.EMPTY).simpleValue;
+							Object nameObj = MultiMap.getSingle(entry.properties, CCouchNamespace.NAME, RDFNode.EMPTY).simpleValue;
 							if( nameObj == null ) {
 								logPathError("Directory entry lacks a name", path);
 								continue;
@@ -145,7 +146,7 @@ public class TreeVerifier
 								continue;
 							}
 							String name = (String)nameObj;
-							String targetUri = entry.properties.getSingle(CCouchNamespace.TARGET, RDFNode.EMPTY).subjectUri;
+							String targetUri = MultiMap.getSingle(entry.properties, CCouchNamespace.TARGET, RDFNode.EMPTY).subjectUri;
 							if( targetUri == null ) {
 								logPathError("Directory entry lacks a target URI", path);
 								continue;
