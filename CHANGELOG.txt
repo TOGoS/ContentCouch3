@@ -1,7 +1,7 @@
 ---------------------------------------------------------------------------------------------------
 Version: 3.7.8
-Date: ???
-JAR: ???
+Date: 2024-12-11
+JAR: urn:bitprint:HCXYUOZ7MGTSGSEIFYUSETLRQ6P6DK5H.NFAYJBAEKYMZ2GF2WQX5DZZOMGBD5UTWYQYHMLQ
 Fixes:
   - SHA1FileRepository#getFiles no longer returns null for unrecognized URIs,
     which means `ccouch3 walk-fs` should no longer crash with
