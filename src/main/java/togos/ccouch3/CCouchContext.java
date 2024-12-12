@@ -11,7 +11,9 @@ import togos.ccouch3.CCouchContext.RepoSpec.RepoType;
 import togos.ccouch3.repo.Repository;
 import togos.ccouch3.repo.SHA1FileRepository;
 import togos.ccouch3.util.ListUtil;
+import togos.ccouch3.util.ObjectUtil;
 import togos.ccouch3.util.ParseResult;
+import togos.ccouch3.util.StringUtil;
 
 /**
  * Context within which all our work is done!
@@ -43,6 +45,20 @@ implements CommandLineOptionHandler<CCouchContext>
 			if( name != null ) desc += " '"+name+"'";
 			if( location != null ) desc += " ("+location+")";
 			return desc;
+		}
+		
+		public @Override String toString() {
+			return "RepoConfig(name="+StringUtil.quote(name)+", type="+type+", location="+StringUtil.quote(location)+")";
+		}
+		public @Override boolean equals(Object obj) {
+			if( !(obj instanceof RepoSpec)) {
+				return false;
+			}
+			RepoSpec ors = (RepoSpec)obj;
+			return ObjectUtil.equals(name, ors.name) && ObjectUtil.equals(type, "xxx") && ObjectUtil.equals(location, ors.location);
+		}
+		public @Override int hashCode() {
+			return ObjectUtil.hashCode(name, type, location);
 		}
 		
 		public File getDirectory() {
@@ -80,6 +96,50 @@ implements CommandLineOptionHandler<CCouchContext>
 		this(null, null, Collections.<RepoSpec>emptyList(), Collections.<RepoSpec>emptyList());
 	}
 	
+	protected static String repoSpecToArglike(String role, RepoSpec rs) {
+		if( rs == null ) return "";
+		return "--"+role+(rs.name == null ? "" : ":"+rs.name)+"=" + rs.location + " ("+rs.type+")";
+	}
+	
+	public @Override String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("CCouchContext(");
+		String sep = "";
+		if( this.storeSector != null ) {
+			sb.append(sep);
+			sb.append("--store-sector="+StringUtil.quote(this.storeSector));
+			sep = " ";
+		}
+		if( this.primaryRepo != null ) {
+			sb.append(sep);
+			sb.append(repoSpecToArglike("primary-repo", this.primaryRepo));
+			sep = " ";
+		}
+		for( RepoSpec repo : localRepos ) {
+			sb.append(sep);
+			sb.append(repoSpecToArglike("local-repo", repo));
+			sep = " ";
+		}
+		for( RepoSpec repo : remoteRepos ) {
+			sb.append(sep);
+			sb.append(repoSpecToArglike("remote-repo", repo));
+			sep = " ";
+		}
+		sb.append(")");
+		return sb.toString();
+	}
+	
+	public @Override boolean equals(Object obj) {
+		
+		return this.toString().equals(obj.toString());
+	}
+	
+	@Override
+	public int hashCode() {
+		return this.toString().hashCode();
+	}
+	
+	
 	public CCouchContext withPrimaryRepo(RepoSpec primaryRepo) {
 		return new CCouchContext(primaryRepo, storeSector, localRepos, remoteRepos);
 	}
@@ -101,6 +161,7 @@ implements CommandLineOptionHandler<CCouchContext>
 		}
 	}
 	
+	// TODO: Pass in env instead of using System.env
 	protected static String getNonEmptyEnv(String name) {
 		String v = System.getenv(name);
 		return v == null || v.isEmpty() ? null : v;
@@ -130,6 +191,7 @@ implements CommandLineOptionHandler<CCouchContext>
 	
 	@Override
 	public ParseResult<List<String>,CCouchContext> handleCommandLineOption(List<String> args) {
+		if( args.isEmpty() ) return ParseResult.of(args, this); 
 		String opt;
 		String explicitArgument = null;
 		String rawOpt = ListUtil.car(args);
@@ -166,13 +228,13 @@ implements CommandLineOptionHandler<CCouchContext>
 			ParseResult<List<String>,String> dirPr = optArg(rawOpt, explicitArgument, args1);
 			return ParseResult.of(
 				dirPr.remainingInput,
-				withAdditionalLocalRepo(new RepoSpec(opt.substring("-repo:".length()), RepoType.FILESYSTEM, resolveRepoDir(dirPr.result)))
+				withAdditionalLocalRepo(new RepoSpec(name, RepoType.FILESYSTEM, resolveRepoDir(dirPr.result)))
 			);
 		} else if( "remote-repo".equals(opt) ) {
 			ParseResult<List<String>,String> uriPr = optArg(rawOpt, explicitArgument, args1);
 			return ParseResult.of(
 				uriPr.remainingInput,
-				withAdditionalRemoteRepo(new RepoSpec(opt.substring("-repo:".length()), RepoType.HTTP_N2R, defuzzRemoteRepoPrefix(uriPr.result)))
+				withAdditionalRemoteRepo(new RepoSpec(name, RepoType.HTTP_N2R, defuzzRemoteRepoPrefix(uriPr.result)))
 			);
 		} else if( "sector".equals(opt) ) {
 			ParseResult<List<String>,String> storeSectorPr = optArg(rawOpt, explicitArgument, args1);
