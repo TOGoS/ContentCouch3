@@ -1,6 +1,7 @@
 package togos.ccouch3.repo;
 
 import java.io.ByteArrayInputStream;
+import java.util.Collections;
 import java.util.Random;
 
 import junit.framework.TestCase;
@@ -83,5 +84,12 @@ public abstract class RepositoryTest extends TestCase
 			fail("Should've had a UnsupportedSchemeException");
 		} catch( UnsupportedSchemeException e ) {
 		}
+	}
+	
+	public void testGetFilesAlwaysReturnsNotNull() {
+		// Invalid URN:
+		assertEquals(Collections.emptyList(), repo.getFiles("ur:shayone:OOPS"));
+		// Valid URN but probably nothing that repo knows about:
+		assertEquals(Collections.emptyList(), repo.getFiles("urn:sha1:EAAEY24Z3KDN6LLRM3DHLTLNCZIDCLSA"));
 	}
 }

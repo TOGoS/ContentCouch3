@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -43,8 +44,8 @@ public class SHA1FileRepository implements Repository
 	
 	@Override public List<File> getFiles( String urn ) {
 		Matcher m = SHA1EXTRACTOR.matcher(urn);
-		if( !m.find() ) return null;
-		if( !dataDir.exists() ) return null;
+		if( !m.find() ) return Collections.emptyList();
+		if( !dataDir.exists() ) return Collections.emptyList();
 		
 		String sha1Base32 = m.group(1);
 		

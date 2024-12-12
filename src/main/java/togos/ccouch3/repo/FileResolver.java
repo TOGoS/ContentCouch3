@@ -19,6 +19,9 @@ public interface FileResolver
 	 * Note that resources may be stored in ways that do
 	 * not directly map to files, and those cases won't
 	 * be accounted for in the resulting list.
+	 * 
+	 * This should always return a list.
+	 * The list may be empty.
 	 */
 	public List<File> getFiles(String name);
 }

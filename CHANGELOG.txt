@@ -1,4 +1,13 @@
 ---------------------------------------------------------------------------------------------------
+Version: 3.7.8
+Date: ???
+JAR: ???
+Fixes:
+  - SHA1FileRepository#getFiles no longer returns null for unrecognized URIs,
+    which means `ccouch3 walk-fs` should no longer crash with
+    `Cannot invoke "java.util.List.iterator()" because the return value of
+    "togos.ccouch3.repo.Repository.getFiles(String)" is null`
+---------------------------------------------------------------------------------------------------
 Verstion: 3.7.6
 Date: 2024-05-19
 JAR: urn:bitprint:IXWL4QFBTND4HOH5O3QHZBDQD5FVNGIA.NCB3KZBERJPSC775JK6SDMSMBX3LHQAVOLUQYOA
