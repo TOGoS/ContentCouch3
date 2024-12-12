@@ -80,5 +80,6 @@ public class CCouchContextTest extends TestCase
 			,
 			res.result
 		);
+		assertEquals(Arrays.asList("http://fred.org/uri-res/N2R?", "http://ted.org/uri-res/N2R?"), Arrays.asList(res.result.getRemoteRepoUrls()));
 	}
 }

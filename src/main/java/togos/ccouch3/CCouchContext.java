@@ -306,7 +306,7 @@ implements CommandLineOptionHandler<CCouchContext>
 	
 	public String[] getRemoteRepoUrls() {
 		LinkedHashSet<String> urls = new LinkedHashSet<String>();
-		for( RepoSpec rs : localRepos ) urls.add(rs.location);
+		for( RepoSpec rs : remoteRepos ) urls.add(rs.location);
 		return urls.toArray(new String[urls.size()]);
 	}
 
