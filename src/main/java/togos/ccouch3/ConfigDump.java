@@ -15,11 +15,14 @@ public class ConfigDump
 	
 	public static int main(CCouchContext ctx, List<String> args) {
 		while( !args.isEmpty() ) {
-			ParseResult<List<String>, CCouchContext> pr = ctx.handleCommandLineOption(args);
-			if( pr.remainingInput == args ) {
-				System.err.println("Unrecognized argument: "+args.get(0));
-				return 1;
+			ParseResult<List<String>,CCouchContext> ctxPr = ctx.handleCommandLineOption(args);
+			if( ctxPr.remainingInput != args ) {
+				args = ctxPr.remainingInput;
+				ctx  = ctxPr.result;
+				continue;
 			}
+			System.err.println("Unrecognized argument: "+args.get(0));
+			return 1;
 		}
 		
 		ctx = ctx.fixed();
