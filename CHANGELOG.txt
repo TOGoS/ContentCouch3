@@ -1,7 +1,7 @@
 ---------------------------------------------------------------------------------------------------
 Version: 3.7.10
-Date: ???
-JAR: ???
+Date: 2024-12-18
+JAR: urn:bitprint:GUZ5Y2R36QHFHAQZTLYU7EBAN2ISCEDH.D4MNL7BXAWLYXUSD33HYPELZ7D2MFMRN5BGL3XA
 Fixes:
   - CCouchContext#getRemoteRepoUrls actually looks at remote repos instead of local ones.
 ---------------------------------------------------------------------------------------------------
