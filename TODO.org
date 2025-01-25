@@ -2,7 +2,16 @@
 
 * Bugs
 
-** ~upload -recurse~ doesn't seem to work
+** TODO Don't litter ~cache~ directories all over
+
+~ccouch id~ run without a repository directory specified will create a
+~cache~ subdirectory in the current directory.
+
+It should either:
+- Use the default ~$HOME/.ccouch/cache~
+- Not bother caching ID results at all
+
+** DONE ~upload -recurse~ doesn't seem to work
 
 *** [2020-09-27T17:40:39-05:00] This might be due to things being marked as fully uploaded before they are actually fully uploaded.
 
@@ -22,7 +31,6 @@ And when I run it for the first time after removing the remote blob presence cac
 (~uploaded-to-X-rs-text.slf2~) it seems to work properly.
 Things seem to go haywire when I kill the process before it's done.
 Then when I try to run it again, it just says it's done before it's done anything.
-
 
 *** [2021-11-07] Some pretty hard evidence
 
@@ -119,8 +127,9 @@ Wait, what is this, in ~runUpload~ ~IndexRunner~:
 It looks like...when creating commits, FullyStoredMarkers are unconditionally pushed to blob sinks.
 That is probably bad!
 
+*** Fixed by 3.6.0, I think
 
-
+It seems like FullyStoredMarkers were being inappropriately returned from CommandUploadClient.
 
 ** ccouch3-cache has some issues
 
